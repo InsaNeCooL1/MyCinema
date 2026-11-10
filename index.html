@@ -206,7 +206,6 @@
   .episode-desc { font-size: 12px; color: var(--text-muted); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; transition: all 0.2s; }
   .episode-desc.expanded { display: block; overflow: visible; -webkit-line-clamp: unset; -webkit-box-orient: initial; }
 
-  /* NOTES */
   .notes-textarea { width: 100%; min-height: 180px; padding: 14px; border: 1px solid var(--bg-3); border-radius: 12px; background: var(--bg-1); color: var(--text); font-size: 15px; font-family: inherit; line-height: 1.5; resize: vertical; outline: none; transition: border-color 0.2s; }
   .notes-textarea:focus { border-color: var(--accent); }
   .notes-hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
@@ -590,7 +589,9 @@
 </script>
 
 <script>
-const TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5MWU2ZGYxNDQ4ZWRmYjYzNDUxOTIzNTg2ZWViZGY4ZSIsIm5iZiI6MTc5NDIzMjgzOS42NjIwMDAyLCJzdWIiOiI2YWYxZDIwN2RiZGEwMThmYjA3MDhhNDAiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.Ub-aLpa-Tj37eRLvjYsvwI8IN5teZUzQnkjzW0c7QoU";
+// ВКАЖИ ТУТ СВОЄ ПОСИЛАННЯ НА CLOUDFLARE WORKER (БЕЗ СЛЕШУ В КІНЦІ)
+const PROXY_URL = "https://mycinema-proxy.insaneteresh123.workers.dev"; 
+
 const OMDB_KEY = "cf56e7ab";
 const LS = "mycinema.library";
 const LS_VER = "mycinema.library.v";
@@ -896,7 +897,7 @@ function hasWatched(item) {
 }
 
 function tmdbFetch(path) {
-  return fetch('https://api.themoviedb.org/3' + path, { headers: { Authorization: 'Bearer ' + TOKEN } })
+  return fetch(PROXY_URL + path)
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
 }
 function normalizeItem(r) {
@@ -1264,7 +1265,6 @@ function renderLibrary() {
   items.forEach((r) => box.append(createListItem(r)));
 }
 
-// ============ NOTES LIST ============
 function renderNotesList() {
   const items = Object.values(lib).filter(x => x.notes && x.notes.trim()).sort((a, b) => (b.updated || 0) - (a.updated || 0));
   box.style.padding = '0 16px 16px';
@@ -1364,7 +1364,6 @@ function removeFromLibrary(key) {
   showSyncToast('🗑️ Прибрано зі списку');
 }
 
-// ============ FILTER ============
 function renderFilter() {
   if (box.querySelector('.filter-panel')) {
     filterPage = 1;
@@ -1490,7 +1489,6 @@ async function doFetchFilter(append) {
   } finally { filterLoading = false; }
 }
 
-// ============ STATISTICS ============
 function renderStatistics() {
   box.style.padding = '0'; box.replaceChildren();
   const wrap = el('div', 'home-wrap');
@@ -1691,13 +1689,11 @@ function renderGenresTab() {
   return [list];
 }
 
-// ============ DETAILED STATISTICS WITH PIE CHARTS ============
 function renderDetailTab() {
   const all = Object.values(lib);
   if (!all.length) return [el('div', 'avail-empty', 'Бібліотека порожня')];
   const wrap = el('div');
 
-  // Pie 1: Type
   const movies = all.filter(x => x.type === 'movie').length;
   const tvShows = all.filter(x => x.type === 'tv').length;
   const typeData = [
@@ -1706,7 +1702,6 @@ function renderDetailTab() {
   ].filter(d => d.value > 0);
   wrap.append(renderPieSection('🎬 Тип контенту', typeData));
 
-  // Pie 2: Status
   const watched = all.filter(x => x.status === 'watched').length;
   const watching = all.filter(x => x.status === 'watching').length;
   const planned = all.filter(x => x.status === 'planned').length;
@@ -1719,7 +1714,6 @@ function renderDetailTab() {
   ].filter(d => d.value > 0);
   wrap.append(renderPieSection('📌 Статуси', statusData));
 
-  // Pie 3: Genres (top 6 + others)
   const genreCount = {};
   all.forEach(x => (x.genres || []).forEach(gid => {
     const g = GENRES.find(g => g.id === gid);
@@ -1733,7 +1727,6 @@ function renderDetailTab() {
   if (others > 0) genreData.push({ label: 'Інші', value: others, color: 'var(--text-dim)' });
   if (genreData.length) wrap.append(renderPieSection('🎭 Жанри', genreData));
 
-  // Counters
   wrap.append(el('h2', 'home-grid-title', '📊 Загальні цифри'));
   const rated = all.map(x => ({ item: x, r: computeItemRating(x) })).filter(x => x.r.avg > 0);
   const avgOfAvgs = rated.length ? rated.reduce((s, x) => s + x.r.avg, 0) / rated.length : 0;
@@ -1812,7 +1805,6 @@ function renderPieChart(data, size = 180) {
   return svg;
 }
 
-// ============ GAME ============
 async function renderGame() {
   if (state.tab !== 'game') return;
   box.replaceChildren(); box.style.padding = '0';
@@ -1973,7 +1965,6 @@ function renderGameOver() {
   c.append(ba, bh); box.append(c);
 }
 
-// ============ CARD ============
 function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`; }
 function pushCardState() {
   const ctx = cardStack[cardStack.length - 1]; if (!ctx) return;
@@ -2271,7 +2262,6 @@ function renderOverviewTab(ctx, scroll) {
   }
   nodes.push(st);
 
-  // --- Блок UAKino ---
   const uakinoRow = el("div", "row"); 
   uakinoRow.style.marginTop = "16px";
   
@@ -2288,7 +2278,6 @@ function renderOverviewTab(ctx, scroll) {
   
   uakinoRow.append(uakinoBtn);
   nodes.push(uakinoRow);
-  // ----------------------------------
 
   if (lib[r.key]) {
     const rw = el("div", "row"); rw.style.marginTop = "16px";
@@ -2543,7 +2532,6 @@ function renderSeasonAverageBlock(sr) {
   block.append(lights); return block;
 }
 
-// ============ PERSON CARD ============
 function renderPersonCard(ctx, scroll) {
   const d = ctx.details; if (!d) return;
   const header = el('div', 'person-header');
@@ -2635,7 +2623,6 @@ function renderPersonGallery(ctx) {
   return [gallery];
 }
 
-// ============ UPDATE ============
 function updateCore(r, patch) {
   const cur = lib[r.key] || { ...r, status: null, ratings: null, watchedEpisodes: [] };
   lib[r.key] = { ...cur, ...patch, updated: Date.now() };
