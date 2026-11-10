@@ -2147,20 +2147,35 @@ function renderMediaCard(ctx, scroll) {
 }
 
 // ============ UAKINO INTEGRATION ============
-async function findUakinoLink(title) {
-  if (!title) return null;
-  const uakinoDomain = "https://uakino-hd.com";
-  const searchUrl = `${uakinoDomain}/index.php?do=search&subaction=search&story=${encodeURIComponent(title)}`;
+async function findUakinoLink(imdbId, title) {
+  if (!imdbId && !title) return null;
+  const uakinoDomain = "https://uakino.best";
+  const searchUrl = `${uakinoDomain}/engine/lazydev/dle_search/ajax.php`;
+  
   try {
     const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(searchUrl)}`;
-    const response = await fetch(proxyUrl);
+    const body = new URLSearchParams();
+    if (imdbId) body.append('story', imdbId);
+    else body.append('story', title);
+    body.append('subaction', 'search');
+    body.append('do', 'search');
+
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    });
+
     if (!response.ok) throw new Error('Network response was not ok');
     const htmlText = await response.text();
-    const match = htmlText.match(/href="(https?:\/\/uakino-hd\.com\/\d+-[^"]+\.html)"/i);
-    if (match && match[1]) return match[1];
+    const match = htmlText.match(/href="(https?:\/\/uakino\.(?:best|me|club)\/\d+-[^"]+\.html)"/i);
+    
+    if (match && match[1]) {
+      return match[1].replace('uakino.best', 'uakino-hd.com').replace('uakino.me', 'uakino-hd.com').replace('uakino.club', 'uakino-hd.com');
+    }
     return null;
   } catch (error) {
-    console.warn('Помилка пошуку на UAKino-HD:', error);
+    console.warn('Помилка пошуку на UAKino:', error);
     return null;
   }
 }
@@ -2241,9 +2256,10 @@ function renderOverviewTab(ctx, scroll) {
   uakinoRow.append(uakinoBtn);
   nodes.push(uakinoRow);
   
+  const imdbId = d.external_ids?.imdb_id;
   const searchTitle = d.title || d.name || r.title;
-  if (searchTitle) {
-    findUakinoLink(searchTitle).then(url => {
+  if (imdbId || searchTitle) {
+    findUakinoLink(imdbId, searchTitle).then(url => {
       if (url) {
         uakinoBtn.textContent = "🍿 Дивитися на UAKino";
         uakinoBtn.dataset.url = url;
@@ -2256,7 +2272,7 @@ function renderOverviewTab(ctx, scroll) {
       }
     });
   } else {
-    uakinoBtn.textContent = "❌ Немає назви";
+    uakinoBtn.textContent = "❌ Немає даних для пошуку";
     uakinoBtn.style.background = "#555";
   }
   // ----------------------------------
