@@ -1,0 +1,17 @@
+{
+  "background_color": "#0b0e7a",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "My Cinema",
+  "orientation": "portrait",
+  "scope": "/MyCinema/",
+  "short_name": "MyCinema",
+  "start_url": "/MyCinema/",
+  "theme_color": "#7bf70b",
+  "id": "my_cinema",
+  "description": "Мій персональний кінощоденник",
+  "lang": "uk",
+  "categories": [
+    "social"
+  ]
+}
