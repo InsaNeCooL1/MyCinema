@@ -88,10 +88,7 @@
   .item-delete:hover { background: var(--danger); color: var(--text); }
 
   .home-greeting { padding: 12px 16px; background: var(--bg-1); border-radius: 14px; margin: 0 16px 16px; font-size: 14px; color: var(--text-secondary); text-align: center; }
-  .home-tabs { display: flex; gap: 8px; margin: 0 16px 16px; max-width: 668px; margin-left: auto; margin-right: auto; }
-  .home-tab { flex: 1; padding: 12px; border: 0; border-radius: 20px; background: var(--bg-1); color: var(--text-muted); font-size: 15px; cursor: pointer; font-weight: 600; text-align: center; transition: all 0.2s; }
-  .home-tab.active { background: var(--accent); color: var(--accent-fg); }
-  .home-wrap { max-width: 700px; margin: 0 auto; padding: 0 16px 16px; }
+  .home-wrap { max-width: 700px; margin: 0 auto; padding: 0 16px 100px; } /* збільшено padding-bottom для острівця */
   .home-note { padding: 12px 16px; color: var(--text-muted); font-size: 13px; text-align: center; }
   .home-grid-title { font-size: 18px; font-weight: 700; margin: 8px 0 12px; text-shadow: var(--text-shadow); }
   .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 14px 12px; }
@@ -101,6 +98,18 @@
   .row-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
   .rec-why { font-size: 11px; color: var(--accent); margin-top: 2px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .home-more { display: block; margin: 14px auto 0; padding: 10px 22px; border: 0; border-radius: 20px; background: var(--bg-3); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  /* Плаваючий острівець знизу для Головної */
+  #home-bottom-island {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--bg-1); border-radius: 30px; padding: 6px;
+    display: flex; gap: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    z-index: 100; border: 1px solid var(--bg-3);
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  #home-bottom-island.hidden { opacity: 0; pointer-events: none; transform: translate(-50%, 20px); }
+  #home-bottom-island .home-tab { padding: 10px 20px; border-radius: 24px; font-size: 14px; border: none; background: transparent; color: var(--text-muted); font-weight: 600; }
+  #home-bottom-island .home-tab.active { background: var(--accent); color: var(--accent-fg); }
 
   .filter-panel { background: var(--bg-1); border-radius: 14px; padding: 14px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
   .filter-row { display: flex; align-items: center; gap: 10px; }
@@ -203,7 +212,6 @@
   .episode-desc { font-size: 12px; color: var(--text-muted); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; transition: all 0.2s; }
   .episode-desc.expanded { display: block; overflow: visible; -webkit-line-clamp: unset; -webkit-box-orient: initial; }
 
-  /* NOTES */
   .notes-textarea { width: 100%; min-height: 180px; padding: 14px; border: 1px solid var(--bg-3); border-radius: 12px; background: var(--bg-1); color: var(--text); font-size: 15px; font-family: inherit; line-height: 1.5; resize: vertical; outline: none; transition: border-color 0.2s; }
   .notes-textarea:focus { border-color: var(--accent); }
   .notes-hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
@@ -427,6 +435,7 @@
   <div class="sidebar-nav">
     <div class="nav-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> Головна</div>
     <div class="nav-item" data-tab="filter" onclick="setTab('filter')"><span class="nav-icon">🔎</span> Фільтр</div>
+    <div class="nav-item" data-tab="recent" onclick="setTab('recent')"><span class="nav-icon">🕒</span> Останні</div>
     <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> Дивлюсь</div>
     <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> Переглянуто</div>
     <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> Планую</div>
@@ -465,6 +474,12 @@
 <div id="sync-indicator" class="sync-indicator"></div>
 <div id="poster-zoom"><button class="zoom-close" onclick="closeImageZoom()">✕</button><img alt=""></div>
 <input type="file" id="import-file" accept=".json" style="display:none;">
+
+<!-- Плаваючий острівець на Головній -->
+<div id="home-bottom-island" class="hidden">
+  <button class="home-tab active" onclick="switchHomeTab('movie')">🎬 Фільми</button>
+  <button class="home-tab" onclick="switchHomeTab('tv')">📺 Серіали</button>
+</div>
 
 <div id="settings-modal">
   <div class="settings-box">
@@ -599,13 +614,8 @@ const EXCLUDED_TV_GENRES = [10763, 10764, 10767];
 const CAST_LIMIT = 10;
 
 const STREAMING_PROVIDERS = [
-  { id: 8, name: 'Netflix' },
-  { id: 1899, name: 'Max / HBO' },
-  { id: 9, name: 'Prime Video' },
-  { id: 350, name: 'Apple TV+' },
-  { id: 15, name: 'Hulu' },
-  { id: 386, name: 'Peacock' },
-  { id: 29, name: 'Sky' }
+  { id: 8, name: 'Netflix' }, { id: 1899, name: 'Max / HBO' }, { id: 9, name: 'Prime Video' },
+  { id: 350, name: 'Apple TV+' }, { id: 15, name: 'Hulu' }, { id: 386, name: 'Peacock' }, { id: 29, name: 'Sky' }
 ];
 
 const RATING_CRITERIA = [
@@ -625,9 +635,8 @@ const GENRES = [
 
 const PLACEHOLDERS = [
   'Від чого кайфонем сьогодні?', 'Що дивимось сьогодні?', 'Знайди свій наступний улюблений фільм',
-  'Серіал на вечір?', 'Шукаєш щось конкретне?', 'Ну що, кіно?',
-  'Який настрій сьогодні?', 'Знайти щось нове?', 'Твій наступний улюблений серіал?',
-  'Хочу щось атмосферне…', 'Що глянемо на вихідних?'
+  'Серіал на вечір?', 'Шукаєш щось конкретне?', 'Ну що, кіно?', 'Який настрій сьогодні?',
+  'Знайти щось нове?', 'Твій наступний улюблений серіал?', 'Хочу щось атмосферне…', 'Що глянемо на вихідних?'
 ];
 
 const THEMES = {
@@ -721,7 +730,7 @@ let state = {
   filter: { query: '', type: 'all', decade: 'any', genre: 'any', minRating: 0, sortBy: 'popularity.desc', streaming: null },
   home: { loading: false, recs: null, sig: null, shown: { movie: 18, tv: 18 }, tab: 'movie' },
   game: { active: false, type: 'movie', round: 0, totalRounds: 30, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() },
-  stats: { tab: 'top', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } }
+  stats: { tab: 'top', actorTab: 'rating', topTab: 'movie', castLoading: false, castProgress: { done: 0, total: 0 } }
 };
 let cardStack = [];
 let filterPage = 1;
@@ -735,6 +744,7 @@ const card = document.getElementById("card");
 const autocomplete = document.getElementById("autocomplete");
 const typeFilterBar = document.getElementById("type-filter");
 const syncIndicator = document.getElementById('sync-indicator');
+const bottomIsland = document.getElementById('home-bottom-island');
 
 function rotatePlaceholder() {
   const current = input.placeholder;
@@ -747,6 +757,15 @@ input.addEventListener('blur', () => { if (!input.value.trim()) rotatePlaceholde
 
 function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-backdrop').classList.add('open'); }
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-backdrop').classList.remove('open'); }
+
+function switchHomeTab(type) {
+  if (state.home.tab === type) return;
+  state.home.tab = type;
+  document.querySelectorAll('#home-bottom-island .home-tab').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && type === 'movie') || (i === 1 && type === 'tv'));
+  });
+  renderHomeContent();
+}
 
 document.addEventListener('pointerdown', (e) => {
   const btn = e.target.closest('.nav-item, .filter-btn, .home-tab, .card-tab, .btn, .card-x, .filter-actions button, .query-bar button, .trailer-btn, .auth-btn, .onb-btn, .game-btn, .login-btn-side, .logout-btn-side, .season-tab-btn, .settings-btn, .cast-loader-btn');
@@ -1098,12 +1117,6 @@ function renderHomeContent() {
   if (cwSection) box.append(cwSection);
   const recs = state.home.recs;
   if (!recs || !recs.seedCount) { box.append(el('div', 'home-note', 'Постав оцінку 7+ хоча б одному фільму чи серіалу, і тут з\'являться персональні рекомендації.')); return; }
-  const tabs = el('div', 'home-tabs');
-  const mTab = el('button', 'home-tab' + (state.home.tab === 'movie' ? ' active' : ''), '🎬 Фільми');
-  const tTab = el('button', 'home-tab' + (state.home.tab === 'tv' ? ' active' : ''), '📺 Серіали');
-  mTab.addEventListener('click', () => { if (state.home.tab !== 'movie') { state.home.tab = 'movie'; renderHomeContent(); } });
-  tTab.addEventListener('click', () => { if (state.home.tab !== 'tv') { state.home.tab = 'tv'; renderHomeContent(); } });
-  tabs.append(mTab, tTab); box.append(tabs);
   const wrap = el('div', 'home-wrap');
   wrap.append(el('div', 'home-note', `На основі твоїх останніх оцінок 7+ (${recs.seedCount})`));
   const type = state.home.tab;
@@ -1222,7 +1235,8 @@ function setTab(t) {
   state.tab = t;
   closeSidebar();
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
-  typeFilterBar.classList.toggle("hidden", !["watching", "watched", "planned"].includes(t));
+  typeFilterBar.classList.toggle("hidden", !["recent", "watching", "watched", "planned"].includes(t));
+  bottomIsland.classList.toggle('hidden', t !== 'home');
   if (t === 'game') { box.style.padding = '0'; renderGame(); return; }
   refresh();
 }
@@ -1242,7 +1256,12 @@ function refresh() {
 }
 
 function renderLibrary() {
-  let items = Object.values(lib).filter(x => x.status === state.tab).sort((a, b) => b.updated - a.updated);
+  let items;
+  if (state.tab === "recent") {
+    items = Object.values(lib).filter(x => hasWatched(x)).sort((a, b) => b.updated - a.updated);
+  } else {
+    items = Object.values(lib).filter(x => x.status === state.tab).sort((a, b) => b.updated - a.updated);
+  }
   if (state.typeFilter !== "all") items = items.filter(x => x.type === state.typeFilter);
   box.style.padding = '0 16px 16px';
   if (!items.length) { box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">Тут поки порожньо</div>`; return; }
@@ -1250,13 +1269,12 @@ function renderLibrary() {
   items.forEach((r) => box.append(createListItem(r)));
 }
 
-// ============ NOTES LIST ============
 function renderNotesList() {
   const items = Object.values(lib).filter(x => x.notes && x.notes.trim()).sort((a, b) => (b.updated || 0) - (a.updated || 0));
   box.style.padding = '0 16px 16px';
   box.replaceChildren();
   if (!items.length) {
-    box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Ще немає нотаток. Відкрийте тайтл і перейдіть на вкладку «📝 Нотатки»</div>';
+    box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Ще немає нотаток.</div>';
     return;
   }
   items.forEach(item => box.append(createNoteCard(item)));
@@ -1328,7 +1346,7 @@ function posterEl(r, cls) {
 
 function removeFromLibrary(key) {
   if (!lib[key]) return;
-  if (!confirm('Видалити цей тайтл з бібліотеки?\nУсі оцінки, статус, нотатки і відмічені епізоди буде втрачено.')) return;
+  if (!confirm('Видалити цей тайтл з бібліотеки?')) return;
   delete lib[key];
   saveNow(); refresh();
   const ctx = cardStack[cardStack.length - 1];
@@ -1336,7 +1354,6 @@ function removeFromLibrary(key) {
   showSyncToast('🗑️ Видалено з бібліотеки');
 }
 
-// ============ FILTER ============
 function renderFilter() {
   if (box.querySelector('.filter-panel')) {
     filterPage = 1;
@@ -1462,12 +1479,11 @@ async function doFetchFilter(append) {
   } finally { filterLoading = false; }
 }
 
-// ============ STATISTICS ============
 function renderStatistics() {
   box.style.padding = '0'; box.replaceChildren();
   const wrap = el('div', 'home-wrap');
   wrap.append(el('h2', 'home-grid-title', '📊 Статистика'));
-  if (!state.stats) state.stats = { tab: 'top', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } };
+  if (!state.stats) state.stats = { tab: 'top', actorTab: 'rating', topTab: 'movie', castLoading: false, castProgress: { done: 0, total: 0 } };
   const tabs = el('div', 'card-tabs');
   const tabDefs = [
     { id: 'top', label: '🏆 Мій топ' },
@@ -1491,12 +1507,31 @@ function renderStatistics() {
 }
 
 function renderTopTab() {
-  const rated = Object.values(lib).map(x => ({ item: x, r: computeItemRating(x) })).filter(x => x.r.avg > 0)
+  const topTab = state.stats.topTab || 'movie';
+  const wrap = el('div');
+  
+  const subTabs = el('div', 'card-tabs');
+  const mTab = el('button', 'card-tab' + (topTab === 'movie' ? ' active' : ''), '🎬 Фільми');
+  const tTab = el('button', 'card-tab' + (topTab === 'tv' ? ' active' : ''), '📺 Серіали');
+  mTab.addEventListener('click', () => { if (state.stats.topTab === 'movie') return; state.stats.topTab = 'movie'; renderStatistics(); });
+  tTab.addEventListener('click', () => { if (state.stats.topTab === 'tv') return; state.stats.topTab = 'tv'; renderStatistics(); });
+  subTabs.append(mTab, tTab);
+  wrap.append(subTabs);
+
+  const rated = Object.values(lib).map(x => ({ item: x, r: computeItemRating(x) }))
+    .filter(x => x.r.avg > 0 && x.item.type === topTab)
     .sort((a, b) => b.r.avg - a.r.avg || b.item.updated - a.item.updated);
-  if (!rated.length) return [el('div', 'avail-empty', 'Ще немає оцінених тайтлів')];
-  const list = el('div');
-  rated.forEach(({ item }, idx) => list.append(createListItem(item, true, idx + 1)));
-  return [list];
+  
+  const content = el('div'); content.style.marginTop = '16px';
+  if (!rated.length) {
+    content.append(el('div', 'avail-empty', 'Ще немає оцінених тайтлів цього типу'));
+  } else {
+    const list = el('div');
+    rated.forEach(({ item }, idx) => list.append(createListItem(item, true, idx + 1)));
+    content.append(list);
+  }
+  wrap.append(content);
+  return [wrap];
 }
 
 function renderActorsTab() {
@@ -1629,13 +1664,11 @@ function renderGenresTab() {
   return [list];
 }
 
-// ============ DETAILED STATISTICS WITH PIE CHARTS ============
 function renderDetailTab() {
   const all = Object.values(lib);
   if (!all.length) return [el('div', 'avail-empty', 'Бібліотека порожня')];
   const wrap = el('div');
 
-  // Pie 1: Type
   const movies = all.filter(x => x.type === 'movie').length;
   const tvShows = all.filter(x => x.type === 'tv').length;
   const typeData = [
@@ -1644,7 +1677,6 @@ function renderDetailTab() {
   ].filter(d => d.value > 0);
   wrap.append(renderPieSection('🎬 Тип контенту', typeData));
 
-  // Pie 2: Status
   const watched = all.filter(x => x.status === 'watched').length;
   const watching = all.filter(x => x.status === 'watching').length;
   const planned = all.filter(x => x.status === 'planned').length;
@@ -1657,7 +1689,6 @@ function renderDetailTab() {
   ].filter(d => d.value > 0);
   wrap.append(renderPieSection('📌 Статуси', statusData));
 
-  // Pie 3: Genres (top 6 + others)
   const genreCount = {};
   all.forEach(x => (x.genres || []).forEach(gid => {
     const g = GENRES.find(g => g.id === gid);
@@ -1671,7 +1702,6 @@ function renderDetailTab() {
   if (others > 0) genreData.push({ label: 'Інші', value: others, color: 'var(--text-dim)' });
   if (genreData.length) wrap.append(renderPieSection('🎭 Жанри', genreData));
 
-  // Counters
   wrap.append(el('h2', 'home-grid-title', '📊 Загальні цифри'));
   const rated = all.map(x => ({ item: x, r: computeItemRating(x) })).filter(x => x.r.avg > 0);
   const avgOfAvgs = rated.length ? rated.reduce((s, x) => s + x.r.avg, 0) / rated.length : 0;
@@ -1750,7 +1780,6 @@ function renderPieChart(data, size = 180) {
   return svg;
 }
 
-// ============ GAME ============
 async function renderGame() {
   if (state.tab !== 'game') return;
   box.replaceChildren(); box.style.padding = '0';
@@ -1763,8 +1792,6 @@ async function renderGame() {
     const bt = el('button', 'game-btn secondary', '📺 Грати з серіалами');
     bt.addEventListener('click', () => startGame('tv'));
     c.append(bm, bt);
-
-    // Winners list
     const hist = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]');
     if (hist.length > 0) {
       const hd = el('div', 'game-history');
@@ -1822,13 +1849,7 @@ async function renderGame() {
   const exitBtn = el('button', 'game-btn danger', '🚪 Вийти з гри');
   exitBtn.addEventListener('click', () => {
     if (confirm('Вийти з гри? Поточний прогрес буде втрачено (переможець не збережеться).')) {
-      state.game.active = false;
-      state.game.finished = false;
-      state.game.champion = null;
-      state.game.challenger = null;
-      state.game.history = [];
-      state.game.round = 0;
-      renderGame();
+      state.game.active = false; state.game.finished = false; state.game.champion = null; state.game.challenger = null; state.game.history = []; state.game.round = 0; renderGame();
     }
   });
   c.append(exitBtn);
@@ -1912,7 +1933,6 @@ function renderGameOver() {
   c.append(ba, bh); box.append(c);
 }
 
-// ============ CARD ============
 function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`; }
 function pushCardState() {
   const ctx = cardStack[cardStack.length - 1]; if (!ctx) return;
@@ -2457,7 +2477,6 @@ function renderSeasonAverageBlock(sr) {
   block.append(lights); return block;
 }
 
-// ============ PERSON CARD ============
 function renderPersonCard(ctx, scroll) {
   const d = ctx.details; if (!d) return;
   const header = el('div', 'person-header');
@@ -2549,7 +2568,6 @@ function renderPersonGallery(ctx) {
   return [gallery];
 }
 
-// ============ UPDATE ============
 function updateCore(r, patch) {
   const cur = lib[r.key] || { ...r, status: null, ratings: null, watchedEpisodes: [] };
   lib[r.key] = { ...cur, ...patch, updated: Date.now() };
@@ -2571,16 +2589,27 @@ function setCriterion(r, criterionKey, value) {
   if (value > 0) ratings[criterionKey] = value; else delete ratings[criterionKey];
   const avg = computeAverage(ratings);
   let newStatus = s.status;
-  if (avg > 0 && s.status !== "watching") newStatus = "watched";
-  else if (avg === 0 && s.status === "watched") newStatus = null;
+  
+  // АВТОМАТИЧНИЙ СТАТУС ПРИ ОЦІНЦІ
+  if (avg > 0) {
+    newStatus = "watched";
+  } else if (avg === 0 && s.status === "watched") {
+    newStatus = null;
+  }
+  
   const patch = { ratings, status: newStatus };
   const ctx = cardStack[cardStack.length - 1];
   if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
   if (!lib[r.key] && ctx?.cast) patch.cast = ctx.cast;
   updateNoRender(r, patch);
+  
   const scroll = card.querySelector('.card-scroll'); if (!scroll) return;
   refreshRatingBlockDOM(scroll, criterionKey, value);
   refreshAverageBlockDOM(scroll, r);
+  
+  // Оновлюємо кнопки статусу на картці
+  const srow = scroll.querySelector('[data-status-row]');
+  if (srow) srow.querySelectorAll('.btn').forEach(btn => btn.classList.toggle('on', btn.dataset.status === newStatus));
 }
 
 function refreshRatingBlockDOM(scroll, critKey, value) {
@@ -2618,7 +2647,14 @@ function setSeasonCriterion(r, seasonNum, criterionKey, value) {
   const cur = { ...(sr[seasonNum] || {}) };
   if (value > 0) cur[criterionKey] = value; else delete cur[criterionKey];
   if (Object.keys(cur).length > 0) sr[seasonNum] = cur; else delete sr[seasonNum];
-  const patch = { seasonRatings: sr };
+  
+  let newStatus = s.status;
+  if (Object.keys(sr).length > 0) {
+    const total = s.totalSeasons || 1;
+    newStatus = (Object.keys(sr).length >= total) ? "watched" : "watching";
+  }
+  
+  const patch = { seasonRatings: sr, status: newStatus };
   const ctx = cardStack[cardStack.length - 1];
   if (ctx?.details?.seasons && !s.totalSeasons) patch.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
   if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
