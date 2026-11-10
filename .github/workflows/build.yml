@@ -11,7 +11,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -19,19 +19,19 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Capacitor
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Init Capacitor
+      - name: Prepare Web Folder
         run: |
           mkdir -p www
-          cp index.html www/
-          cp manifest.json www/
+          cp index.html www/ || true
+          cp manifest.json www/ || true
+
+      - name: Init Capacitor
+        run: |
           npx cap init MyCinema com.mycinema.app --web-dir=www
           npx cap add android
           npx cap sync android
@@ -40,7 +40,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew clean assembleDebug
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
