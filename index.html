@@ -1,0 +1,2683 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MyCinema</title>
+<style>
+  :root {
+    --bg-0: #05060f; --bg-1: #0d1020; --bg-2: #161a30; --bg-3: #252a55; --bg-4: #3a4370;
+    --bg-sidebar: #080a14; --bg-query: #02030a;
+    --accent: #c6f432; --accent-hover: #d6ff42; --accent-fg: #111;
+    --text: #eee; --text-secondary: #cfd0e6; --text-muted: #9a9bb5; --text-dim: #5a5f8a;
+    --text-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    --danger: #ef4444; --danger-bg: #7f1d1d; --danger-bg-hover: #991b1b;
+    --success: #22c55e; --warning: #eab308;
+    --tmdb: #01b4e4; --imdb: #f5c518; --rt: #fa320a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg-0); color:var(--text); overflow-x: hidden; transition: background 0.2s, color 0.2s; }
+  header { padding:16px; position:sticky; top:0; background:var(--bg-0); z-index:50; display: flex; align-items: center; gap: 12px; }
+  .hamburger { background: none; border: 0; color: var(--text); font-size: 26px; cursor: pointer; padding: 0 4px; line-height: 1; }
+  .hamburger:hover { color: var(--accent); }
+  .search-container { position: relative; flex: 1; max-width: 900px; }
+  input#q { width:100%; padding:12px 16px; font-size:16px; border:0; border-radius:14px; background:var(--bg-1); color:var(--text); }
+  input#q::placeholder { color:var(--text-dim); }
+
+  .autocomplete { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-1); border-radius: 14px; overflow-y: auto; z-index: 60; max-height: 60vh; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+  .autocomplete.hidden { display: none; }
+  .ac-item { display: flex; gap: 10px; padding: 8px 10px; cursor: pointer; border-bottom: 1px solid var(--bg-3); }
+  .ac-item:hover { background: var(--bg-2); }
+  .ac-poster { width: 40px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--bg-3); }
+  .ac-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  .ac-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ac-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .ac-type-person { color: var(--accent); }
+  .ac-footer { padding: 12px; text-align: center; font-size: 13px; color: var(--accent); cursor: pointer; background: var(--bg-sidebar); font-weight: 600; }
+  .ac-footer:hover { background: var(--bg-1); }
+  .ac-empty { padding: 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+  #sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  #sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+  #sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 280px; max-width: 80vw; background: var(--bg-sidebar); z-index: 101; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: 4px 0 20px rgba(0,0,0,0.5); }
+  #sidebar.open { transform: translateX(0); }
+  .sidebar-header { padding: 24px 20px; border-bottom: 1px solid var(--bg-3); }
+  .sidebar-logo { font-size: 24px; font-weight: 800; color: var(--accent); margin-bottom: 4px; text-shadow: var(--text-shadow); }
+  .sidebar-email { font-size: 12px; color: var(--text-muted); word-break: break-all; }
+  .sidebar-nav { flex: 1; overflow-y: auto; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 12px; color: var(--text-secondary); font-size: 16px; cursor: pointer; transition: background 0.2s, color 0.2s; text-shadow: var(--text-shadow); }
+  .nav-item:hover { background: var(--bg-1); color: var(--text); }
+  .nav-item.active { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+  .nav-icon { font-size: 18px; width: 24px; text-align: center; }
+  .sidebar-footer { padding: 20px; border-top: 1px solid var(--bg-3); display: flex; flex-direction: column; gap: 8px; }
+  .logout-btn-side { width: 100%; padding: 12px; background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .logout-btn-side:hover { background: var(--danger); color: var(--text); }
+  .login-btn-side { width: 100%; padding: 12px; background: var(--accent); border: 0; color: var(--accent-fg); border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .login-btn-side:hover { background: var(--accent-hover); }
+
+  #auth-banner { display: none; background: var(--bg-1); border-bottom: 1px solid var(--bg-3); padding: 10px 16px; text-align: center; font-size: 13px; color: var(--text-secondary); }
+  #auth-banner.visible { display: block; }
+  #auth-banner button { background: var(--accent); color: var(--accent-fg); border: 0; padding: 6px 14px; border-radius: 12px; font-weight: 700; cursor: pointer; margin-left: 10px; }
+
+  .tab, .filter-btn, .home-tab, .card-tab, .btn, .card-x, .filter-actions button, .query-bar button, .trailer-btn, .auth-btn, .game-btn { position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; transition: background 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease; }
+  .ripple { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.4); transform: scale(0); animation: ripple-anim 0.65s ease-out; pointer-events: none; z-index: 1; }
+  @keyframes ripple-anim { to { transform: scale(1); opacity: 0; } }
+
+  .filter-bar { display: flex; gap: 6px; margin: 0 16px 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-bar.hidden { display: none; }
+  .filter-btn { flex: 0 0 auto; padding: 6px 16px; border: 0; border-radius: 20px; background: var(--bg-1); color: var(--text-muted); font-size: 13px; cursor: pointer; font-weight: 500; }
+  .filter-btn.active { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+
+  #results { padding:0 16px 16px; max-width:700px; margin:auto; }
+  .item { display:flex; gap:12px; background:var(--bg-1); border-radius:14px; overflow:hidden; cursor:pointer; margin-bottom: 12px; transition: background 0.15s; position: relative; }
+  .item:hover { background: var(--bg-2); }
+  .item.has-number { position: relative; }
+  .top-number { position: absolute; top: 6px; left: 6px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 13px; background: var(--accent); color: var(--accent-fg); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; z-index: 2; font-variant-numeric: tabular-nums; }
+  .poster { width:80px; height:120px; object-fit:cover; background:var(--bg-3); flex-shrink:0; }
+  .poster-empty { background: var(--bg-3); }
+  .info { padding:10px 10px 10px 0; flex: 1; min-width: 0; }
+  .title { font-weight:600; text-shadow: var(--text-shadow); }
+  .meta { color:var(--text-muted); font-size:14px; margin-top:4px; }
+  .badge { display:inline-block; margin-top:6px; padding:3px 10px; border-radius:10px; background:var(--bg-3); font-size:13px; font-weight: 500; }
+  .badge.rated { font-weight: 700; }
+  .badge.rated.green { background: #22c55e; color: #052e16; }
+  .badge.rated.yellow { background: #eab308; color: #422006; }
+  .badge.rated.red { background: #ef4444; color: #fef2f2; }
+  .item-delete { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-3); color: var(--danger); border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; margin: auto 8px auto 0; flex-shrink: 0; }
+  .item-delete:hover { background: var(--danger); color: var(--text); }
+
+  .home-greeting { padding: 12px 16px; background: var(--bg-1); border-radius: 14px; margin: 0 16px 16px; font-size: 14px; color: var(--text-secondary); text-align: center; }
+  .home-tabs { display: flex; gap: 8px; margin: 0 16px 16px; max-width: 668px; margin-left: auto; margin-right: auto; }
+  .home-tab { flex: 1; padding: 12px; border: 0; border-radius: 20px; background: var(--bg-1); color: var(--text-muted); font-size: 15px; cursor: pointer; font-weight: 600; text-align: center; transition: all 0.2s; }
+  .home-tab.active { background: var(--accent); color: var(--accent-fg); }
+  .home-wrap { max-width: 700px; margin: 0 auto; padding: 0 16px 16px; }
+  .home-note { padding: 12px 16px; color: var(--text-muted); font-size: 13px; text-align: center; }
+  .home-grid-title { font-size: 18px; font-weight: 700; margin: 8px 0 12px; text-shadow: var(--text-shadow); }
+  .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 14px 12px; }
+  .rec-card { cursor: pointer; min-width: 0; }
+  .rec-poster { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 10px; background: var(--bg-3); display: block; }
+  .row-title { font-size: 13px; margin-top: 6px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .row-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .rec-why { font-size: 11px; color: var(--accent); margin-top: 2px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .home-more { display: block; margin: 14px auto 0; padding: 10px 22px; border: 0; border-radius: 20px; background: var(--bg-3); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  .filter-panel { background: var(--bg-1); border-radius: 14px; padding: 14px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .filter-row { display: flex; align-items: center; gap: 10px; }
+  .filter-row label { font-size: 13px; color: var(--text-muted); min-width: 90px; flex-shrink: 0; }
+  .filter-row select { flex: 1; padding: 10px 14px; border: 0; border-radius: 12px; background: var(--bg-3); color: var(--text); font-size: 14px; cursor: pointer; }
+  .filter-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .filter-actions button { padding: 10px 18px; border: 0; border-radius: 20px; background: var(--bg-3); color: var(--text); font-size: 14px; cursor: pointer; font-weight: 600; }
+  .query-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-query); border-radius: 12px; margin-bottom: 12px; font-size: 14px; }
+  .query-bar span { flex: 1; color: var(--text-secondary); }
+  .query-bar button { background: var(--bg-3); border: 0; color: var(--text); padding: 6px 12px; border-radius: 14px; cursor: pointer; font-size: 13px; }
+
+  #overlay { position:fixed; inset:0; background:var(--bg-0); display:none; align-items:stretch; justify-content:center; z-index:200; }
+  #overlay.open { display:flex; }
+  #card { background:var(--bg-0); width:100%; max-width:700px; height:100%; position: relative; display: flex; flex-direction: column; overflow: hidden; }
+  .card-bar { flex: none; display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; min-height: 62px; position: relative; z-index: 1; }
+  .card-scroll { overflow-y: auto; padding: 0 16px 28px; flex: 1; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; position: relative; z-index: 1; }
+  .card-x { width: 42px; height: 42px; border-radius: 50%; background: var(--bg-1); color: var(--text); border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 300; }
+  .card-x:hover { background: var(--bg-3); }
+  .card-spacer { width: 42px; height: 42px; }
+  .card-poster-bg { position: absolute; inset: 0; background-size: cover; background-position: center; filter: blur(40px) brightness(0.25) saturate(0.7); z-index: 0; pointer-events: none; opacity: 0.7; }
+
+  .top { display:flex; gap:12px; }
+  .top .poster { width:110px; height:165px; border-radius:12px; }
+  .poster.zoomable { cursor: zoom-in; transition: opacity 0.15s; }
+  .poster.zoomable:hover { opacity: 0.85; }
+  .overview { margin:14px 0; line-height:1.5; color:var(--text-secondary); font-size:15px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .btn { padding:10px 18px; border:0; border-radius:22px; background:var(--bg-3); color:var(--text); font-size:15px; cursor:pointer; font-weight: 500; }
+  .btn.on { background:var(--accent); color:var(--accent-fg); font-weight:700; }
+  .btn.danger { background: var(--danger-bg); color: #fecaca; }
+  .btn.danger:hover { background: var(--danger-bg-hover); color: var(--text); }
+  .label { margin-top:14px; color:var(--text-muted); font-size:14px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; text-shadow: var(--text-shadow); }
+  .trailer-container { margin-top:14px; aspect-ratio:16/9; background:#000; border-radius:12px; overflow:hidden; }
+  .trailer-container iframe { width:100%; height:100%; border:0; }
+  .meta-details { font-size:14px; color:var(--text-muted); margin-top:4px; }
+
+  .trailer-buttons { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .trailer-btn { padding: 6px 12px; border: 0; border-radius: 16px; background: var(--bg-3); color: var(--text-secondary); font-size: 13px; cursor: pointer; font-weight: 500; }
+  .trailer-btn.active { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+
+  .studios-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+  .studio-badge { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; background: var(--bg-3); border-radius: 20px; }
+  .studio-logo { width: 22px; height: 22px; border-radius: 50%; object-fit: contain; background: #fff; padding: 1px; }
+  .studio-badge span { font-size: 12px; color: var(--text); font-weight: 500; }
+
+  .ratings-row { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; align-items: center; }
+  .rating-badge { padding:6px 14px; border-radius:12px; font-weight:bold; display:flex; align-items:center; gap:6px; }
+  .rating-imdb { background:var(--imdb); color:#000; }
+  .rating-rt { background:var(--rt); color:#fff; }
+  .rating-tmdb { background:var(--tmdb); color:#fff; }
+
+  .streaming-emblems { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+  .streaming-emblem { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; background: var(--bg-3); cursor: default; }
+
+  .card-tabs { display: flex; gap: 4px; margin: 16px -16px 0; padding: 0 16px; border-bottom: 1px solid var(--bg-3); overflow-x: auto; scrollbar-width: none; }
+  .card-tabs::-webkit-scrollbar { display: none; }
+  .card-tab { flex: 0 0 auto; padding: 10px 16px; background: transparent; border: 0; color: var(--text-muted); font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; border-radius: 8px 8px 0 0; }
+  .card-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  .actor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; margin-top: 12px; }
+  .actor-tile { cursor: pointer; text-align: center; }
+  .actor-tile-photo { width: 100%; aspect-ratio: 1; border-radius: 50%; object-fit: cover; background: var(--bg-3); }
+  .actor-tile-name { font-size: 12px; margin-top: 6px; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .actor-tile-role { font-size: 11px; color: var(--text-muted); margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+
+  .similar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 12px; margin-top: 12px; }
+  .similar-card { cursor: pointer; }
+  .similar-poster { width: 100%; aspect-ratio: 2/3; border-radius: 10px; object-fit: cover; background: var(--bg-3); transition: transform 0.15s; }
+  .similar-card:hover .similar-poster { transform: scale(1.03); }
+  .similar-title { font-size: 12px; margin-top: 6px; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .similar-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+  .similar-rating { color: var(--accent); font-weight: 600; }
+
+  .avail-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+  .season-tabs-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin: 4px 0 16px; scrollbar-width: none; }
+  .season-tabs-bar::-webkit-scrollbar { display: none; }
+  .season-tab-btn { flex: 0 0 auto; padding: 8px 14px; border: 0; border-radius: 20px; background: var(--bg-3); color: var(--text-secondary); font-size: 14px; cursor: pointer; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 4px; transition: background 0.15s, color 0.15s; position: relative; overflow: hidden; }
+  .season-tab-btn:hover { background: var(--bg-4); }
+  .season-tab-btn.active { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+  .season-tab-badge { font-size: 11px; opacity: 0.85; }
+  .season-tab-btn.active .season-tab-badge { color: var(--accent-fg); opacity: 0.9; }
+
+  .episode-card { display: flex; gap: 10px; background: var(--bg-2); border-radius: 12px; padding: 8px; margin-bottom: 8px; transition: background 0.15s; align-items: flex-start; }
+  .episode-card:hover { background: var(--bg-3); }
+  .episode-poster-wrap { position: relative; width: 140px; aspect-ratio: 16/9; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: var(--bg-3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s; }
+  .episode-poster-wrap:active { transform: scale(0.97); }
+  .episode-poster-wrap img { width: 100%; height: 100%; object-fit: cover; transition: opacity 0.2s; display: block; }
+  .episode-card:not(.watched) .episode-poster-wrap img { opacity: 0.5; }
+  .episode-poster-empty { color: var(--text-dim); font-size: 20px; font-weight: 700; }
+  .episode-check { position: absolute; top: 6px; left: 6px; width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.65); background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; color: transparent; font-size: 14px; font-weight: 800; transition: all 0.15s; }
+  .episode-card.watched .episode-check { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  .episode-body { flex: 1; min-width: 0; padding: 2px 4px; cursor: pointer; border-radius: 6px; transition: background 0.15s; }
+  .episode-body:hover { background: rgba(255,255,255,0.03); }
+  .episode-num { font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: 0.5px; }
+  .episode-card.watched .episode-num { color: var(--success); }
+  .episode-title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin: 2px 0 4px; }
+  .episode-title { font-size: 14px; font-weight: 600; line-height: 1.25; flex: 1; }
+  .episode-expand-icon { color: var(--accent); font-size: 12px; flex-shrink: 0; padding-top: 2px; }
+  .episode-desc { font-size: 12px; color: var(--text-muted); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; transition: all 0.2s; }
+  .episode-desc.expanded { display: block; overflow: visible; -webkit-line-clamp: unset; -webkit-box-orient: initial; }
+
+  /* NOTES */
+  .notes-textarea { width: 100%; min-height: 180px; padding: 14px; border: 1px solid var(--bg-3); border-radius: 12px; background: var(--bg-1); color: var(--text); font-size: 15px; font-family: inherit; line-height: 1.5; resize: vertical; outline: none; transition: border-color 0.2s; }
+  .notes-textarea:focus { border-color: var(--accent); }
+  .notes-hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .note-card { display: flex; gap: 12px; background: var(--bg-1); border-radius: 14px; padding: 12px; margin-bottom: 12px; cursor: pointer; transition: background 0.15s; align-items: flex-start; }
+  .note-card:hover { background: var(--bg-2); }
+  .note-poster { width: 70px; height: 105px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--bg-3); }
+  .note-body { flex: 1; min-width: 0; }
+  .note-title { font-size: 16px; font-weight: 700; line-height: 1.25; margin-bottom: 4px; text-shadow: var(--text-shadow); }
+  .note-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .note-text { font-size: 13px; color: var(--text-secondary); line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; white-space: pre-wrap; }
+
+  .ratings-block { margin-top: 8px; display: flex; flex-direction: column; gap: 14px; }
+  .rating-block { display: flex; flex-direction: column; gap: 6px; }
+  .rating-block-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .rating-block-label { font-size: 13px; color: var(--text-secondary); }
+  .rating-block-value { font-weight: 700; color: var(--accent); font-size: 14px; min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+  .rating-block-value.empty { color: var(--text-dim); }
+  .rating-block-value.green { color: var(--success); }
+  .rating-block-value.yellow { color: var(--warning); }
+  .rating-block-value.red { color: var(--danger); }
+  .rating-lights { display: flex; gap: 4px; user-select: none; -webkit-user-select: none; }
+  .light { flex: 1; height: 14px; border-radius: 7px; background: var(--bg-3); cursor: pointer; transition: background 0.15s; min-width: 6px; max-width: 28px; }
+  .light.on { background: var(--accent); }
+  .light.on:hover { filter: brightness(1.1); }
+  .light:not(.on):not(.partial):hover { background: var(--bg-4); }
+  .light.partial { background: linear-gradient(to right, var(--accent) var(--fill, 50%), var(--bg-3) var(--fill, 50%)); cursor: default; }
+  .light.readonly { cursor: default; pointer-events: none; }
+  .rating-block.average { border-top: 1px solid var(--bg-3); padding-top: 14px; margin-top: 2px; }
+  .rating-block.average .rating-block-label { font-weight: 700; color: var(--text); font-size: 14px; }
+  .rating-block.average .rating-block-value { font-size: 17px; }
+
+  .person-header { display: flex; gap: 14px; margin-bottom: 8px; }
+  .person-photo { width: 110px; height: 165px; border-radius: 12px; object-fit: cover; background: var(--bg-3); flex-shrink: 0; }
+  .person-photo.zoomable { cursor: zoom-in; transition: opacity 0.15s; }
+  .person-photo.zoomable:hover { opacity: 0.85; }
+  .person-name { font-size: 20px; font-weight: 700; margin: 0 0 8px; text-shadow: var(--text-shadow); }
+  .person-bio { line-height: 1.55; color: var(--text-secondary); font-size: 14px; white-space: pre-wrap; }
+  .person-meta { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  .filmography-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 10px; }
+  .filmography-card { cursor: pointer; }
+  .filmography-poster { width: 100%; aspect-ratio: 2/3; border-radius: 8px; object-fit: cover; background: var(--bg-3); }
+  .filmography-title { font-size: 12px; margin-top: 6px; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .filmography-year { font-size: 11px; color: var(--text-muted); }
+
+  .photo-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin-top: 8px; }
+  .gallery-photo { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; cursor: zoom-in; background: var(--bg-3); transition: opacity 0.15s; display: block; }
+  .gallery-photo:hover { opacity: 0.85; }
+
+  #poster-zoom { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 3000; display: none; align-items: center; justify-content: center; cursor: zoom-out; padding: 20px; backdrop-filter: blur(4px); }
+  #poster-zoom.open { display: flex; }
+  #poster-zoom img { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.8); object-fit: contain; }
+  #poster-zoom .zoom-close { position: absolute; top: 20px; right: 20px; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.7); color: #fff; border: 0; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; }
+  #poster-zoom .zoom-close:hover { background: rgba(255,255,255,0.15); }
+
+  .sync-indicator { position: fixed; bottom: 12px; left: 12px; padding: 6px 12px; border-radius: 16px; font-size: 11px; font-weight: 600; background: var(--bg-1); color: var(--text-muted); z-index: 50; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  .sync-indicator.visible { display: block; }
+  .sync-indicator.saving { color: var(--warning); }
+  .sync-indicator.saved { color: var(--success); }
+  .sync-indicator.error { color: var(--danger); }
+
+  #auth-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+  .auth-box { background: var(--bg-1); padding: 24px; border-radius: 20px; width: 90%; max-width: 360px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 12px; }
+  .auth-box h2 { margin: 0 0 10px 0; text-align: center; font-size: 20px; text-shadow: var(--text-shadow); }
+  .auth-input { width: 100%; padding: 12px 16px; border: 0; border-radius: 12px; background: var(--bg-3); color: var(--text); font-size: 15px; outline: none; }
+  .auth-btn { width: 100%; padding: 12px; border: 0; border-radius: 12px; font-size: 15px; cursor: pointer; font-weight: 700; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .auth-btn.primary { background: var(--accent); color: var(--accent-fg); margin-top: 4px; }
+  .auth-btn.primary:hover { background: var(--accent-hover); }
+  .auth-btn.secondary { background: transparent; color: var(--text-muted); font-weight: 500; font-size: 13px; }
+  .auth-btn.secondary:hover { color: var(--text); }
+  .auth-btn.google { background: #fff; color: #000; margin-bottom: 4px; }
+  .auth-btn.google:hover { background: #eee; }
+  .auth-divider { text-align: center; color: var(--text-dim); font-size: 12px; margin: 8px 0; position: relative; }
+  .auth-divider::before, .auth-divider::after { content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--bg-3); }
+  .auth-divider::before { left: 0; }
+  .auth-divider::after { right: 0; }
+  .auth-error { color: var(--danger); font-size: 13px; text-align: center; min-height: 16px; }
+
+  #onboarding-modal { position: fixed; inset: 0; background: var(--bg-0); z-index: 2000; display: none; flex-direction: column; }
+  .onb-header { padding: 20px 16px; text-align: center; border-bottom: 1px solid var(--bg-3); background: var(--bg-1); }
+  .onb-header h1 { margin: 0 0 8px; font-size: 22px; text-shadow: var(--text-shadow); }
+  .onb-header p { margin: 0; color: var(--text-muted); font-size: 14px; }
+  .onb-scroll { flex: 1; overflow-y: auto; padding: 16px; max-width: 1400px; margin: 0 auto; width: 100%; }
+  .onb-category { margin-bottom: 30px; }
+  .onb-category-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; color: var(--text); text-shadow: var(--text-shadow); }
+  .onb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; }
+  .onb-card { position: relative; cursor: pointer; border-radius: 10px; transition: transform 0.1s; }
+  .onb-card.selected { transform: scale(0.95); }
+  .onb-card.selected .onb-poster { border: 3px solid var(--accent); }
+  .onb-card.selected::after { content: '✓'; position: absolute; top: 6px; right: 6px; background: var(--accent); color: var(--accent-fg); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; }
+  .onb-poster { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 10px; background: var(--bg-3); border: 3px solid transparent; }
+  .onb-title { font-size: 12px; margin-top: 6px; text-align: center; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .onb-footer { padding: 16px; background: var(--bg-1); border-top: 1px solid var(--bg-3); text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .onb-btn { width: 100%; max-width: 300px; padding: 14px; border: 0; border-radius: 20px; background: var(--bg-3); color: var(--text-dim); font-size: 16px; font-weight: 700; cursor: not-allowed; transition: all 0.2s; }
+  .onb-btn.active { background: var(--accent); color: var(--accent-fg); cursor: pointer; }
+  .onb-btn.skip { background: transparent; color: var(--text-muted); border: 1px solid var(--bg-3); cursor: pointer; }
+  .onb-btn.skip:hover { color: var(--text); }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+  .stat-card { background: var(--bg-1); padding: 16px; border-radius: 12px; text-align: center; }
+  .stat-value { font-size: 28px; font-weight: 800; color: var(--accent); text-shadow: var(--text-shadow); }
+  .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .stats-list { background: var(--bg-1); padding: 12px; border-radius: 12px; }
+  .stats-list-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--bg-3); font-size: 14px; }
+  .stats-list-row:last-child { border-bottom: 0; }
+  .stats-list-row span:last-child { color: var(--accent); font-weight: 600; }
+
+  .pie-section { background: var(--bg-1); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .pie-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; text-shadow: var(--text-shadow); }
+  .pie-content { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  .pie-svg { flex-shrink: 0; }
+  .pie-legend { flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 8px; }
+  .pie-legend-row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .pie-legend-dot { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+  .pie-legend-label { flex: 1; color: var(--text-secondary); }
+  .pie-legend-value { font-weight: 700; color: var(--text); }
+
+  .actor-rank-list { display: flex; flex-direction: column; gap: 8px; }
+  .actor-rank-item { display: flex; gap: 12px; padding: 10px; background: var(--bg-1); border-radius: 12px; align-items: center; cursor: pointer; transition: background 0.15s; }
+  .actor-rank-item:hover { background: var(--bg-2); }
+  .actor-rank-num { font-size: 16px; font-weight: 800; color: var(--accent); min-width: 28px; text-align: center; }
+  .actor-rank-photo { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--bg-3); flex-shrink: 0; }
+  .actor-rank-photo-empty { width: 48px; height: 48px; border-radius: 50%; background: var(--bg-3); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-weight: 700; font-size: 18px; }
+  .actor-rank-info { flex: 1; min-width: 0; }
+  .actor-rank-name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .actor-rank-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .actor-rank-value { font-size: 16px; font-weight: 800; color: var(--accent); flex-shrink: 0; }
+  .actor-rank-value.green { color: var(--success); }
+  .actor-rank-value.yellow { color: var(--warning); }
+  .actor-rank-value.red { color: var(--danger); }
+
+  .cast-loader { padding: 16px; background: var(--bg-1); border-radius: 12px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }
+  .cast-loader-text { font-size: 13px; color: var(--text-secondary); }
+  .cast-loader-btn { padding: 10px 20px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-fg); font-size: 14px; font-weight: 700; cursor: pointer; }
+  .cast-loader-btn:disabled { background: var(--bg-3); color: var(--text-dim); cursor: not-allowed; }
+
+  #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 1500; backdrop-filter: blur(4px); }
+  #settings-modal.open { display: flex; }
+  .settings-box { background: var(--bg-1); padding: 24px; border-radius: 20px; width: 90%; max-width: 480px; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 20px; }
+  .settings-header { display: flex; justify-content: space-between; align-items: center; }
+  .settings-header h2 { margin: 0; font-size: 20px; text-shadow: var(--text-shadow); }
+  .settings-close { background: none; border: 0; color: var(--text); font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
+  .settings-close:hover { background: var(--bg-3); }
+  .settings-section { display: flex; flex-direction: column; gap: 10px; }
+  .settings-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+  .theme-swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+  .theme-swatch { width: 52px; height: 52px; border-radius: 12px; cursor: pointer; border: 3px solid transparent; transition: transform 0.15s, border-color 0.15s; position: relative; }
+  .theme-swatch:hover { transform: scale(1.08); }
+  .theme-swatch.active { border-color: var(--accent); }
+  .theme-swatch-label { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font-size: 9px; font-weight: 600; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.9); pointer-events: none; }
+  .settings-toggle { display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 12px; background: var(--bg-2); border-radius: 12px; font-size: 14px; }
+  .settings-toggle input { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+  .settings-btn { width: 100%; padding: 12px 16px; border: 0; border-radius: 12px; background: var(--bg-3); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; transition: background 0.15s; }
+  .settings-btn:hover { background: var(--bg-4); }
+
+  .game-container { max-width: 700px; margin: 0 auto; padding: 16px; }
+  .game-header { text-align: center; margin-bottom: 20px; }
+  .game-title { font-size: 24px; font-weight: 800; margin: 0 0 8px; text-shadow: var(--text-shadow); }
+  .game-subtitle { color: var(--text-muted); font-size: 14px; margin: 0; }
+  .game-stats { display: flex; justify-content: center; gap: 20px; margin: 16px 0; font-size: 14px; color: var(--text-secondary); }
+  .game-stats span { font-weight: 700; color: var(--accent); }
+  .game-arena { display: flex; flex-direction: column; gap: 16px; margin: 20px 0; }
+  .game-vs-label { text-align: center; font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; margin: 4px 0; }
+  .game-card { background: var(--bg-1); border-radius: 16px; overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 10px; }
+  .game-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+  .game-card-poster { width: 80px; height: 120px; object-fit: cover; border-radius: 8px; background: var(--bg-3); flex-shrink: 0; }
+  .game-card-body { flex: 1; }
+  .game-card-title { font-size: 16px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; text-shadow: var(--text-shadow); }
+  .game-card-meta { font-size: 13px; color: var(--text-muted); }
+  .game-card-crown { font-size: 20px; margin-left: auto; padding-right: 8px; }
+  .game-btn { width: 100%; padding: 12px; border: 0; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; margin-bottom: 8px; }
+  .game-btn.primary { background: var(--accent); color: var(--accent-fg); }
+  .game-btn.primary:hover { background: var(--accent-hover); }
+  .game-btn.secondary { background: var(--bg-3); color: var(--text); }
+  .game-btn.secondary:hover { background: var(--bg-4); }
+  .game-btn.danger { background: var(--danger); color: var(--text); }
+  .game-history { margin-top: 30px; }
+  .game-history h3 { font-size: 18px; margin-bottom: 12px; text-shadow: var(--text-shadow); }
+  .history-item { display: flex; gap: 10px; padding: 10px; background: var(--bg-1); border-radius: 10px; margin-bottom: 8px; font-size: 13px; align-items: center; }
+  .history-item .hi-poster { width: 40px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--bg-3); }
+  .history-item .hi-info { flex: 1; min-width: 0; }
+  .history-item .hi-title { font-weight: 600; text-shadow: var(--text-shadow); }
+  .history-item .hi-meta { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+  .game-over { text-align: center; padding: 40px 16px; }
+  .game-over h2 { font-size: 28px; margin-bottom: 8px; text-shadow: var(--text-shadow); }
+  .game-over p { color: var(--text-muted); margin-bottom: 20px; }
+
+  @media (min-width: 900px) {
+    #results { max-width: 1000px; }
+    .home-wrap { max-width: 1000px; }
+    .game-container { max-width: 1000px; }
+    .home-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px 14px; }
+    .onb-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    .stats-grid { grid-template-columns: repeat(4, 1fr); }
+    .filmography-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .photo-gallery { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .home-tabs { max-width: 968px; }
+    .home-greeting { max-width: 968px; margin-left: auto; margin-right: auto; }
+    .filter-bar { max-width: 968px; margin-left: auto; margin-right: auto; }
+  }
+  @media (min-width: 1200px) {
+    #results { max-width: 1300px; }
+    .home-wrap { max-width: 1300px; }
+    .game-container { max-width: 1300px; }
+    .home-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .onb-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .home-tabs { max-width: 1268px; }
+    .home-greeting { max-width: 1268px; }
+    .filter-bar { max-width: 1268px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="sidebar-backdrop" onclick="closeSidebar()"></div>
+<div id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">MyCinema</div>
+    <div class="sidebar-email" id="sidebar-email">Гість</div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> Головна</div>
+    <div class="nav-item" data-tab="filter" onclick="setTab('filter')"><span class="nav-icon">🔎</span> Фільтр</div>
+    <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> Дивлюсь</div>
+    <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> Переглянуто</div>
+    <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> Планую</div>
+    <div class="nav-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> Нотатки</div>
+    <div class="nav-item" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> Статистика</div>
+    <div class="nav-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> Цар гори</div>
+  </div>
+  <div class="sidebar-footer">
+    <button class="login-btn-side" id="sidebar-login-btn" onclick="openAuthModal()">Увійти в акаунт</button>
+    <button class="logout-btn-side" id="sidebar-logout-btn" style="display:none;" onclick="logoutUser()">Вийти з акаунту</button>
+    <button class="logout-btn-side" style="border-color: var(--accent); color: var(--accent);" onclick="openSettings()">⚙️ Налаштування</button>
+  </div>
+</div>
+
+<header>
+  <button class="hamburger" onclick="openSidebar()">☰</button>
+  <div class="search-container">
+    <input id="q" type="search" placeholder="Від чого кайфонем сьогодні?" autocomplete="off">
+    <div id="autocomplete" class="autocomplete hidden"></div>
+  </div>
+</header>
+
+<div id="auth-banner">
+  Ви не увійшли. Дані зберігаються лише на цьому пристрої.
+  <button onclick="openAuthModal()">Увійти</button>
+</div>
+
+<div id="type-filter" class="filter-bar hidden">
+  <button class="filter-btn active" data-filter="all">Всі</button>
+  <button class="filter-btn" data-filter="movie">Фільми</button>
+  <button class="filter-btn" data-filter="tv">Серіали</button>
+</div>
+
+<div id="results"></div>
+<div id="overlay"><div id="card"></div></div>
+<div id="sync-indicator" class="sync-indicator"></div>
+<div id="poster-zoom"><button class="zoom-close" onclick="closeImageZoom()">✕</button><img alt=""></div>
+<input type="file" id="import-file" accept=".json" style="display:none;">
+
+<div id="settings-modal">
+  <div class="settings-box">
+    <div class="settings-header">
+      <h2>⚙️ Налаштування</h2>
+      <button class="settings-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">🎨 Колір фону</div>
+      <div class="theme-swatches" id="bg-swatches"></div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">✨ Колір виділення</div>
+      <div class="theme-swatches" id="accent-swatches"></div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">🖼️ Вигляд</div>
+      <label class="settings-toggle">
+        <input type="checkbox" id="poster-bg-toggle" onchange="onPosterBgToggle(this.checked)">
+        <span>Постер як фон на картці тайтлу</span>
+      </label>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">📁 Дані</div>
+      <button class="settings-btn" onclick="exportLibrary()">💾 Експорт бібліотеки</button>
+      <button class="settings-btn" onclick="importLibrary()">📥 Імпорт бібліотеки</button>
+      <button class="settings-btn" onclick="restartOnboardingFromSettings()">🔄 Пройти онбординг знову</button>
+    </div>
+  </div>
+</div>
+
+<div id="auth-modal">
+  <div class="auth-box">
+    <h2>Вхід до MyCinema</h2>
+    <button class="auth-btn google" onclick="loginWithGoogle()">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Увійти через Google
+    </button>
+    <div class="auth-divider">або через Email</div>
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email" autocomplete="email">
+    <input type="password" id="auth-password" class="auth-input" placeholder="Пароль" autocomplete="current-password">
+    <div id="auth-error" class="auth-error"></div>
+    <button id="btn-login" class="auth-btn primary" onclick="loginUser()">Увійти</button>
+    <button id="btn-register" class="auth-btn secondary" onclick="registerUser()">Створити новий акаунт</button>
+    <button class="auth-btn secondary" onclick="closeAuthModal()" style="margin-top:8px;">Продовжити без входу</button>
+  </div>
+</div>
+
+<div id="onboarding-modal">
+  <div class="onb-header">
+    <h1>Ласкаво просимо!</h1>
+    <p>Оберіть мінімум 5 тайтлів, які вам подобаються.</p>
+  </div>
+  <div class="onb-scroll" id="onb-scroll"></div>
+  <div class="onb-footer">
+    <button class="onb-btn" id="onb-submit" onclick="submitOnboarding()">Продовжити</button>
+    <button class="onb-btn skip" onclick="skipOnboarding()">Пропустити</button>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  const firebaseConfig = {
+    apiKey: "AIzaSyCEFo7IwNEGAzkVnhtPXRJuxLgIksd187Q",
+    authDomain: "mucinema-d9595.firebaseapp.com",
+    projectId: "mucinema-d9595",
+    storageBucket: "mucinema-d9595.firebasestorage.app",
+    messagingSenderId: "353318067827",
+    appId: "1:353318067827:web:e5c58dc9c67ad354d2d406",
+    measurementId: "G-L14CFME65J"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  window.firestoreDB = db; window.firestoreDoc = doc; window.firestoreGetDoc = getDoc; window.firestoreSetDoc = setDoc;
+  window.loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    const err = document.getElementById('auth-error'); err.textContent = '';
+    try { await signInWithRedirect(auth, provider); }
+    catch (e) { err.textContent = e.code === 'auth/unauthorized-domain' ? "Домен не авторизовано." : "Помилка Google: " + e.message; }
+  };
+  getRedirectResult(auth).then((r) => { if (r) document.getElementById('auth-modal').style.display = 'none'; })
+    .catch((error) => { const err = document.getElementById('auth-error'); if (err) err.textContent = "Помилка входу: " + error.message; });
+  window.loginUser = async () => {
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const err = document.getElementById('auth-error'); err.textContent = '';
+    if (!email || !password) { err.textContent = "Введіть email та пароль"; return; }
+    try { document.getElementById('btn-login').textContent = 'Вхід...'; await signInWithEmailAndPassword(auth, email, password); }
+    catch (e) { err.textContent = "Невірний email або пароль"; document.getElementById('btn-login').textContent = 'Увійти'; }
+  };
+  window.registerUser = async () => {
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const err = document.getElementById('auth-error'); err.textContent = '';
+    if (!email || !password) { err.textContent = "Введіть email та пароль"; return; }
+    if (password.length < 6) { err.textContent = "Пароль має бути мінімум 6 символів"; return; }
+    try { document.getElementById('btn-register').textContent = 'Створення...'; await createUserWithEmailAndPassword(auth, email, password); }
+    catch (e) { err.textContent = "Помилка: " + (e.code === 'auth/email-already-in-use' ? "Ця пошта вже зареєстрована" : e.message); document.getElementById('btn-register').textContent = 'Створити новий акаунт'; }
+  };
+  window.logoutUser = async () => { if(confirm('Ви впевнені, що хочете вийти?')) { await signOut(auth); location.reload(); } };
+  window.openAuthModal = () => { document.getElementById('auth-modal').style.display = 'flex'; };
+  window.closeAuthModal = () => { document.getElementById('auth-modal').style.display = 'none'; };
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      window.currentUser = user; window.firebaseReady = true;
+      document.getElementById('auth-modal').style.display = 'none';
+      document.getElementById('auth-banner').classList.remove('visible');
+      document.getElementById('sidebar-email').textContent = user.email || user.displayName || 'Користувач';
+      document.getElementById('sidebar-login-btn').style.display = 'none';
+      document.getElementById('sidebar-logout-btn').style.display = 'block';
+      window.dispatchEvent(new CustomEvent('firebase-ready'));
+    } else {
+      window.currentUser = null; window.firebaseReady = false;
+      document.getElementById('auth-banner').classList.add('visible');
+      document.getElementById('sidebar-email').textContent = 'Гість';
+      document.getElementById('sidebar-login-btn').style.display = 'block';
+      document.getElementById('sidebar-logout-btn').style.display = 'none';
+    }
+  });
+</script>
+
+<script>
+const TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5MWU2ZGYxNDQ4ZWRmYjYzNDUxOTIzNTg2ZWViZGY4ZSIsIm5iZiI6MTc5NDIzMjgzOS42NjIwMDAyLCJzdWIiOiI2YWYxZDIwN2RiMGEwMThmYjA3MDhhNDAiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.Ub-aLpa-Tj37eRLvjYsvwI8IN5teZUzQnkjzW0c7QoU";
+const OMDB_KEY = "cf56e7ab";
+const LS = "mycinema.library";
+const LS_VER = "mycinema.library.v";
+const TMDB_IMG = "https://image.tmdb.org/t/p/";
+const EXCLUDED_TV_GENRES = [10763, 10764, 10767];
+const CAST_LIMIT = 10;
+
+const STREAMING_PROVIDERS = [
+  { id: 8, name: 'Netflix' },
+  { id: 1899, name: 'Max / HBO' },
+  { id: 9, name: 'Prime Video' },
+  { id: 350, name: 'Apple TV+' },
+  { id: 15, name: 'Hulu' },
+  { id: 386, name: 'Peacock' },
+  { id: 29, name: 'Sky' }
+];
+
+const RATING_CRITERIA = [
+  { key: 'plot', label: 'Сюжет' }, { key: 'cast', label: 'Персонажі і каст' },
+  { key: 'style', label: 'Стилістика і картинка' }, { key: 'emotions', label: 'Емоції' },
+  { key: 'overall', label: 'Загальне враження' }
+];
+
+const GENRES = [
+  { id: 28, name: 'Бойовик' }, { id: 12, name: 'Пригоди' }, { id: 16, name: 'Анімація' },
+  { id: 35, name: 'Комедія' }, { id: 80, name: 'Кримінал' }, { id: 99, name: 'Документальне' },
+  { id: 18, name: 'Драма' }, { id: 10751, name: 'Сімейне' }, { id: 14, name: 'Фентезі' },
+  { id: 36, name: 'Історія' }, { id: 27, name: 'Жахи' }, { id: 10402, name: 'Музика' },
+  { id: 9648, name: 'Детектив' }, { id: 10749, name: 'Романтика' }, { id: 878, name: 'Фантастика' },
+  { id: 53, name: 'Трилер' }, { id: 10752, name: 'Війна' }, { id: 37, name: 'Вестерн' }
+];
+
+const PLACEHOLDERS = [
+  'Від чого кайфонем сьогодні?', 'Що дивимось сьогодні?', 'Знайди свій наступний улюблений фільм',
+  'Серіал на вечір?', 'Шукаєш щось конкретне?', 'Ну що, кіно?',
+  'Який настрій сьогодні?', 'Знайти щось нове?', 'Твій наступний улюблений серіал?',
+  'Хочу щось атмосферне…', 'Що глянемо на вихідних?'
+];
+
+const THEMES = {
+  navy:    { name: 'Navy',    light: false, bg0:'#05060f', bg1:'#0d1020', bg2:'#161a30', bg3:'#252a55', bg4:'#3a4370', sidebar:'#080a14', query:'#02030a', text:'#eee', textSecondary:'#cfd0e6', textMuted:'#9a9bb5', textDim:'#5a5f8a', shadow:'0 1px 3px rgba(0,0,0,0.35)' },
+  black:   { name: 'Black',   light: false, bg0:'#000000', bg1:'#0a0a0a', bg2:'#161616', bg3:'#262626', bg4:'#3a3a3a', sidebar:'#050505', query:'#000000', text:'#eee', textSecondary:'#cfcfcf', textMuted:'#999', textDim:'#555', shadow:'0 1px 3px rgba(0,0,0,0.5)' },
+  plum:    { name: 'Plum',    light: false, bg0:'#0a0510', bg1:'#150a20', bg2:'#200f30', bg3:'#3a1a55', bg4:'#4a2565', sidebar:'#0e0618', query:'#06020a', text:'#eee', textSecondary:'#d8cfe6', textMuted:'#9a8fb5', textDim:'#5a4f7a', shadow:'0 1px 3px rgba(0,0,0,0.4)' },
+  forest:  { name: 'Forest',  light: false, bg0:'#020a06', bg1:'#0a1510', bg2:'#0f2018', bg3:'#1a3525', bg4:'#254530', sidebar:'#040e08', query:'#010504', text:'#eee', textSecondary:'#cfe6d8', textMuted:'#8fb5a0', textDim:'#4f7a5a', shadow:'0 1px 3px rgba(0,0,0,0.4)' },
+  mocha:   { name: 'Mocha',   light: false, bg0:'#0a0705', bg1:'#150f0a', bg2:'#201810', bg3:'#3a2a1a', bg4:'#4a3525', sidebar:'#0e0a06', query:'#050302', text:'#eee', textSecondary:'#e6d8c7', textMuted:'#b5a08f', textDim:'#7a5f4a', shadow:'0 1px 3px rgba(0,0,0,0.4)' },
+  mist:    { name: 'Mist',    light: true,  bg0:'#dde5ed', bg1:'#e8eef4', bg2:'#f0f4f8', bg3:'#c8d3de', bg4:'#b0bfce', sidebar:'#e8eef4', query:'#d3dde6', text:'#1a2330', textSecondary:'#3a4756', textMuted:'#6a7688', textDim:'#9aa4b3', shadow:'0 1px 2px rgba(0,0,0,0.12)' },
+  paper:   { name: 'Paper',   light: true,  bg0:'#f5f0e5', bg1:'#ebe5d8', bg2:'#e0d9c8', bg3:'#cfc6b0', bg4:'#b8ad95', sidebar:'#ebe5d8', query:'#f9f5ec', text:'#1a1a1a', textSecondary:'#3a3a3a', textMuted:'#666',    textDim:'#999',    shadow:'0 1px 2px rgba(0,0,0,0.12)' }
+};
+
+const ACCENTS = {
+  lime:    { name: 'Lime',    accent:'#c6f432', hover:'#d6ff42', fg:'#111' },
+  cyan:    { name: 'Cyan',    accent:'#22d3ee', hover:'#3ddcf5', fg:'#0a1a1e' },
+  orange:  { name: 'Orange',  accent:'#fb923c', hover:'#fcab5c', fg:'#2a1005' },
+  pink:    { name: 'Pink',    accent:'#f472b6', hover:'#f78dbf', fg:'#2a0520' },
+  violet:  { name: 'Violet',  accent:'#a78bfa', hover:'#b8a3ff', fg:'#1a0a3a' },
+  emerald: { name: 'Emerald', accent:'#10b981', hover:'#22c997', fg:'#ffffff' },
+  ruby:    { name: 'Ruby',    accent:'#dc2626', hover:'#ef4444', fg:'#ffffff' }
+};
+
+const settings = {
+  themeBg: localStorage.getItem('mycinema.theme.bg') || 'navy',
+  themeAccent: localStorage.getItem('mycinema.theme.accent') || 'lime',
+  posterBg: localStorage.getItem('mycinema.posterBg') === 'true'
+};
+
+function applyTheme(bgName, accentName) {
+  const t = THEMES[bgName] || THEMES.navy;
+  const a = ACCENTS[accentName] || ACCENTS.lime;
+  const r = document.documentElement.style;
+  r.setProperty('--bg-0', t.bg0); r.setProperty('--bg-1', t.bg1); r.setProperty('--bg-2', t.bg2);
+  r.setProperty('--bg-3', t.bg3); r.setProperty('--bg-4', t.bg4);
+  r.setProperty('--bg-sidebar', t.sidebar); r.setProperty('--bg-query', t.query);
+  r.setProperty('--text', t.text); r.setProperty('--text-secondary', t.textSecondary);
+  r.setProperty('--text-muted', t.textMuted); r.setProperty('--text-dim', t.textDim);
+  r.setProperty('--text-shadow', t.shadow);
+  r.setProperty('--accent', a.accent); r.setProperty('--accent-hover', a.hover); r.setProperty('--accent-fg', a.fg);
+  settings.themeBg = bgName; settings.themeAccent = accentName;
+  localStorage.setItem('mycinema.theme.bg', bgName);
+  localStorage.setItem('mycinema.theme.accent', accentName);
+}
+applyTheme(settings.themeBg, settings.themeAccent);
+
+function isLightTheme(name) { return (THEMES[name] || THEMES.navy).light; }
+
+function renderSettingsSwatches() {
+  const bgWrap = document.getElementById('bg-swatches');
+  const acWrap = document.getElementById('accent-swatches');
+  bgWrap.replaceChildren(); acWrap.replaceChildren();
+  Object.entries(THEMES).forEach(([key, t]) => {
+    const s = el('div', 'theme-swatch' + (settings.themeBg === key ? ' active' : ''));
+    s.style.background = `linear-gradient(135deg, ${t.bg1} 0%, ${t.bg3} 100%)`;
+    s.innerHTML = `<span class="theme-swatch-label" style="color:${t.text}">${t.name}</span>`;
+    s.addEventListener('click', () => { applyTheme(key, settings.themeAccent); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
+    bgWrap.append(s);
+  });
+  Object.entries(ACCENTS).forEach(([key, a]) => {
+    const s = el('div', 'theme-swatch' + (settings.themeAccent === key ? ' active' : ''));
+    s.style.background = a.accent;
+    s.innerHTML = `<span class="theme-swatch-label" style="color:${a.fg}">${a.name}</span>`;
+    s.addEventListener('click', () => { applyTheme(settings.themeBg, key); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
+    acWrap.append(s);
+  });
+}
+
+function openSettings() {
+  closeSidebar();
+  renderSettingsSwatches();
+  document.getElementById('poster-bg-toggle').checked = settings.posterBg;
+  document.getElementById('settings-modal').classList.add('open');
+}
+function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+function onPosterBgToggle(on) {
+  settings.posterBg = on;
+  localStorage.setItem('mycinema.posterBg', on ? 'true' : 'false');
+  if (cardStack.length) renderCard();
+}
+function restartOnboardingFromSettings() {
+  closeSettings();
+  if (confirm('Пройти налаштування знову? Обрані тайтли додадуться до бібліотеки з оцінкою 8.')) {
+    localStorage.removeItem('onboardingDone');
+    startOnboarding();
+  }
+}
+
+let lib = load();
+let state = {
+  tab: 'home', typeFilter: 'all',
+  filter: { query: '', type: 'all', decade: 'any', genre: 'any', minRating: 0, sortBy: 'popularity.desc', streaming: null },
+  home: { loading: false, recs: null, sig: null, shown: { movie: 18, tv: 18 }, tab: 'movie' },
+  game: { active: false, type: 'movie', round: 0, totalRounds: 30, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() },
+  stats: { tab: 'top', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } }
+};
+let cardStack = [];
+let filterPage = 1;
+let filterLoading = false;
+let timer, acTimer;
+
+const input = document.getElementById("q");
+const box = document.getElementById("results");
+const overlay = document.getElementById("overlay");
+const card = document.getElementById("card");
+const autocomplete = document.getElementById("autocomplete");
+const typeFilterBar = document.getElementById("type-filter");
+const syncIndicator = document.getElementById('sync-indicator');
+
+function rotatePlaceholder() {
+  const current = input.placeholder;
+  let next, attempts = 0;
+  do { next = PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)]; attempts++; } while (next === current && attempts < 10);
+  input.placeholder = next;
+}
+rotatePlaceholder();
+input.addEventListener('blur', () => { if (!input.value.trim()) rotatePlaceholder(); });
+
+function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-backdrop').classList.add('open'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-backdrop').classList.remove('open'); }
+
+document.addEventListener('pointerdown', (e) => {
+  const btn = e.target.closest('.nav-item, .filter-btn, .home-tab, .card-tab, .btn, .card-x, .filter-actions button, .query-bar button, .trailer-btn, .auth-btn, .onb-btn, .game-btn, .login-btn-side, .logout-btn-side, .season-tab-btn, .settings-btn, .cast-loader-btn');
+  if (!btn) return;
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height) * 2.2;
+  const ripple = document.createElement('span');
+  ripple.className = 'ripple';
+  ripple.style.width = size + 'px'; ripple.style.height = size + 'px';
+  ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+  ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+  btn.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 700);
+});
+
+function openImageZoom(path, size) {
+  if (!path) return;
+  const zoom = document.getElementById('poster-zoom');
+  zoom.querySelector('img').src = TMDB_IMG + (size || 'w500') + path;
+  zoom.classList.add('open');
+}
+function closeImageZoom() { document.getElementById('poster-zoom').classList.remove('open'); }
+document.getElementById('poster-zoom').addEventListener('click', (e) => {
+  if (e.target.id === 'poster-zoom' || e.target.classList.contains('zoom-close')) closeImageZoom();
+});
+
+function setSyncStatus(status, text) {
+  syncIndicator.className = 'sync-indicator visible ' + status;
+  syncIndicator.textContent = text;
+  if (status === 'saved') setTimeout(() => { syncIndicator.classList.remove('visible'); }, 2000);
+}
+function showSyncToast(text) {
+  syncIndicator.className = 'sync-indicator visible saved';
+  syncIndicator.textContent = text;
+  clearTimeout(showSyncToast._t);
+  showSyncToast._t = setTimeout(() => syncIndicator.classList.remove('visible'), 1800);
+}
+
+function load() {
+  let data;
+  try { data = JSON.parse(localStorage.getItem(LS)) || {}; } catch { data = {}; }
+  const version = parseInt(localStorage.getItem(LS_VER)) || 1;
+  if (version < 2) {
+    Object.values(data).forEach(item => {
+      if (typeof item.rating === 'number' && item.rating > 0 && !item.ratings) item.ratings = { overall: item.rating };
+      delete item.rating;
+    });
+    try { localStorage.setItem(LS, JSON.stringify(data)); localStorage.setItem(LS_VER, "2"); } catch {}
+  }
+  return data;
+}
+function saveLocalOnly() { try { localStorage.setItem(LS, JSON.stringify(lib)); } catch {} }
+let _saveTimer = null;
+function save() { saveLocalOnly(); clearTimeout(_saveTimer); _saveTimer = setTimeout(saveToCloud, 800); }
+function saveNow() { saveLocalOnly(); clearTimeout(_saveTimer); return saveToCloud(); }
+
+async function saveToCloud() {
+  if (!window.currentUser || !window.firebaseReady) return;
+  try {
+    setSyncStatus('saving', 'Зберігаю...');
+    const ref = window.firestoreDoc(window.firestoreDB, 'libraries', window.currentUser.uid);
+    await window.firestoreSetDoc(ref, { items: lib, updatedAt: new Date(), email: window.currentUser.email });
+    setSyncStatus('saved', '✓ Збережено');
+  } catch (e) { setSyncStatus('error', '⚠ Помилка'); console.error(e); }
+}
+
+async function syncFromCloud() {
+  if (!window.currentUser || !window.firebaseReady) return;
+  try {
+    setSyncStatus('saving', 'Синхронізую...');
+    const ref = window.firestoreDoc(window.firestoreDB, 'libraries', window.currentUser.uid);
+    const snap = await window.firestoreGetDoc(ref);
+    if (snap.exists()) {
+      const cloudItems = snap.data().items || {};
+      if (Object.keys(cloudItems).length > 0) { lib = cloudItems; saveLocalOnly(); refresh(); }
+      setSyncStatus('saved', '✓ Синхронізовано');
+    } else {
+      if (Object.keys(lib).length > 0) await saveToCloud();
+      else setSyncStatus('saved', '✓ Готово');
+    }
+    if (Object.keys(lib).length === 0 && !localStorage.getItem('onboardingDone')) startOnboarding();
+  } catch (e) { setSyncStatus('error', '⚠ Помилка'); }
+}
+
+function exportLibrary() {
+  closeSettings();
+  const data = JSON.stringify(lib, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'mycinema-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showSyncToast('💾 Експортовано');
+}
+
+function importLibrary() {
+  closeSettings();
+  const fileInput = document.getElementById('import-file');
+  fileInput.value = '';
+  fileInput.onchange = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (typeof data !== 'object' || Array.isArray(data)) throw new Error('Невірний формат');
+      const count = Object.keys(data).length;
+      if (!confirm('Імпортувати ' + count + ' тайтлів? Поточні дані буде замінено.')) return;
+      lib = data; await saveNow(); refresh();
+      showSyncToast('📥 Імпортовано: ' + count);
+    } catch (err) { alert('Помилка імпорту: ' + err.message); }
+  };
+  fileInput.click();
+}
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+function fmtNum(n) { return n.toFixed(1).replace('.', ','); }
+function computeAverage(ratings) {
+  if (!ratings) return 0;
+  const vals = RATING_CRITERIA.map(c => ratings[c.key] || 0).filter(v => v > 0);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+}
+function countFilled(ratings) { return ratings ? RATING_CRITERIA.filter(c => ratings[c.key] > 0).length : 0; }
+function ratingClass(avg) { return avg >= 8 ? 'green' : (avg >= 6 ? 'yellow' : 'red'); }
+
+function computeItemRating(item) {
+  if (!item) return { avg: 0, complete: false, rated: 0, total: 0 };
+  if (item.type === 'tv') {
+    const sr = item.seasonRatings || {};
+    const ratedKeys = Object.keys(sr).filter(k => computeAverage(sr[k]) > 0);
+    const total = item.totalSeasons || ratedKeys.length || 0;
+    if (!ratedKeys.length) return { avg: 0, complete: false, rated: 0, total };
+    const avgs = ratedKeys.map(k => computeAverage(sr[k]));
+    return { avg: avgs.reduce((a, b) => a + b, 0) / avgs.length, complete: total > 0 && ratedKeys.length >= total, rated: ratedKeys.length, total };
+  }
+  const avg = computeAverage(item.ratings);
+  return { avg, complete: avg > 0, rated: avg > 0 ? 1 : 0, total: 1 };
+}
+
+function hasWatched(item) {
+  if (!item) return false;
+  if (item.status === 'watched' || item.status === 'watching') return true;
+  if (item.ratings && Object.values(item.ratings).some(v => v > 0)) return true;
+  if (item.seasonRatings && Object.keys(item.seasonRatings).length > 0) return true;
+  if (item.watchedEpisodes && item.watchedEpisodes.length > 0) return true;
+  return false;
+}
+
+function tmdbFetch(path) {
+  return fetch('https://api.themoviedb.org/3' + path, { headers: { Authorization: 'Bearer ' + TOKEN } })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+}
+function normalizeItem(r) {
+  const type = r.media_type || (r.first_air_date ? 'tv' : 'movie');
+  return {
+    key: type + '-' + r.id, id: r.id, type,
+    title: r.title || r.name, year: (r.release_date || r.first_air_date || '').slice(0, 4),
+    poster: r.poster_path, overview: r.overview || '', tmdbRating: r.vote_average || 0,
+    votes: r.vote_count || 0, popularity: r.popularity || 0
+  };
+}
+
+function findAllTrailers(videos, originalLang) {
+  const list = (videos?.results || []).filter(v => v.site === 'YouTube' && v.key && (v.type === 'Trailer' || v.type === 'Teaser'));
+  const langRank = v => v.iso_639_1 === 'uk' ? 0 : (v.iso_639_1 === originalLang ? 1 : (v.iso_639_1 === 'en' ? 2 : 3));
+  const typeRank = v => v.type === 'Trailer' ? 0 : 1;
+  const seen = new Set();
+  return list.sort((a, b) =>
+      typeRank(a) - typeRank(b) || langRank(a) - langRank(b) ||
+      (b.official ? 1 : 0) - (a.official ? 1 : 0) || new Date(b.published_at) - new Date(a.published_at))
+    .filter(v => { if (seen.has(v.key)) return false; seen.add(v.key); return true; }).slice(0, 5);
+}
+function trailerLabel(t) {
+  const lang = t.iso_639_1 === 'uk' ? 'UA' : (t.iso_639_1 ? t.iso_639_1.toUpperCase() : '—');
+  return (t.type === 'Teaser' ? 'Тізер' : 'Трейлер') + ' · ' + lang;
+}
+
+let onbSelected = new Set();
+let onbCategories = [];
+
+async function startOnboarding() {
+  document.getElementById('onboarding-modal').style.display = 'flex';
+  const sc = document.getElementById('onb-scroll');
+  sc.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
+  onbSelected.clear();
+  try {
+    const [trM, popM, topM, trT, popT, topT] = await Promise.all([
+      tmdbFetch('/trending/movie/week?language=uk-UA').catch(() => ({ results: [] })),
+      tmdbFetch('/discover/movie?language=uk-UA&sort_by=popularity.desc&vote_count.gte=100&page=1').catch(() => ({ results: [] })),
+      tmdbFetch('/discover/movie?language=uk-UA&sort_by=vote_average.desc&vote_count.gte=1000&page=1').catch(() => ({ results: [] })),
+      tmdbFetch('/trending/tv/week?language=uk-UA').catch(() => ({ results: [] })),
+      tmdbFetch('/discover/tv?language=uk-UA&sort_by=popularity.desc&vote_count.gte=100&page=1').catch(() => ({ results: [] })),
+      tmdbFetch('/discover/tv?language=uk-UA&sort_by=vote_average.desc&vote_count.gte=500&page=1').catch(() => ({ results: [] }))
+    ]);
+    const dedup = (items, seen) => items.filter(x => { if (seen.has(x.key) || !x.poster) return false; seen.add(x.key); return true; });
+    const seenM = new Set();
+    const trMItems = dedup(trM.results.map(r => normalizeItem({...r, media_type: 'movie'})), seenM).slice(0, 15);
+    const popMItems = dedup(popM.results.map(r => normalizeItem({...r, media_type: 'movie'})), seenM).slice(0, 20);
+    const topMItems = dedup(topM.results.map(r => normalizeItem({...r, media_type: 'movie'})), seenM).slice(0, 15);
+    const seenT = new Set();
+    const trTItems = dedup(trT.results.map(r => normalizeItem({...r, media_type: 'tv'})), seenT).slice(0, 15);
+    const popTItems = dedup(popT.results.map(r => normalizeItem({...r, media_type: 'tv'})), seenT).slice(0, 20);
+    const topTItems = dedup(topT.results.map(r => normalizeItem({...r, media_type: 'tv'})), seenT).slice(0, 15);
+    onbCategories = [
+      { title: '🔥 Фільми · Тренди тижня', items: trMItems },
+      { title: '⭐ Фільми · Популярне', items: popMItems },
+      { title: '🏆 Фільми · Найкращі', items: topMItems },
+      { title: '🔥 Серіали · Тренди тижня', items: trTItems },
+      { title: '⭐ Серіали · Популярне', items: popTItems },
+      { title: '🏆 Серіали · Найкращі', items: topTItems }
+    ].filter(c => c.items.length > 0);
+    renderOnbGrids();
+  } catch (e) { sc.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${e.message}</div>`; }
+}
+
+function renderOnbGrids() {
+  const sc = document.getElementById('onb-scroll');
+  sc.innerHTML = '';
+  onbCategories.forEach(cat => {
+    const catEl = el('div', 'onb-category');
+    catEl.append(el('div', 'onb-category-title', cat.title));
+    const gridEl = el('div', 'onb-grid');
+    cat.items.forEach(item => {
+      const c = el('div', 'onb-card' + (onbSelected.has(item.key) ? ' selected' : ''));
+      const p = el('img', 'onb-poster'); p.src = TMDB_IMG + 'w185' + item.poster; p.loading = 'lazy';
+      c.append(p); c.append(el('div', 'onb-title', item.title));
+      c.addEventListener('click', () => {
+        if (onbSelected.has(item.key)) onbSelected.delete(item.key); else onbSelected.add(item.key);
+        c.classList.toggle('selected'); updateOnbSubmit();
+      });
+      gridEl.append(c);
+    });
+    catEl.append(gridEl); sc.append(catEl);
+  });
+  updateOnbSubmit();
+}
+
+function updateOnbSubmit() {
+  const btn = document.getElementById('onb-submit');
+  if (onbSelected.size >= 5) { btn.classList.add('active'); btn.disabled = false; }
+  else { btn.classList.remove('active'); btn.disabled = true; }
+}
+
+async function submitOnboarding() {
+  const btn = document.getElementById('onb-submit');
+  btn.textContent = 'Збереження...'; btn.disabled = true;
+  const items = [];
+  onbCategories.forEach(cat => cat.items.forEach(it => { if (onbSelected.has(it.key)) items.push(it); }));
+  items.forEach(it => {
+    lib[it.key] = { ...it, status: 'watched', ratings: it.type === 'movie' ? { overall: 8 } : null, updated: Date.now() };
+  });
+  localStorage.setItem('onboardingDone', 'true');
+  document.getElementById('onboarding-modal').style.display = 'none';
+  btn.textContent = 'Продовжити';
+  await saveNow(); refresh();
+}
+
+function skipOnboarding() {
+  if (confirm('Пропустити налаштування?')) {
+    localStorage.setItem('onboardingDone', 'true');
+    document.getElementById('onboarding-modal').style.display = 'none';
+  }
+}
+
+const RECS_CACHE = 'mycinema.recs';
+const RECS_TTL = 12 * 60 * 60 * 1000;
+const RECS_STEP = 18;
+
+function getSeeds() {
+  return Object.values(lib).map(x => ({ ...x, avg: computeItemRating(x).avg }))
+    .filter(x => x.avg >= 7 && x.id && (x.type === 'movie' || x.type === 'tv'))
+    .sort((a, b) => (b.updated || 0) - (a.updated || 0)).slice(0, 10);
+}
+
+async function buildRecommendations(seeds) {
+  const pool = { movie: new Map(), tv: new Map() };
+  const add = (type, r, score, seed, pos) => {
+    if (!r.poster_path || r.adult) return;
+    if ((r.vote_count || 0) < 100 || (r.vote_average || 0) < 6) return;
+    const key = type + '-' + r.id;
+    let e = pool[type].get(key);
+    if (!e) { e = { ...normalizeItem({ ...r, media_type: type }), score: 0, hits: 0, best: 0, from: null }; pool[type].set(key, e); }
+    e.score += score; e.hits++;
+    if (score > e.best) { e.best = score; e.from = seed ? seed.title : null; }
+  };
+  await Promise.all(seeds.map(async (seed, idx) => {
+    const weight = (seed.avg / 10) * (1 - idx * 0.05);
+    const pages = await Promise.all([1, 2].map(p => tmdbFetch(`/${seed.type}/${seed.id}/recommendations?language=uk-UA&page=${p}`).catch(() => ({ results: [] }))));
+    pages.flatMap(p => p.results).forEach((r, pos) => {
+      const rank = Math.max(0.3, 1 - pos / 45);
+      add(seed.type, r, weight * rank + ((r.vote_average || 0) / 10) * 0.05, seed, pos);
+    });
+  }));
+  const need = ['movie', 'tv'].filter(t => pool[t].size < 15);
+  if (need.length) {
+    const kwCount = {};
+    await Promise.all(seeds.map(async seed => {
+      try { const d = await tmdbFetch(`/${seed.type}/${seed.id}/keywords`); (d.keywords || d.results || []).forEach(k => { kwCount[k.id] = (kwCount[k.id] || 0) + 1; }); } catch {}
+    }));
+    const kws = Object.entries(kwCount).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => id);
+    if (kws.length) {
+      await Promise.all(need.map(async type => {
+        const pages = await Promise.all([1, 2].map(p => tmdbFetch(`/discover/${type}?language=uk-UA&with_keywords=${kws.join('|')}&sort_by=popularity.desc&vote_count.gte=150&vote_average.gte=6.3&page=${p}`).catch(() => ({ results: [] }))));
+        pages.flatMap(p => p.results).forEach((r, pos) => add(type, r, 0.25 * Math.max(0.3, 1 - pos / 40), null, pos));
+      }));
+    }
+  }
+  const rank = m => [...m.values()].sort((a, b) => b.score - a.score).slice(0, 80);
+  return { movie: rank(pool.movie), tv: rank(pool.tv), seedCount: seeds.length };
+}
+
+function readRecsCache(sig) {
+  try { const c = JSON.parse(localStorage.getItem(RECS_CACHE)); if (c && c.sig === sig && Date.now() - c.ts < RECS_TTL) return c.data; } catch {}
+  return null;
+}
+function writeRecsCache(sig, data) { try { localStorage.setItem(RECS_CACHE, JSON.stringify({ sig, ts: Date.now(), data })); } catch {} }
+
+async function loadHome() {
+  if (state.tab !== 'home') return;
+  const seeds = getSeeds();
+  const sig = seeds.map(s => s.key + ':' + s.avg.toFixed(1)).join('|');
+  if (!seeds.length) { state.home.recs = { movie: [], tv: [], seedCount: 0 }; state.home.sig = sig; renderHomeContent(); return; }
+  if (state.home.recs && state.home.sig === sig) { renderHomeContent(); return; }
+  const cached = readRecsCache(sig);
+  if (cached) { state.home.recs = cached; state.home.sig = sig; state.home.shown = { movie: RECS_STEP, tv: RECS_STEP }; renderHomeContent(); return; }
+  if (state.home.loading === sig) return;
+  state.home.loading = sig;
+  box.style.padding = '0';
+  box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Підбираю рекомендації...</div>';
+  try {
+    const data = await buildRecommendations(seeds);
+    writeRecsCache(sig, data);
+    state.home.recs = data; state.home.sig = sig; state.home.shown = { movie: RECS_STEP, tv: RECS_STEP };
+    renderHomeContent();
+  } catch (e) { box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${e.message}</div>`; }
+  finally { state.home.loading = false; }
+}
+
+function renderHomeContent() {
+  if (state.tab !== 'home') return;
+  box.replaceChildren(); box.style.padding = '0';
+  const libSize = Object.keys(lib).length;
+  if (libSize > 0) {
+    const watched = Object.values(lib).filter(x => x.status === 'watched').length;
+    const watching = Object.values(lib).filter(x => x.status === 'watching').length;
+    box.append(el('div', 'home-greeting', `У бібліотеці: ${libSize} · Переглянуто: ${watched} · Дивлюсь: ${watching}`));
+  }
+  const cwSection = buildContinueWatchingSection();
+  if (cwSection) box.append(cwSection);
+  const recs = state.home.recs;
+  if (!recs || !recs.seedCount) { box.append(el('div', 'home-note', 'Постав оцінку 7+ хоча б одному фільму чи серіалу, і тут з\'являться персональні рекомендації.')); return; }
+  const tabs = el('div', 'home-tabs');
+  const mTab = el('button', 'home-tab' + (state.home.tab === 'movie' ? ' active' : ''), '🎬 Фільми');
+  const tTab = el('button', 'home-tab' + (state.home.tab === 'tv' ? ' active' : ''), '📺 Серіали');
+  mTab.addEventListener('click', () => { if (state.home.tab !== 'movie') { state.home.tab = 'movie'; renderHomeContent(); } });
+  tTab.addEventListener('click', () => { if (state.home.tab !== 'tv') { state.home.tab = 'tv'; renderHomeContent(); } });
+  tabs.append(mTab, tTab); box.append(tabs);
+  const wrap = el('div', 'home-wrap');
+  wrap.append(el('div', 'home-note', `На основі твоїх останніх оцінок 7+ (${recs.seedCount})`));
+  const type = state.home.tab;
+  const items = (recs[type] || []).filter(x => !lib[x.key]);
+  const section = el('div', 'home-row-section');
+  section.append(el('h2', 'home-grid-title', type === 'movie' ? '🎬 Фільми для тебе' : '📺 Серіали для тебе'));
+  if (!items.length) {
+    section.append(el('div', 'home-note', 'Поки нема з чого підібрати.'));
+  } else {
+    const shown = state.home.shown[type];
+    const grid = el('div', 'home-grid');
+    items.slice(0, shown).forEach(item => grid.append(recCard(item)));
+    section.append(grid);
+    if (items.length > shown) {
+      const more = el('button', 'home-more', 'Показати ще');
+      more.addEventListener('click', () => { state.home.shown[type] += RECS_STEP; renderHomeContent(); });
+      section.append(more);
+    }
+  }
+  wrap.append(section); box.append(wrap);
+}
+
+function buildContinueWatchingSection() {
+  const watching = Object.values(lib).filter(x => x.type === 'tv' && x.status === 'watching' && x.watchedEpisodes && x.watchedEpisodes.length > 0).sort((a, b) => b.updated - a.updated).slice(0, 6);
+  if (!watching.length) return null;
+  const wrap = el('div', 'home-wrap');
+  wrap.append(el('h2', 'home-grid-title', '⏯️ Продовжити дивитись'));
+  const grid = el('div', 'home-grid');
+  watching.forEach(item => {
+    const c = el('div', 'rec-card');
+    const p = el('img', 'rec-poster');
+    if (item.poster) p.src = TMDB_IMG + 'w342' + item.poster;
+    c.append(p); c.append(el('div', 'row-title', item.title));
+    const eps = item.watchedEpisodes || [];
+    if (eps.length) c.append(el('div', 'rec-why', 'зупинився на ' + eps[eps.length - 1].replace('-', '×')));
+    c.addEventListener('click', () => openCard(item));
+    grid.append(c);
+  });
+  wrap.append(grid); return wrap;
+}
+
+function recCard(item) {
+  const c = el('div', 'rec-card');
+  const p = el('img', 'rec-poster'); p.src = TMDB_IMG + 'w342' + item.poster; p.loading = 'lazy';
+  c.append(p);
+  c.append(el('div', 'row-title', item.title));
+  let meta = item.year || '';
+  if (item.tmdbRating) meta += (meta ? ' · ' : '') + item.tmdbRating.toFixed(1);
+  c.append(el('div', 'row-meta', meta));
+  if (item.from) c.append(el('div', 'rec-why', 'як «' + item.from + '»' + (item.hits > 1 ? ' +' + (item.hits - 1) : '')));
+  else c.append(el('div', 'rec-why', 'за темами оцінок'));
+  c.addEventListener('click', () => openCard(item));
+  return c;
+}
+
+input.addEventListener("input", () => {
+  clearTimeout(acTimer);
+  const q = input.value.trim();
+  if (!q) { hideAutocomplete(); return; }
+  acTimer = setTimeout(async () => {
+    try {
+      const data = await tmdbFetch(`/search/multi?language=uk-UA&query=${encodeURIComponent(q)}&include_adult=false`);
+      showAutocomplete(data.results, q);
+    } catch (e) {}
+  }, 300);
+});
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); performFullSearch(); }
+  if (e.key === "Escape") hideAutocomplete();
+});
+document.addEventListener("click", (e) => { if (!e.target.closest(".search-container")) hideAutocomplete(); });
+
+function hideAutocomplete() { autocomplete.classList.add("hidden"); autocomplete.replaceChildren(); }
+function showAutocomplete(rawResults, query) {
+  const people = rawResults.filter(r => r.media_type === 'person').slice(0, 2);
+  const media = rawResults.filter(r => r.media_type === 'movie' || r.media_type === 'tv').map(normalizeItem).sort((a, b) => b.popularity - a.popularity).slice(0, 6);
+  autocomplete.replaceChildren(); autocomplete.classList.remove("hidden");
+  if (!people.length && !media.length) { autocomplete.append(el("div", "ac-empty", `Нічого не знайдено`)); return; }
+  for (const p of people) {
+    const row = el("div", "ac-item");
+    const photo = p.profile_path ? el("img", "ac-poster") : el("div", "ac-poster");
+    if (p.profile_path) { photo.src = TMDB_IMG + "w185" + p.profile_path; photo.loading = "lazy"; }
+    row.append(photo);
+    const info = el("div", "ac-info");
+    info.append(el("div", "ac-title", p.name));
+    info.append(el("div", "ac-meta ac-type-person", "Актор/Акторка"));
+    row.append(info);
+    row.addEventListener("click", () => { hideAutocomplete(); openPerson(p.id, p); });
+    autocomplete.append(row);
+  }
+  for (const item of media) {
+    const row = el("div", "ac-item");
+    row.append(posterEl(item, "ac-poster"));
+    const info = el("div", "ac-info");
+    info.append(el("div", "ac-title", item.title));
+    let meta = (item.type === "tv" ? "Серіал" : "Фільм") + (item.year ? " · " + item.year : "");
+    if (item.tmdbRating) meta += ` · ${item.tmdbRating.toFixed(1)}`;
+    info.append(el("div", "ac-meta", meta));
+    row.append(info);
+    row.addEventListener("click", () => { hideAutocomplete(); openCard(item); });
+    autocomplete.append(row);
+  }
+  const footer = el("div", "ac-footer", `Показати всі результати для "${query}" ↵`);
+  footer.addEventListener("click", performFullSearch);
+  autocomplete.append(footer);
+}
+function performFullSearch() {
+  const q = input.value.trim();
+  if (!q) return;
+  hideAutocomplete();
+  state.filter.query = q;
+  if (state.tab !== "filter") setTab("filter"); else renderFilter();
+}
+
+function setTab(t) {
+  state.tab = t;
+  closeSidebar();
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+  typeFilterBar.classList.toggle("hidden", !["watching", "watched", "planned"].includes(t));
+  if (t === 'game') { box.style.padding = '0'; renderGame(); return; }
+  refresh();
+}
+document.querySelectorAll(".filter-btn").forEach(b => b.addEventListener("click", () => setTypeFilter(b.dataset.filter)));
+function setTypeFilter(f) {
+  state.typeFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === f));
+  if (state.tab === "filter") renderFilter(); else renderLibrary();
+}
+function refresh() {
+  if (state.tab === "home") loadHome();
+  else if (state.tab === "filter") renderFilter();
+  else if (state.tab === "game") renderGame();
+  else if (state.tab === "statistics") renderStatistics();
+  else if (state.tab === "notes") renderNotesList();
+  else renderLibrary();
+}
+
+function renderLibrary() {
+  let items = Object.values(lib).filter(x => x.status === state.tab).sort((a, b) => b.updated - a.updated);
+  if (state.typeFilter !== "all") items = items.filter(x => x.type === state.typeFilter);
+  box.style.padding = '0 16px 16px';
+  if (!items.length) { box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">Тут поки порожньо</div>`; return; }
+  box.replaceChildren();
+  items.forEach((r) => box.append(createListItem(r)));
+}
+
+// ============ NOTES LIST ============
+function renderNotesList() {
+  const items = Object.values(lib).filter(x => x.notes && x.notes.trim()).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  box.style.padding = '0 16px 16px';
+  box.replaceChildren();
+  if (!items.length) {
+    box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Ще немає нотаток. Відкрийте тайтл і перейдіть на вкладку «📝 Нотатки»</div>';
+    return;
+  }
+  items.forEach(item => box.append(createNoteCard(item)));
+}
+
+function createNoteCard(item) {
+  const card = el('div', 'note-card');
+  card.append(posterEl(item, 'note-poster'));
+  const body = el('div', 'note-body');
+  body.append(el('div', 'note-title', item.title));
+  const meta = (item.type === 'tv' ? 'Серіал' : 'Фільм') + (item.year ? ' · ' + item.year : '');
+  body.append(el('div', 'note-meta', meta));
+  body.append(el('div', 'note-text', item.notes));
+  card.append(body);
+  card.addEventListener('click', () => openCard(item));
+  return card;
+}
+
+function createListItem(r, showNumber, number) {
+  const item = el("div", "item" + (showNumber ? " has-number" : ""));
+  if (showNumber) item.append(el("div", "top-number", String(number)));
+  item.append(posterEl(r, "poster"));
+  const info = el("div", "info");
+  info.append(el("div", "title", r.title));
+  let metaText = (r.type === "tv" ? "Серіал" : "Фільм") + (r.year ? " · " + r.year : "");
+  if (r.tmdbRating > 0) metaText += ` · TMDB: ${r.tmdbRating.toFixed(1)}`;
+  info.append(el("div", "meta", metaText));
+  const saved = lib[r.key];
+  if (saved) {
+    const ir = computeItemRating(saved);
+    if (ir.avg > 0) {
+      const suffix = ir.complete ? '' : '-...';
+      info.append(el("span", "badge rated " + ratingClass(ir.avg), `Моя оцінка: ${fmtNum(ir.avg)}${suffix}/10`));
+    } else if (saved.status) {
+      const labels = { watched: "Переглянуто", planned: "Планую", watching: "Дивлюсь" };
+      info.append(el("span", "badge", labels[saved.status] || ""));
+    }
+  }
+  item.append(info);
+  if (saved) {
+    const del = el("button", "item-delete", "×");
+    del.title = "Видалити з бібліотеки";
+    del.addEventListener("click", (e) => { e.stopPropagation(); removeFromLibrary(r.key); });
+    item.append(del);
+  }
+  item.addEventListener("click", () => openCard(r));
+  return item;
+}
+
+function createPersonResult(p) {
+  const item = el("div", "item");
+  const photo = p.profile_path ? el("img", "poster") : el("div", "poster");
+  if (p.profile_path) { photo.src = TMDB_IMG + "w185" + p.profile_path; photo.loading = "lazy"; }
+  item.append(photo);
+  const info = el("div", "info");
+  info.append(el("div", "title", p.name)); info.append(el("div", "meta", "Актор/Акторка"));
+  if (p.known_for?.length) {
+    const titles = p.known_for.slice(0, 3).map(k => k.title || k.name).filter(Boolean).join(', ');
+    if (titles) info.append(el("div", "meta", titles));
+  }
+  item.append(info); item.addEventListener("click", () => openPerson(p.id, p)); return item;
+}
+function posterEl(r, cls) {
+  const tag = r.poster ? "img" : "div"; const e = el(tag, cls);
+  if (r.poster) { e.src = TMDB_IMG + "w342" + r.poster; e.loading = "lazy"; }
+  else e.classList.add('poster-empty');
+  return e;
+}
+
+function removeFromLibrary(key) {
+  if (!lib[key]) return;
+  if (!confirm('Видалити цей тайтл з бібліотеки?\nУсі оцінки, статус, нотатки і відмічені епізоди буде втрачено.')) return;
+  delete lib[key];
+  saveNow(); refresh();
+  const ctx = cardStack[cardStack.length - 1];
+  if (ctx && ctx.type === 'media' && ctx.item.key === key) renderCard();
+  showSyncToast('🗑️ Видалено з бібліотеки');
+}
+
+// ============ FILTER ============
+function renderFilter() {
+  if (box.querySelector('.filter-panel')) {
+    filterPage = 1;
+    const list = document.getElementById('filter-results-list'); if (list) list.innerHTML = '';
+    doFetchFilter(false); return;
+  }
+  box.replaceChildren(); box.style.padding = '0 16px 16px';
+  if (state.filter.query) {
+    const qb = el("div", "query-bar");
+    qb.append(el("span", "", `Результати пошуку: "${state.filter.query}"`));
+    const clr = el("button", "", "✕");
+    clr.addEventListener("click", () => { state.filter.query = ''; input.value = ''; renderFilter(); });
+    qb.append(clr); box.append(qb);
+  }
+  box.append(buildFilterPanel());
+  const ra = el("div"); ra.id = "filter-results-list"; box.append(ra);
+  filterPage = 1; doFetchFilter(false);
+}
+
+function buildFilterPanel() {
+  const panel = el("div", "filter-panel");
+  const decades = [['any', 'Будь-яке'], ['2020', '2020-ті'], ['2010', '2010-ті'], ['2000', '2000-ті'], ['1990', '1990-ті'], ['1980', '1980-ті'], ['1970', '1970-ті']];
+  const ratings = [[0, 'Будь-який'], [5, '5+'], [6, '6+'], [7, '7+'], [8, '8+'], [9, '9+']];
+  const sorts = [['popularity.desc', 'Популярність ↓'], ['vote_average.desc', 'Рейтинг ↓'], ['primary_release_date.desc', 'Новіші'], ['primary_release_date.asc', 'Старіші']];
+  const streams = [['any', 'Будь-який'], ...STREAMING_PROVIDERS.map(p => [String(p.id), p.name])];
+  panel.append(makeSelectRow('Тип', 'f-type', [['all', 'Всі'], ['movie', 'Фільми'], ['tv', 'Серіали']], state.filter.type));
+  panel.append(makeSelectRow('Десятиліття', 'f-decade', decades, state.filter.decade));
+  panel.append(makeSelectRow('Жанр', 'f-genre', [['any', 'Будь-який'], ...GENRES.map(g => [String(g.id), g.name])], String(state.filter.genre)));
+  panel.append(makeSelectRow('Мін. рейтинг', 'f-rating', ratings, String(state.filter.minRating)));
+  panel.append(makeSelectRow('Стрімінг', 'f-streaming', streams, state.filter.streaming ? String(state.filter.streaming) : 'any'));
+  panel.append(makeSelectRow('Сортування', 'f-sort', sorts, state.filter.sortBy));
+  const actions = el("div", "filter-actions");
+  const resetBtn = el("button", "", "Скинути");
+  resetBtn.addEventListener("click", () => {
+    state.filter = { ...state.filter, type: 'all', decade: 'any', genre: 'any', minRating: 0, sortBy: 'popularity.desc', streaming: null };
+    ['f-type','f-decade','f-genre','f-rating','f-sort','f-streaming'].forEach(id => document.getElementById(id).value = id === 'f-type' ? 'all' : id === 'f-decade' ? 'any' : id === 'f-genre' ? 'any' : id === 'f-rating' ? '0' : id === 'f-sort' ? 'popularity.desc' : 'any');
+    filterPage = 1;
+    const list = document.getElementById('filter-results-list'); if (list) list.innerHTML = '';
+    doFetchFilter(false);
+  });
+  actions.append(resetBtn); panel.append(actions); return panel;
+}
+
+function makeSelectRow(label, id, options, currentVal) {
+  const row = el("div", "filter-row"); row.append(el("label", "", label));
+  const sel = document.createElement("select"); sel.id = id;
+  for (const [val, text] of options) {
+    const opt = document.createElement("option"); opt.value = val; opt.textContent = text;
+    if (String(val) === String(currentVal)) opt.selected = true;
+    sel.append(opt);
+  }
+  sel.addEventListener("change", () => {
+    if (id === 'f-type') state.filter.type = sel.value;
+    else if (id === 'f-decade') state.filter.decade = sel.value;
+    else if (id === 'f-genre') state.filter.genre = sel.value === 'any' ? 'any' : parseInt(sel.value);
+    else if (id === 'f-rating') state.filter.minRating = parseInt(sel.value);
+    else if (id === 'f-sort') state.filter.sortBy = sel.value;
+    else if (id === 'f-streaming') state.filter.streaming = sel.value === 'any' ? null : parseInt(sel.value);
+    filterPage = 1;
+    const list = document.getElementById('filter-results-list'); if (list) list.innerHTML = '';
+    doFetchFilter(false);
+  });
+  row.append(sel); return row;
+}
+
+async function doFetchFilter(append) {
+  if (filterLoading) return;
+  filterLoading = true;
+  const resultsList = document.getElementById('filter-results-list');
+  if (!resultsList) { filterLoading = false; return; }
+  if (!append) resultsList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Пошук...</div>';
+  const f = state.filter;
+  try {
+    let hasMore = false;
+    const people = [], media = [];
+    if (f.query) {
+      const data = await tmdbFetch(`/search/multi?language=uk-UA&query=${encodeURIComponent(f.query)}&include_adult=false&page=${filterPage}`);
+      if (!append) data.results.filter(r => r.media_type === 'person').forEach(p => people.push(p));
+      data.results.filter(r => r.media_type === 'movie' || r.media_type === 'tv').map(normalizeItem).forEach(x => media.push(x));
+      hasMore = filterPage < (data.total_pages || 1);
+    } else {
+      const bp = { language: 'uk-UA', sort_by: (f.sortBy.includes('release_date') && f.type === 'all') ? 'popularity.desc' : f.sortBy, page: String(filterPage) };
+      if (f.minRating > 0) bp['vote_average.gte'] = String(f.minRating);
+      if (f.genre !== "any") bp['with_genres'] = String(f.genre);
+      if (f.streaming) { bp['with_watch_providers'] = String(f.streaming); bp['watch_region'] = 'UA'; }
+      const fetches = [];
+      let mP = 0, tP = 0;
+      if (f.type === "movie" || f.type === "all") {
+        const p = { ...bp };
+        if (f.decade !== "any") { p['primary_release_date.gte'] = `${f.decade}-01-01`; p['primary_release_date.lte'] = `${parseInt(f.decade) + 9}-12-31`; }
+        fetches.push(tmdbFetch(`/discover/movie?${new URLSearchParams(p)}`).then(d => { mP = d.total_pages || 1; return d.results.map(r => normalizeItem({ ...r, media_type: 'movie' })); }).catch(() => []));
+      }
+      if (f.type === "tv" || f.type === "all") {
+        const p = { ...bp };
+        if (f.decade !== "any") { p['first_air_date.gte'] = `${f.decade}-01-01`; p['first_air_date.lte'] = `${parseInt(f.decade) + 9}-12-31`; }
+        fetches.push(tmdbFetch(`/discover/tv?${new URLSearchParams(p)}`).then(d => { tP = d.total_pages || 1; return d.results.map(r => normalizeItem({ ...r, media_type: 'tv' })); }).catch(() => []));
+      }
+      const all = await Promise.all(fetches);
+      all.flat().forEach(x => media.push(x));
+      hasMore = filterPage < Math.max(mP, tP);
+      if (f.type === "all") {
+        if (f.sortBy === 'popularity.desc') media.sort((a, b) => b.popularity - a.popularity);
+        else if (f.sortBy === 'vote_average.desc') media.sort((a, b) => b.tmdbRating - a.tmdbRating);
+      }
+    }
+    if (!append) resultsList.innerHTML = '';
+    if (f.minRating > 0) for (let i = media.length - 1; i >= 0; i--) if (media[i].tmdbRating < f.minRating) media.splice(i, 1);
+    if (f.decade !== "any") {
+      const yS = parseInt(f.decade), yE = yS + 9;
+      for (let i = media.length - 1; i >= 0; i--) { const y = parseInt(media[i].year); if (!(y >= yS && y <= yE)) media.splice(i, 1); }
+    }
+    for (const p of people) resultsList.append(createPersonResult(p));
+    for (const r of media) resultsList.append(createListItem(r, false));
+    const old = document.getElementById('filter-more-btn'); if (old) old.remove();
+    if (hasMore) {
+      const more = el('button', 'home-more', 'Показати ще'); more.id = 'filter-more-btn';
+      more.addEventListener('click', () => { filterPage++; doFetchFilter(true); });
+      resultsList.append(more);
+    }
+    if (!resultsList.children.length) resultsList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Нічого не знайдено</div>';
+  } catch (e) {
+    resultsList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger);">Помилка: ${e.message}</div>`;
+  } finally { filterLoading = false; }
+}
+
+// ============ STATISTICS ============
+function renderStatistics() {
+  box.style.padding = '0'; box.replaceChildren();
+  const wrap = el('div', 'home-wrap');
+  wrap.append(el('h2', 'home-grid-title', '📊 Статистика'));
+  if (!state.stats) state.stats = { tab: 'top', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } };
+  const tabs = el('div', 'card-tabs');
+  const tabDefs = [
+    { id: 'top', label: '🏆 Мій топ' },
+    { id: 'actors', label: '🎬 Топ акторів' },
+    { id: 'genres', label: '🎭 Топ жанрів' },
+    { id: 'detail', label: '📊 Детальна' }
+  ];
+  for (const t of tabDefs) {
+    const btn = el('button', 'card-tab' + (state.stats.tab === t.id ? ' active' : ''), t.label);
+    btn.addEventListener('click', () => { if (state.stats.tab === t.id) return; state.stats.tab = t.id; renderStatistics(); });
+    tabs.append(btn);
+  }
+  wrap.append(tabs);
+  const content = el('div'); content.style.marginTop = '16px';
+  if (state.stats.tab === 'top') content.append(...renderTopTab());
+  else if (state.stats.tab === 'actors') content.append(...renderActorsTab());
+  else if (state.stats.tab === 'genres') content.append(...renderGenresTab());
+  else if (state.stats.tab === 'detail') content.append(...renderDetailTab());
+  wrap.append(content);
+  box.append(wrap);
+}
+
+function renderTopTab() {
+  const rated = Object.values(lib).map(x => ({ item: x, r: computeItemRating(x) })).filter(x => x.r.avg > 0)
+    .sort((a, b) => b.r.avg - a.r.avg || b.item.updated - a.item.updated);
+  if (!rated.length) return [el('div', 'avail-empty', 'Ще немає оцінених тайтлів')];
+  const list = el('div');
+  rated.forEach(({ item }, idx) => list.append(createListItem(item, true, idx + 1)));
+  return [list];
+}
+
+function renderActorsTab() {
+  const wrap = el('div');
+  const subTabs = el('div', 'card-tabs');
+  const rTab = el('button', 'card-tab' + (state.stats.actorTab === 'rating' ? ' active' : ''), '⭐ За оцінкою');
+  const cTab = el('button', 'card-tab' + (state.stats.actorTab === 'count' ? ' active' : ''), '👁️ За переглядами');
+  rTab.addEventListener('click', () => { if (state.stats.actorTab === 'rating') return; state.stats.actorTab = 'rating'; renderStatistics(); });
+  cTab.addEventListener('click', () => { if (state.stats.actorTab === 'count') return; state.stats.actorTab = 'count'; renderStatistics(); });
+  subTabs.append(rTab, cTab); wrap.append(subTabs);
+  const content = el('div'); content.style.marginTop = '16px';
+  const items = Object.values(lib);
+  const missing = items.filter(x => !x.cast || !x.cast.length);
+  if (missing.length > 0) {
+    const loader = el('div', 'cast-loader');
+    if (state.stats.castLoading) {
+      loader.append(el('div', 'cast-loader-text', `Завантажую акторів: ${state.stats.castProgress.done}/${state.stats.castProgress.total}...`));
+    } else {
+      loader.append(el('div', 'cast-loader-text', `Даних про акторів немає для ${missing.length} з ${items.length} тайтлів`));
+      const btn = el('button', 'cast-loader-btn', '📥 Завантажити дані акторів');
+      btn.addEventListener('click', async () => {
+        state.stats.castLoading = true;
+        state.stats.castProgress = { done: 0, total: missing.length };
+        renderStatistics();
+        await fetchAllMissingCasts();
+        state.stats.castLoading = false;
+        renderStatistics();
+      });
+      loader.append(btn);
+    }
+    wrap.append(loader);
+  }
+  const actorMap = new Map();
+  items.forEach(item => {
+    (item.cast || []).forEach(a => {
+      if (!actorMap.has(a.id)) actorMap.set(a.id, { id: a.id, name: a.name, profile_path: a.profile_path, projects: [] });
+      actorMap.get(a.id).projects.push(item);
+    });
+  });
+  const actors = [...actorMap.values()].map(a => {
+    const watched = a.projects.filter(hasWatched);
+    const rated = watched.filter(p => computeItemRating(p).avg > 0);
+    const avgRating = rated.length ? rated.reduce((s, p) => s + computeItemRating(p).avg, 0) / rated.length : 0;
+    return { ...a, watchedCount: watched.length, ratedCount: rated.length, avgRating };
+  });
+  let display, valueFn;
+  if (state.stats.actorTab === 'rating') {
+    display = actors.filter(a => a.ratedCount >= 1).sort((x, y) => y.avgRating - x.avgRating || y.ratedCount - x.ratedCount || x.name.localeCompare(y.name));
+    valueFn = a => ({ text: fmtNum(a.avgRating), cls: ratingClass(a.avgRating) });
+  } else {
+    display = actors.filter(a => a.watchedCount >= 1).sort((x, y) => y.watchedCount - x.watchedCount || y.avgRating - x.avgRating || x.name.localeCompare(y.name));
+    valueFn = a => ({ text: String(a.watchedCount), cls: '' });
+  }
+  if (!display.length) {
+    content.append(el('div', 'avail-empty', state.stats.actorTab === 'rating' ? 'Немає оцінених проєктів з акторами' : 'Немає переглянутих проєктів з акторами'));
+    wrap.append(content); return [wrap];
+  }
+  const list = el('div', 'actor-rank-list');
+  display.slice(0, 50).forEach((a, idx) => {
+    const it = el('div', 'actor-rank-item');
+    it.append(el('div', 'actor-rank-num', String(idx + 1)));
+    if (a.profile_path) {
+      const ph = el('img', 'actor-rank-photo'); ph.src = TMDB_IMG + 'w185' + a.profile_path; ph.loading = 'lazy'; it.append(ph);
+    } else {
+      it.append(el('div', 'actor-rank-photo-empty', (a.name || '?').charAt(0).toUpperCase()));
+    }
+    const info = el('div', 'actor-rank-info');
+    info.append(el('div', 'actor-rank-name', a.name));
+    const meta = state.stats.actorTab === 'rating'
+      ? `${a.ratedCount} ${plural(a.ratedCount, 'оцінений', 'оцінених', 'оцінених')} проєкт${plural(a.ratedCount, '', 'и', 'ів')}`
+      : `${a.watchedCount} ${plural(a.watchedCount, 'перегляд', 'перегляди', 'переглядів')}`;
+    info.append(el('div', 'actor-rank-meta', meta));
+    it.append(info);
+    const v = valueFn(a);
+    it.append(el('div', 'actor-rank-value ' + v.cls, v.text));
+    it.addEventListener('click', () => openPerson(a.id, { name: a.name }));
+    list.append(it);
+  });
+  content.append(list);
+  wrap.append(content);
+  return [wrap];
+}
+
+function plural(n, one, few, many) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
+}
+
+async function fetchAllMissingCasts() {
+  const missing = Object.values(lib).filter(x => !x.cast || !x.cast.length);
+  const batchSize = 5;
+  for (let i = 0; i < missing.length; i += batchSize) {
+    const batch = missing.slice(i, i + batchSize);
+    await Promise.all(batch.map(async item => {
+      try {
+        const d = await tmdbFetch(`/${item.type}/${item.id}/credits?language=uk-UA`);
+        if (lib[item.key] && d.cast) lib[item.key].cast = d.cast.slice(0, CAST_LIMIT).map(a => ({ id: a.id, name: a.name, profile_path: a.profile_path }));
+      } catch {}
+    }));
+    state.stats.castProgress.done = Math.min(missing.length, i + batchSize);
+    if (state.stats.tab === 'actors') renderStatistics();
+    await new Promise(r => setTimeout(r, 200));
+  }
+  save();
+}
+
+function renderGenresTab() {
+  const all = Object.values(lib);
+  const genreCount = {};
+  all.forEach(x => (x.genres || []).forEach(gid => {
+    const g = GENRES.find(g => g.id === gid); if (g) genreCount[g.name] = (genreCount[g.name] || 0) + 1;
+  }));
+  const topGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]);
+  if (!topGenres.length) return [el('div', 'avail-empty', 'Немає даних про жанри')];
+  const wrap = el('div');
+  const maxCount = topGenres[0][1];
+  topGenres.forEach(([name, count]) => {
+    const row = el('div', 'stats-list-row');
+    const left = el('div'); left.style.flex = '1';
+    left.append(el('span', '', name));
+    const bar = el('div'); bar.style.cssText = `height:6px;background:var(--accent);border-radius:3px;margin-top:4px;width:${(count / maxCount) * 100}%;opacity:0.6;`;
+    left.append(bar);
+    row.append(left, el('span', '', String(count)));
+    wrap.append(row);
+  });
+  const list = el('div', 'stats-list');
+  list.append(...wrap.children);
+  return [list];
+}
+
+// ============ DETAILED STATISTICS WITH PIE CHARTS ============
+function renderDetailTab() {
+  const all = Object.values(lib);
+  if (!all.length) return [el('div', 'avail-empty', 'Бібліотека порожня')];
+  const wrap = el('div');
+
+  // Pie 1: Type
+  const movies = all.filter(x => x.type === 'movie').length;
+  const tvShows = all.filter(x => x.type === 'tv').length;
+  const typeData = [
+    { label: 'Фільми', value: movies, color: 'var(--accent)' },
+    { label: 'Серіали', value: tvShows, color: '#22d3ee' }
+  ].filter(d => d.value > 0);
+  wrap.append(renderPieSection('🎬 Тип контенту', typeData));
+
+  // Pie 2: Status
+  const watched = all.filter(x => x.status === 'watched').length;
+  const watching = all.filter(x => x.status === 'watching').length;
+  const planned = all.filter(x => x.status === 'planned').length;
+  const noStatus = all.length - watched - watching - planned;
+  const statusData = [
+    { label: 'Переглянуто', value: watched, color: 'var(--success)' },
+    { label: 'Дивлюсь', value: watching, color: 'var(--warning)' },
+    { label: 'Планую', value: planned, color: '#60a5fa' },
+    { label: 'Без статусу', value: noStatus, color: 'var(--text-muted)' }
+  ].filter(d => d.value > 0);
+  wrap.append(renderPieSection('📌 Статуси', statusData));
+
+  // Pie 3: Genres (top 6 + others)
+  const genreCount = {};
+  all.forEach(x => (x.genres || []).forEach(gid => {
+    const g = GENRES.find(g => g.id === gid);
+    if (g) genreCount[g.name] = (genreCount[g.name] || 0) + 1;
+  }));
+  const sortedGenres = Object.entries(genreCount).sort((a, b) => b[1] - a[1]);
+  const top6 = sortedGenres.slice(0, 6);
+  const others = sortedGenres.slice(6).reduce((s, [, c]) => s + c, 0);
+  const genreColors = ['var(--accent)', '#22d3ee', '#fb923c', '#f472b6', '#a78bfa', '#22c55e'];
+  const genreData = top6.map(([name, count], i) => ({ label: name, value: count, color: genreColors[i] }));
+  if (others > 0) genreData.push({ label: 'Інші', value: others, color: 'var(--text-dim)' });
+  if (genreData.length) wrap.append(renderPieSection('🎭 Жанри', genreData));
+
+  // Counters
+  wrap.append(el('h2', 'home-grid-title', '📊 Загальні цифри'));
+  const rated = all.map(x => ({ item: x, r: computeItemRating(x) })).filter(x => x.r.avg > 0);
+  const avgOfAvgs = rated.length ? rated.reduce((s, x) => s + x.r.avg, 0) / rated.length : 0;
+  const sg = el('div', 'stats-grid');
+  const addStat = (l, v) => { const s = el('div', 'stat-card'); s.append(el('div', 'stat-value', String(v))); s.append(el('div', 'stat-label', l)); sg.append(s); };
+  addStat('Всього', all.length);
+  addStat('Оцінено', rated.length);
+  addStat('Середня оцінка', avgOfAvgs > 0 ? fmtNum(avgOfAvgs) : '—');
+  addStat('З нотатками', all.filter(x => x.notes && x.notes.trim()).length);
+  wrap.append(sg);
+
+  return [wrap];
+}
+
+function renderPieSection(title, data) {
+  const section = el('div', 'pie-section');
+  section.append(el('div', 'pie-title', title));
+  const content = el('div', 'pie-content');
+  content.append(renderPieChart(data));
+  const legend = el('div', 'pie-legend');
+  const total = data.reduce((s, d) => s + d.value, 0);
+  data.forEach(d => {
+    const row = el('div', 'pie-legend-row');
+    const dot = el('div', 'pie-legend-dot');
+    dot.style.background = d.color;
+    row.append(dot);
+    row.append(el('span', 'pie-legend-label', d.label));
+    row.append(el('span', 'pie-legend-value', `${d.value} · ${Math.round(d.value / total * 100)}%`));
+    legend.append(row);
+  });
+  content.append(legend);
+  section.append(content);
+  return section;
+}
+
+function renderPieChart(data, size = 180) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return el('div', 'avail-empty', 'Немає даних');
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('class', 'pie-svg');
+  let angle = -Math.PI / 2;
+  const cx = size / 2, cy = size / 2, r = size / 2 - 4;
+  data.forEach(d => {
+    if (d.value === 0) return;
+    const sweep = (d.value / total) * Math.PI * 2;
+    const x1 = cx + r * Math.cos(angle);
+    const y1 = cy + r * Math.sin(angle);
+    const x2 = cx + r * Math.cos(angle + sweep);
+    const y2 = cy + r * Math.sin(angle + sweep);
+    const largeArc = sweep > Math.PI ? 1 : 0;
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`);
+    path.setAttribute('fill', d.color);
+    path.setAttribute('stroke', 'var(--bg-0)');
+    path.setAttribute('stroke-width', '2');
+    svg.appendChild(path);
+    angle += sweep;
+  });
+  const circle = document.createElementNS(svgNS, 'circle');
+  circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+  circle.setAttribute('r', r * 0.55);
+  circle.setAttribute('fill', 'var(--bg-1)');
+  svg.appendChild(circle);
+  const text = document.createElementNS(svgNS, 'text');
+  text.setAttribute('x', cx); text.setAttribute('y', cy + 6);
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('fill', 'var(--text)');
+  text.setAttribute('font-size', '20');
+  text.setAttribute('font-weight', '800');
+  text.textContent = String(total);
+  svg.appendChild(text);
+  return svg;
+}
+
+// ============ GAME ============
+async function renderGame() {
+  if (state.tab !== 'game') return;
+  box.replaceChildren(); box.style.padding = '0';
+  if (!state.game.active && !state.game.finished) {
+    const c = el('div', 'game-container');
+    c.append(el('div', 'game-header', ''));
+    c.querySelector('.game-header').append(el('h1', 'game-title', '👑 Цар гори'), el('p', 'game-subtitle', 'Обери найкращий тайтл.'));
+    const bm = el('button', 'game-btn primary', '🎬 Грати з фільмами');
+    bm.addEventListener('click', () => startGame('movie'));
+    const bt = el('button', 'game-btn secondary', '📺 Грати з серіалами');
+    bt.addEventListener('click', () => startGame('tv'));
+    c.append(bm, bt);
+
+    // Winners list
+    const hist = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]');
+    if (hist.length > 0) {
+      const hd = el('div', 'game-history');
+      hd.append(el('h3', '', '🏆 Список переможців'));
+      hist.slice().reverse().forEach(h => {
+        const it = el('div', 'history-item');
+        if (h.champion && h.champion.poster) {
+          const p = el('img', 'hi-poster'); p.src = TMDB_IMG + 'w92' + h.champion.poster; p.loading = 'lazy';
+          it.append(p);
+        } else {
+          const ph = el('div', 'hi-poster'); it.append(ph);
+        }
+        const inf = el('div', 'hi-info');
+        inf.append(el('div', 'hi-title', (h.champion && h.champion.title) || '?'));
+        inf.append(el('div', 'hi-meta', `${h.wins} ${plural(h.wins, 'перемога', 'перемоги', 'перемог')} · ${new Date(h.date).toLocaleDateString('uk-UA')} · ${h.type === 'movie' ? 'фільми' : 'серіали'}`));
+        it.append(inf);
+        hd.append(it);
+      });
+      c.append(hd);
+    }
+    box.append(c); return;
+  }
+  if (state.game.finished) { renderGameOver(); return; }
+  const c = el('div', 'game-container');
+  const stats = el('div', 'game-stats');
+  stats.append(el('span', '', `Хід ${state.game.round + 1} / ${state.game.totalRounds}`));
+  c.append(stats);
+  if (!state.game.champion || !state.game.challenger) { c.append(el('div', 'avail-empty', 'Завантаження...')); box.append(c); return; }
+  const arena = el('div', 'game-arena');
+  const cc = el('div', 'game-card');
+  const cp = el('img', 'game-card-poster'); cp.src = TMDB_IMG + 'w342' + state.game.champion.poster;
+  cc.append(cp);
+  const cb = el('div', 'game-card-body');
+  cb.append(el('div', 'game-card-title', state.game.champion.title));
+  let cm = state.game.champion.year || '';
+  if (state.game.champion.tmdbRating) cm += (cm ? ' · ' : '') + state.game.champion.tmdbRating.toFixed(1);
+  cb.append(el('div', 'game-card-meta', cm));
+  cc.append(cb); cc.append(el('div', 'game-card-crown', '👑'));
+  cc.addEventListener('click', () => makeGameChoice('champion'));
+  arena.append(cc, el('div', 'game-vs-label', 'VS'));
+  const ch = el('div', 'game-card');
+  const chp = el('img', 'game-card-poster'); chp.src = TMDB_IMG + 'w342' + state.game.challenger.poster;
+  ch.append(chp);
+  const chb = el('div', 'game-card-body');
+  chb.append(el('div', 'game-card-title', state.game.challenger.title));
+  let chm = state.game.challenger.year || '';
+  if (state.game.challenger.tmdbRating) chm += (chm ? ' · ' : '') + state.game.challenger.tmdbRating.toFixed(1);
+  chb.append(el('div', 'game-card-meta', chm));
+  ch.append(chb);
+  ch.addEventListener('click', () => makeGameChoice('challenger'));
+  arena.append(ch); c.append(arena);
+  const sk = el('button', 'game-btn secondary', '🤷 Не дивився (залишити чемпіона)');
+  sk.addEventListener('click', () => makeGameChoice('skip'));
+  c.append(sk);
+  const exitBtn = el('button', 'game-btn danger', '🚪 Вийти з гри');
+  exitBtn.addEventListener('click', () => {
+    if (confirm('Вийти з гри? Поточний прогрес буде втрачено (переможець не збережеться).')) {
+      state.game.active = false;
+      state.game.finished = false;
+      state.game.champion = null;
+      state.game.challenger = null;
+      state.game.history = [];
+      state.game.round = 0;
+      renderGame();
+    }
+  });
+  c.append(exitBtn);
+  if (state.game.history.length > 0) {
+    const hd = el('div', 'game-history');
+    hd.append(el('h3', '', '📜 Історія ходів'));
+    state.game.history.slice(-5).reverse().forEach(h => {
+      const it = el('div', 'history-item');
+      const p = el('img', 'hi-poster'); p.src = TMDB_IMG + 'w92' + h.winner.poster;
+      it.append(p);
+      const inf = el('div', 'hi-info');
+      inf.append(el('div', 'hi-title', h.winner.title));
+      inf.append(el('div', 'hi-meta', `Хід ${h.round + 1}: ${h.result === 'challenger' ? 'претендент переміг' : h.result === 'champion' ? 'чемпіон втримався' : 'пропущено'}`));
+      it.append(inf); hd.append(it);
+    });
+    c.append(hd);
+  }
+  box.append(c);
+}
+async function startGame(type) {
+  state.game = { active: true, type, round: 0, totalRounds: 30, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() };
+  renderGame(); await loadGameChampion(); await loadGameChallenger(); renderGame();
+}
+async function refillGamePool() {
+  const g = state.game;
+  const path = g.type === 'movie' ? '/discover/movie' : '/discover/tv';
+  for (let a = 0; a < 6 && g.pool.length < 6; a++) {
+    let page;
+    do { page = Math.floor(Math.random() * 15) + 1; } while (g.usedPages.has(page) && g.usedPages.size < 15);
+    g.usedPages.add(page);
+    try {
+      const d = await tmdbFetch(`${path}?language=uk-UA&sort_by=popularity.desc&vote_count.gte=300&include_adult=false&page=${page}`);
+      d.results.map(r => normalizeItem({ ...r, media_type: g.type }))
+        .filter(r => r.poster && !g.seen.has(r.key) && !g.pool.some(x => x.key === r.key))
+        .forEach(r => g.pool.push(r));
+    } catch (e) { console.error(e); }
+  }
+}
+function takeFromPool() {
+  const g = state.game;
+  if (!g.pool.length) return null;
+  const item = g.pool.splice(Math.floor(Math.random() * g.pool.length), 1)[0];
+  g.seen.add(item.key); return item;
+}
+async function loadGameChampion() { state.game.pool = []; await refillGamePool(); state.game.champion = takeFromPool(); }
+async function loadGameChallenger() { if (state.game.pool.length < 3) await refillGamePool(); state.game.challenger = takeFromPool(); }
+function makeGameChoice(choice) {
+  if (!state.game.champion || !state.game.challenger) return;
+  let winner, result;
+  if (choice === 'challenger') { winner = state.game.challenger; state.game.champion = winner; result = 'challenger'; }
+  else if (choice === 'champion') { winner = state.game.champion; result = 'champion'; }
+  else { winner = state.game.champion; result = 'skip'; }
+  state.game.history.push({ round: state.game.round, winner, result, champion: state.game.champion, challenger: state.game.challenger });
+  state.game.round++;
+  if (state.game.round >= state.game.totalRounds) { finishGame(); return; }
+  loadGameChallenger().then(() => renderGame());
+}
+function finishGame() {
+  state.game.finished = true; state.game.active = false;
+  const hist = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]');
+  hist.push({ date: new Date().toISOString(), wins: state.game.history.filter(h => h.result !== 'skip').length, total: state.game.totalRounds, type: state.game.type, champion: state.game.champion });
+  localStorage.setItem('kingOfTheHillHistory', JSON.stringify(hist));
+  renderGame();
+}
+function renderGameOver() {
+  box.replaceChildren();
+  const c = el('div', 'game-container game-over');
+  c.append(el('h2', '', '🎉 Гра завершена!'), el('p', '', `Твій фінальний чемпіон:`));
+  if (state.game.champion) {
+    const cd = el('div', 'game-card', ''); cd.style.maxWidth = '300px'; cd.style.margin = '0 auto 20px';
+    const p = el('img', 'game-card-poster'); p.src = TMDB_IMG + 'w342' + state.game.champion.poster;
+    cd.append(p);
+    const body = el('div', 'game-card-body');
+    body.append(el('div', 'game-card-title', state.game.champion.title));
+    cd.append(body); c.append(cd);
+  }
+  const ba = el('button', 'game-btn primary', 'Грати знову');
+  ba.addEventListener('click', () => { state.game.finished = false; state.game.active = false; renderGame(); });
+  const bh = el('button', 'game-btn secondary', 'На головну');
+  bh.addEventListener('click', () => setTab('home'));
+  c.append(ba, bh); box.append(c);
+}
+
+// ============ CARD ============
+function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`; }
+function pushCardState() {
+  const ctx = cardStack[cardStack.length - 1]; if (!ctx) return;
+  const st = { mc: cardStack.length };
+  if (ctx.type === 'person') st.ctx = { type: 'person', id: ctx.id };
+  else st.ctx = { type: 'media', id: ctx.item.id, media_type: ctx.item.type, key: ctx.item.key };
+  history.pushState(st, '', hashFor(ctx));
+}
+function saveCardScroll() {
+  const s = card.querySelector('.card-scroll'); const top = cardStack[cardStack.length - 1];
+  if (s && top) top.scroll = s.scrollTop;
+}
+async function openCard(r) {
+  if (cardStack.length) return openMediaFromStack(r);
+  overlay.classList.add("open");
+  const ctx = { type: 'media', item: r, activeTab: 'overview', seasonState: {} };
+  cardStack = [ctx]; pushCardState(); renderLoading();
+  await loadMediaCardData(ctx);
+  if (cardStack[cardStack.length - 1] !== ctx) return;
+  renderCard();
+}
+async function openPerson(personId, fromItem) {
+  overlay.classList.add("open");
+  const top = cardStack[cardStack.length - 1];
+  if (top && top.type === 'person' && top.id === personId) return;
+  saveCardScroll();
+  const ctx = { type: 'person', id: personId, item: fromItem, personTab: 'bio' };
+  cardStack.push(ctx); pushCardState(); renderLoading();
+  await loadPersonCardData(ctx);
+  if (cardStack[cardStack.length - 1] !== ctx) return;
+  renderCard();
+}
+async function openMediaFromStack(item) {
+  saveCardScroll();
+  const ctx = { type: 'media', item, activeTab: 'overview', seasonState: {} };
+  cardStack.push(ctx); pushCardState(); renderLoading();
+  await loadMediaCardData(ctx);
+  if (cardStack[cardStack.length - 1] !== ctx) return;
+  renderCard();
+}
+function cardBar() {
+  const bar = el('div', 'card-bar');
+  const back = el('button', 'card-x', '←'); back.title = 'Назад';
+  back.addEventListener('click', () => history.back());
+  bar.append(back);
+  if (cardStack.length > 1) {
+    const x = el('button', 'card-x', '✕'); x.title = 'Закрити все';
+    x.addEventListener('click', closeCard); bar.append(x);
+  } else bar.append(el('div', 'card-spacer'));
+  return bar;
+}
+function renderLoading() {
+  card.innerHTML = '';
+  card.append(cardBar());
+  const scroll = el('div', 'card-scroll');
+  scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
+  card.append(scroll);
+}
+async function loadMediaCardData(ctx) {
+  const r = ctx.item;
+  try {
+    const d = await tmdbFetch(`/${r.type}/${r.id}?language=uk-UA&include_video_language=uk,en,null&append_to_response=credits,videos,external_ids,watch/providers,recommendations,similar`);
+    ctx.details = d;
+    if (!r.title) {
+      r.title = d.title || d.name || '';
+      r.year = (d.release_date || d.first_air_date || '').slice(0, 4);
+      r.poster = d.poster_path;
+      r.overview = d.overview || '';
+      r.tmdbRating = d.vote_average || 0;
+      r.votes = d.vote_count || 0;
+      r.popularity = d.popularity || 0;
+    }
+    if (d.genres) { ctx.genres = d.genres.map(g => g.id); if (lib[r.key]) { lib[r.key].genres = ctx.genres; save(); } }
+    if (d.credits?.cast?.length) {
+      ctx.cast = d.credits.cast.slice(0, CAST_LIMIT).map(a => ({ id: a.id, name: a.name, profile_path: a.profile_path }));
+      if (lib[r.key] && !lib[r.key].cast) { lib[r.key].cast = ctx.cast; save(); }
+    }
+    if (d.external_ids?.imdb_id) {
+      try {
+        const omdbRes = await fetch(`https://www.omdbapi.com/?i=${d.external_ids.imdb_id}&apikey=${OMDB_KEY}`);
+        const omdbData = await omdbRes.json();
+        if (omdbData.Response === "True") ctx.omdb = omdbData;
+      } catch {}
+    }
+    if (r.type === "tv" && d.seasons) {
+      const sd = await Promise.all(d.seasons.map(s => tmdbFetch(`/tv/${r.id}/season/${s.season_number}?language=uk-UA`).catch(() => null)));
+      ctx.details.seasons = d.seasons.map((s, i) => ({ ...s, episode_count: sd[i] ? sd[i].episodes.length : s.episode_count, episodes: sd[i] ? sd[i].episodes : [] }));
+      const totalSeasons = d.seasons.filter(s => s.season_number !== 0).length;
+      if (lib[r.key]) lib[r.key].totalSeasons = totalSeasons;
+    }
+    ctx.watchProviders = d['watch/providers']?.results?.UA || null;
+    const recs = d.recommendations?.results || [];
+    const sims = d.similar?.results || [];
+    const pool = recs.length > 0 ? recs : sims;
+    ctx.similar = pool.map(item => normalizeItem({ ...item, media_type: r.type })).filter(item => item.poster && item.id !== r.id);
+  } catch (e) { ctx.error = e.message; }
+}
+async function loadPersonCardData(ctx) {
+  try {
+    const [details, imagesData] = await Promise.all([
+      tmdbFetch(`/person/${ctx.id}?language=uk-UA&append_to_response=combined_credits`),
+      tmdbFetch(`/person/${ctx.id}/images`).catch(() => ({ profiles: [] }))
+    ]);
+    ctx.details = details;
+    ctx.images = (imagesData?.profiles || []).filter(p => p.file_path);
+  } catch (e) { ctx.error = e.message; }
+}
+function closeCard() {
+  if (cardStack.length) history.go(-cardStack.length);
+  else { overlay.classList.remove('open'); refresh(); }
+}
+window.addEventListener('popstate', async (e) => {
+  const depth = (e.state && e.state.mc) || 0;
+  if (depth === cardStack.length) return;
+  if (depth > cardStack.length) {
+    const s = e.state;
+    if (!s || !s.ctx || depth - cardStack.length > 1) {
+      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id : '#/' + s.ctx.media_type + '/' + s.ctx.id) : '';
+      location.hash = h; location.reload(); return;
+    }
+    if (s.ctx.type === 'person') await loadPersonForForward(s.ctx.id);
+    else if (s.ctx.type === 'media') await loadMediaForForward(s.ctx);
+    return;
+  }
+  while (cardStack.length > depth) cardStack.pop();
+  if (depth === 0) { overlay.classList.remove('open'); refresh(); }
+  else renderCard(true);
+});
+async function loadPersonForForward(id) {
+  overlay.classList.add("open");
+  const ctx = { type: 'person', id, item: {}, personTab: 'bio' };
+  cardStack.push(ctx); renderLoading();
+  await loadPersonCardData(ctx);
+  if (cardStack[cardStack.length - 1] !== ctx) return;
+  renderCard();
+}
+async function loadMediaForForward(s) {
+  overlay.classList.add("open");
+  const item = { key: s.key, id: s.id, type: s.media_type, title: '', year: '', poster: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 };
+  const ctx = { type: 'media', item, activeTab: 'overview', seasonState: {} };
+  cardStack.push(ctx); renderLoading();
+  await loadMediaCardData(ctx);
+  if (cardStack[cardStack.length - 1] !== ctx) return;
+  renderCard();
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const zoom = document.getElementById('poster-zoom');
+    if (zoom && zoom.classList.contains('open')) { closeImageZoom(); return; }
+    const sm = document.getElementById('settings-modal');
+    if (sm && sm.classList.contains('open')) { closeSettings(); return; }
+    if (cardStack.length) history.back();
+  }
+});
+function routeFromHash() {
+  const m = location.hash.match(/^#\/(movie|tv|person)\/(\d+)$/);
+  if (!m) return;
+  history.replaceState({}, '', location.pathname + location.search);
+  const id = parseInt(m[2]);
+  if (m[1] === 'person') openPerson(id, {});
+  else openCard({ key: m[1] + '-' + id, id, type: m[1], title: '', year: '', poster: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 });
+}
+
+function renderCard(restore) {
+  const ctx = cardStack[cardStack.length - 1];
+  if (!ctx) { overlay.classList.remove('open'); return; }
+  const prevScroll = card.querySelector('.card-scroll');
+  const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
+  card.innerHTML = '';
+  card.append(cardBar());
+  const scroll = el('div', 'card-scroll'); card.append(scroll);
+  if (!ctx.details && !ctx.error) scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
+  else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${ctx.error}</div>`;
+  else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
+  else renderMediaCard(ctx, scroll);
+  if (savedScroll > 0) scroll.scrollTop = savedScroll;
+}
+
+function renderMediaCard(ctx, scroll) {
+  const r = ctx.item; const d = ctx.details;
+  if (settings.posterBg && r.poster && !isLightTheme(settings.themeBg)) {
+    const bg = el('div', 'card-poster-bg');
+    bg.style.backgroundImage = `url(${TMDB_IMG}w500${r.poster})`;
+    card.insertBefore(bg, card.firstChild);
+  }
+  const top = el("div", "top");
+  const poster = posterEl(r, "poster");
+  if (r.poster) { poster.classList.add('zoomable'); poster.addEventListener('click', () => openImageZoom(r.poster, 'w500')); }
+  top.append(poster);
+  const head = el("div");
+  head.append(el("div", "title", d.title || d.name || r.title));
+  let ms = d.release_date ? d.release_date.slice(0, 4) : (d.first_air_date ? d.first_air_date.slice(0, 4) : "");
+  if (d.runtime) ms += ` · ${d.runtime} хв`;
+  if (d.number_of_seasons) ms += ` · ${d.number_of_seasons} сезонів`;
+  if (d.genres) ms += ` · ${d.genres.map(g => g.name).join(", ")}`;
+  head.append(el("div", "meta-details", ms)); top.append(head); scroll.append(top);
+  if (d.production_companies?.length) {
+    const sr = el("div", "studios-row");
+    for (const c of d.production_companies.slice(0, 4)) {
+      const b = el("div", "studio-badge");
+      if (c.logo_path) { const l = el("img", "studio-logo"); l.src = TMDB_IMG + "w92" + c.logo_path; l.loading = "lazy"; b.append(l); }
+      b.append(el("span", "", c.name)); sr.append(b);
+    }
+    scroll.append(sr);
+  }
+  const rr = el("div", "ratings-row"); let hasR = false;
+  if (d.vote_average) { rr.append(el("div", "rating-badge rating-tmdb", `TMDB: ${d.vote_average.toFixed(1)}`)); hasR = true; }
+  if (ctx.omdb) {
+    if (ctx.omdb.imdbRating && ctx.omdb.imdbRating !== "N/A") { rr.append(el("div", "rating-badge rating-imdb", `IMDb: ${ctx.omdb.imdbRating}`)); hasR = true; }
+    const rt = ctx.omdb.Ratings?.find(x => x.Source === "Rotten Tomatoes");
+    if (rt && rt.Value !== "N/A") { rr.append(el("div", "rating-badge rating-rt", `RT: ${rt.Value}`)); hasR = true; }
+  }
+  if (hasR) scroll.append(rr);
+  if (ctx.watchProviders?.flatrate?.length) {
+    const w = el('div', 'streaming-emblems');
+    for (const p of ctx.watchProviders.flatrate.slice(0, 6)) {
+      const img = el('img', 'streaming-emblem'); img.src = TMDB_IMG + 'w92' + p.logo_path; img.title = p.provider_name; img.loading = 'lazy'; w.append(img);
+    }
+    scroll.append(w);
+  }
+  const tabsList = [{ id: 'overview', label: 'Опис' }, { id: 'cast', label: 'Актори' }];
+  if (r.type === 'tv') tabsList.push({ id: 'seasons', label: 'Сезони' });
+  if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
+  tabsList.push({ id: 'notes', label: '📝 Нотатки' });
+  const tabs = el('div', 'card-tabs');
+  for (const t of tabsList) {
+    const btn = el('button', 'card-tab' + (ctx.activeTab === t.id ? ' active' : ''), t.label);
+    btn.addEventListener('click', () => { ctx.activeTab = t.id; renderCard(); }); tabs.append(btn);
+  }
+  scroll.append(tabs);
+  const content = el('div'); content.style.marginTop = '16px';
+  if (ctx.activeTab === 'overview') content.append(...renderOverviewTab(ctx, scroll));
+  else if (ctx.activeTab === 'cast') content.append(...renderCastTab(ctx));
+  else if (ctx.activeTab === 'seasons') content.append(...renderSeasonsTab(ctx));
+  else if (ctx.activeTab === 'similar') content.append(...renderSimilarTab(ctx));
+  else if (ctx.activeTab === 'notes') content.append(...renderNotesTab(ctx));
+  scroll.append(content);
+}
+
+function renderNotesTab(ctx) {
+  const r = ctx.item;
+  const s = lib[r.key] || {};
+  const wrap = el('div');
+  wrap.append(el('div', 'notes-hint', 'Ваші особисті нотатки до тайтлу. Автоматично зберігаються.'));
+  const textarea = document.createElement('textarea');
+  textarea.className = 'notes-textarea';
+  textarea.placeholder = 'Напишіть свої думки, враження, цитати...';
+  textarea.value = s.notes || '';
+  let notesTimer;
+  textarea.addEventListener('input', () => {
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(() => {
+      const cur = lib[r.key] || { ...r, status: null, watchedEpisodes: [] };
+      if (textarea.value.trim()) {
+        lib[r.key] = { ...cur, notes: textarea.value, updated: Date.now() };
+      } else if (lib[r.key]) {
+        delete lib[r.key].notes;
+        const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
+        const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
+        const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
+        if (!lib[r.key].status && !hasR && !hasSR && !hasEps) delete lib[r.key];
+      }
+      save();
+    }, 800);
+  });
+  wrap.append(textarea);
+  const status = el('div', 'notes-hint'); status.id = 'notes-status';
+  if (s.notes) status.textContent = 'Востаннє оновлено: ' + new Date(s.updated || Date.now()).toLocaleString('uk-UA');
+  wrap.append(status);
+  return [wrap];
+}
+
+function renderOverviewTab(ctx, scroll) {
+  const d = ctx.details; const r = ctx.item; const s = lib[r.key] || {};
+  const nodes = [];
+  nodes.push(el("div", "overview", d.overview || "Опису нема."));
+  const trailers = findAllTrailers(d.videos, d.original_language);
+  if (trailers.length > 0) {
+    nodes.push(el("div", "label", trailers.length > 1 ? "Трейлери" : "Трейлер"));
+    const td = el("div", "trailer-container");
+    const iframe = document.createElement("iframe"); iframe.src = `https://www.youtube.com/embed/${trailers[0].key}`;
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"; iframe.allowFullscreen = true;
+    td.append(iframe); nodes.push(td);
+    if (trailers.length > 1) {
+      const br = el("div", "trailer-buttons");
+      trailers.forEach((t, i) => {
+        const btn = el("button", "trailer-btn" + (i === 0 ? " active" : ""), trailerLabel(t)); btn.title = t.name || '';
+        btn.addEventListener("click", () => {
+          iframe.src = `https://www.youtube.com/embed/${t.key}`;
+          br.querySelectorAll('.trailer-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
+        });
+        br.append(btn);
+      });
+      nodes.push(br);
+    }
+  }
+  nodes.push(el("div", "label", "Статус"));
+  const st = el("div", "row"); st.dataset.statusRow = "1";
+  const statuses = r.type === "tv" ? [["watching", "Дивлюсь"], ["watched", "Переглянуто"], ["planned", "Планую"]] : [["watched", "Переглянуто"], ["planned", "Планую"]];
+  for (const [val, text] of statuses) {
+    const b = el("button", "btn" + (s.status === val ? " on" : ""), text);
+    b.dataset.status = val;
+    b.addEventListener("click", () => {
+      const cur = lib[r.key] || {};
+      const newStatus = cur.status === val ? null : val;
+      let newEps = cur.watchedEpisodes || [];
+      if (r.type === "tv") {
+        if (newStatus === "watched") {
+          newEps = [];
+          d.seasons.forEach(season => {
+            if (season.season_number !== 0) {
+              const cnt = season.episodes ? season.episodes.length : season.episode_count;
+              for (let i = 1; i <= cnt; i++) newEps.push(season.season_number + "-" + i);
+            }
+          });
+        } else if (newStatus === "planned" || newStatus === null) newEps = [];
+      }
+      const patch = { status: newStatus, watchedEpisodes: newEps };
+      if (!lib[r.key] && ctx.genres) patch.genres = ctx.genres;
+      if (!lib[r.key] && ctx.cast) patch.cast = ctx.cast;
+      if (r.type === "tv" && d.seasons && !lib[r.key]?.totalSeasons) patch.totalSeasons = d.seasons.filter(x => x.season_number !== 0).length;
+      updateNoRender(r, patch);
+      const srow = scroll.querySelector('[data-status-row]');
+      if (srow) srow.querySelectorAll('.btn').forEach(btn => btn.classList.toggle('on', btn.dataset.status === newStatus));
+    });
+    st.append(b);
+  }
+  nodes.push(st);
+  if (lib[r.key]) {
+    const rw = el("div", "row"); rw.style.marginTop = "16px";
+    const rb = el("button", "btn danger", "🗑️ Видалити з бібліотеки");
+    rb.addEventListener("click", () => removeFromLibrary(r.key));
+    rw.append(rb); nodes.push(rw);
+  }
+  if (r.type === 'tv') {
+    const ir = computeItemRating(s);
+    if (ir.avg > 0) {
+      nodes.push(el("div", "label", "Моя оцінка"));
+      const block = el("div", "ratings-block");
+      const infoEl = el("div");
+      infoEl.style.padding = "8px 0"; infoEl.style.fontSize = "15px"; infoEl.style.color = "var(--text-secondary)";
+      const suffix = ir.complete ? '' : ` <span style="color:var(--warning)">(оцінено ${ir.rated}/${ir.total} сезонів)</span>`;
+      infoEl.innerHTML = `${fmtNum(ir.avg)}/10${suffix}`;
+      block.append(infoEl);
+      block.append(renderAverageBlock(ir.avg, 5));
+      nodes.push(block);
+    }
+    const row = el("div", "row"); row.style.marginTop = "8px";
+    const btn = el("button", "btn", ir.avg > 0 ? "⭐ Змінити оцінки сезонів" : "⭐ Оцінити сезони");
+    btn.addEventListener('click', () => { ctx.activeTab = 'seasons'; renderCard(); });
+    row.append(btn); nodes.push(row);
+  } else {
+    nodes.push(el("div", "label", "Моя оцінка"));
+    const rb = el("div", "ratings-block");
+    const cur = s.ratings || {};
+    for (const crit of RATING_CRITERIA) rb.append(renderRatingBlock(crit, cur[crit.key] || 0, r));
+    rb.append(renderAverageBlock(computeAverage(cur), countFilled(cur)));
+    nodes.push(rb);
+  }
+  return nodes;
+}
+
+function renderCastTab(ctx) {
+  const cast = ctx.details.credits?.cast || [];
+  if (!cast.length) return [el('div', 'avail-empty', 'Немає даних про акторів')];
+  const grid = el('div', 'actor-grid');
+  for (const a of cast.slice(0, 20)) {
+    const tile = el('div', 'actor-tile');
+    const photo = el(a.profile_path ? 'img' : 'div', 'actor-tile-photo');
+    if (a.profile_path) { photo.src = TMDB_IMG + 'w185' + a.profile_path; photo.loading = 'lazy'; }
+    tile.append(photo, el('div', 'actor-tile-name', a.name));
+    if (a.character) tile.append(el('div', 'actor-tile-role', a.character));
+    tile.addEventListener('click', () => openPerson(a.id, a)); grid.append(tile);
+  }
+  return [grid];
+}
+
+function renderSimilarTab(ctx) {
+  const similar = ctx.similar || [];
+  if (!similar.length) return [el('div', 'avail-empty', 'Немає схожих проєктів')];
+  const grid = el('div', 'similar-grid');
+  for (const item of similar.slice(0, 20)) {
+    const c = el('div', 'similar-card');
+    const p = el('img', 'similar-poster'); p.src = TMDB_IMG + 'w342' + item.poster; p.loading = 'lazy';
+    c.append(p, el('div', 'similar-title', item.title));
+    const mr = el('div', 'similar-meta');
+    if (item.year) mr.append(el('span', '', item.year));
+    if (item.tmdbRating > 0) { if (item.year) mr.append(el('span', '', '·')); mr.append(el('span', 'similar-rating', item.tmdbRating.toFixed(1))); }
+    c.append(mr); c.addEventListener('click', () => openMediaFromStack(item)); grid.append(c);
+  }
+  return [grid];
+}
+
+function renderSeasonsTab(ctx) {
+  const d = ctx.details; const r = ctx.item;
+  const s = lib[r.key] || {};
+  if (!d.seasons) return [el('div', 'avail-empty', 'Немає даних про сезони')];
+  const seasons = d.seasons.filter(x => x.season_number !== 0);
+  if (!seasons.length) return [el('div', 'avail-empty', 'Немає сезонів')];
+  if (!ctx.seasonState) ctx.seasonState = {};
+  if (!ctx.seasonState.expandedEps) ctx.seasonState.expandedEps = {};
+  if (ctx.seasonState.selectedSeason === undefined) ctx.seasonState.selectedSeason = seasons[0].season_number;
+  const selNum = ctx.seasonState.selectedSeason;
+  const sel = seasons.find(x => x.season_number === selNum) || seasons[0];
+  const wrap = el('div');
+  const tabsBar = el('div', 'season-tabs-bar');
+  seasons.forEach(season => {
+    const sr = (s.seasonRatings || {})[season.season_number] || {};
+    const avg = computeAverage(sr);
+    const isActive = season.season_number === selNum;
+    const tab = el('button', 'season-tab-btn' + (isActive ? ' active' : ''));
+    tab.append(document.createTextNode('Сезон ' + season.season_number));
+    if (avg > 0) tab.append(el('span', 'season-tab-badge', '⭐ ' + fmtNum(avg)));
+    tab.addEventListener('click', () => {
+      if (ctx.seasonState.selectedSeason === season.season_number) return;
+      ctx.seasonState.selectedSeason = season.season_number;
+      renderCard();
+    });
+    tabsBar.append(tab);
+  });
+  wrap.append(tabsBar);
+  const seasonRatings = (s.seasonRatings || {})[selNum] || {};
+  wrap.append(el('div', 'label', 'Оцінка сезону ' + selNum));
+  const rb = el('div', 'ratings-block'); rb.style.marginBottom = '20px';
+  for (const crit of RATING_CRITERIA) rb.append(renderSeasonRatingBlock(r, selNum, crit, seasonRatings[crit.key] || 0));
+  rb.append(renderSeasonAverageBlock(seasonRatings));
+  wrap.append(rb);
+  const episodes = sel.episodes || [];
+  wrap.append(el('div', 'label', `Серії (${episodes.length || sel.episode_count || 0})`));
+  if (!episodes.length) { wrap.append(el('div', 'avail-empty', 'Немає даних про серії цього сезону')); return [wrap]; }
+  const watchedSet = new Set(s.watchedEpisodes || []);
+  const statusIsWatched = s.status === 'watched';
+  const epList = el('div');
+  episodes.forEach((ep, idx) => {
+    const epNum = ep.episode_number || (idx + 1);
+    const epKey = selNum + '-' + epNum;
+    const isWatched = statusIsWatched || watchedSet.has(epKey);
+    const isExpanded = !!ctx.seasonState.expandedEps[epKey];
+    const epCard = el('div', 'episode-card' + (isWatched ? ' watched' : ''));
+    const posterWrap = el('div', 'episode-poster-wrap');
+    posterWrap.title = isWatched ? 'Зняти позначку перегляду' : 'Позначити як переглянуте';
+    if (ep.still_path) {
+      const img = el('img'); img.src = TMDB_IMG + 'w300' + ep.still_path; img.loading = 'lazy'; img.alt = ''; posterWrap.append(img);
+    } else {
+      posterWrap.append(el('div', 'episode-poster-empty', String(epNum)));
+    }
+    posterWrap.append(el('div', 'episode-check', isWatched ? '✓' : ''));
+    posterWrap.addEventListener('click', (e) => { e.stopPropagation(); toggleEpisodeWatched(r, selNum, epNum, ctx); });
+    epCard.append(posterWrap);
+    const body = el('div', 'episode-body');
+    body.append(el('div', 'episode-num', 'S' + selNum + 'E' + epNum));
+    const titleRow = el('div', 'episode-title-row');
+    titleRow.append(el('div', 'episode-title', ep.name || ('Серія ' + epNum)));
+    titleRow.append(el('span', 'episode-expand-icon', isExpanded ? '▴' : '▾'));
+    body.append(titleRow);
+    const descEl = el('div', 'episode-desc' + (isExpanded ? ' expanded' : ''));
+    descEl.textContent = ep.overview || 'Опис відсутній';
+    body.append(descEl);
+    body.addEventListener('click', () => {
+      const key = selNum + '-' + epNum;
+      if (!ctx.seasonState.expandedEps) ctx.seasonState.expandedEps = {};
+      if (ctx.seasonState.expandedEps[key]) {
+        delete ctx.seasonState.expandedEps[key];
+        descEl.classList.remove('expanded');
+        const icon = body.querySelector('.episode-expand-icon'); if (icon) icon.textContent = '▾';
+      } else {
+        ctx.seasonState.expandedEps[key] = true;
+        descEl.classList.add('expanded');
+        const icon = body.querySelector('.episode-expand-icon'); if (icon) icon.textContent = '▴';
+      }
+    });
+    epCard.append(body); epList.append(epCard);
+  });
+  wrap.append(epList);
+  return [wrap];
+}
+
+function toggleEpisodeWatched(r, seasonNum, epNum, ctx) {
+  const s = lib[r.key] || {};
+  let wEps = s.watchedEpisodes || [];
+  if (s.status === 'watched' && ctx?.details?.seasons) {
+    const all = [];
+    ctx.details.seasons.forEach(season => {
+      if (season.season_number === 0) return;
+      const cnt = (season.episodes?.length) || season.episode_count || 0;
+      for (let i = 1; i <= cnt; i++) all.push(season.season_number + '-' + i);
+    });
+    const wSet = new Set(wEps); all.forEach(k => wSet.add(k)); wEps = [...wSet];
+  }
+  const epKey = seasonNum + '-' + epNum;
+  if (wEps.includes(epKey)) wEps = wEps.filter(k => k !== epKey);
+  else wEps = [...wEps, epKey];
+  let totalAllEps = 0;
+  if (ctx?.details?.seasons) {
+    totalAllEps = ctx.details.seasons.filter(x => x.season_number !== 0).reduce((sum, x) => sum + (x.episodes?.length || x.episode_count || 0), 0);
+  }
+  let newStatus = s.status;
+  if (wEps.length === 0) newStatus = s.status === 'watching' ? 'planned' : s.status;
+  else if (totalAllEps > 0 && wEps.length >= totalAllEps) newStatus = 'watched';
+  else newStatus = 'watching';
+  const patch = { watchedEpisodes: wEps, status: newStatus };
+  if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
+  if (!lib[r.key] && ctx?.cast) patch.cast = ctx.cast;
+  if (ctx?.details?.seasons && !s.totalSeasons) patch.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
+  update(r, patch);
+}
+
+function renderSeasonRatingBlock(r, seasonNum, crit, value) {
+  const block = el("div", "rating-block");
+  block.dataset.season = seasonNum; block.dataset.crit = crit.key;
+  const header = el("div", "rating-block-header");
+  header.append(el("span", "rating-block-label", crit.label));
+  header.append(el("span", "rating-block-value" + (value ? "" : " empty"), value ? String(value) : "—"));
+  block.append(header);
+  const lights = el("div", "rating-lights");
+  for (let i = 1; i <= 10; i++) {
+    const light = el("span", "light" + (i <= value ? " on" : ""));
+    light.addEventListener("click", () => setSeasonCriterion(r, seasonNum, crit.key, value === i ? 0 : i));
+    lights.append(light);
+  }
+  block.append(lights); return block;
+}
+
+function renderSeasonAverageBlock(sr) {
+  const avg = computeAverage(sr);
+  const filled = RATING_CRITERIA.filter(c => sr[c.key] > 0).length;
+  const block = el("div", "rating-block average");
+  const header = el("div", "rating-block-header");
+  header.append(el("span", "rating-block-label", "Середня оцінка сезону"));
+  let vt = avg > 0 ? fmtNum(avg) : "—";
+  if (filled > 0 && filled < 5) vt += ` (${filled}/5)`;
+  header.append(el("span", "rating-block-value " + (avg > 0 ? ratingClass(avg) : 'empty'), vt));
+  block.append(header);
+  const lights = el("div", "rating-lights");
+  const full = Math.floor(avg); const frac = avg - full;
+  for (let i = 1; i <= 10; i++) {
+    const light = el("span", "light readonly");
+    if (i <= full) light.classList.add("on");
+    else if (i === full + 1 && frac > 0.01) { light.classList.add("partial"); light.style.setProperty("--fill", (frac * 100).toFixed(0) + "%"); }
+    lights.append(light);
+  }
+  block.append(lights); return block;
+}
+
+// ============ PERSON CARD ============
+function renderPersonCard(ctx, scroll) {
+  const d = ctx.details; if (!d) return;
+  const header = el('div', 'person-header');
+  const photo = el(d.profile_path ? 'img' : 'div', 'person-photo');
+  if (d.profile_path) {
+    photo.src = TMDB_IMG + 'w342' + d.profile_path;
+    photo.classList.add('zoomable');
+    photo.addEventListener('click', () => openImageZoom(d.profile_path, 'w500'));
+  }
+  header.append(photo);
+  const info = el('div');
+  info.append(el('div', 'person-name', d.name || ''));
+  if (d.known_for_department) info.append(el('div', 'person-meta', d.known_for_department));
+  if (d.birthday) { let b = d.birthday; if (d.deathday) b += ' — ' + d.deathday; info.append(el('div', 'person-meta', 'Народження: ' + b)); }
+  if (d.place_of_birth) info.append(el('div', 'person-meta', d.place_of_birth));
+  header.append(info);
+  scroll.append(header);
+  if (!ctx.personTab) ctx.personTab = 'bio';
+  const tabs = el('div', 'card-tabs');
+  const tabDefs = [
+    { id: 'bio', label: '📖 Біографія' },
+    { id: 'filmography', label: '🎬 Фільмографія' },
+    { id: 'gallery', label: '📸 Галерея' }
+  ];
+  for (const t of tabDefs) {
+    const btn = el('button', 'card-tab' + (ctx.personTab === t.id ? ' active' : ''), t.label);
+    btn.addEventListener('click', () => { if (ctx.personTab === t.id) return; ctx.personTab = t.id; renderCard(); });
+    tabs.append(btn);
+  }
+  scroll.append(tabs);
+  const content = el('div'); content.style.marginTop = '16px';
+  if (ctx.personTab === 'bio') {
+    if (d.biography) content.append(el('div', 'person-bio', d.biography));
+    else content.append(el('div', 'avail-empty', 'Біографія відсутня'));
+  } else if (ctx.personTab === 'filmography') {
+    content.append(...renderPersonFilmography(ctx));
+  } else if (ctx.personTab === 'gallery') {
+    content.append(...renderPersonGallery(ctx));
+  }
+  scroll.append(content);
+}
+
+function renderPersonFilmography(ctx) {
+  const d = ctx.details;
+  const allCast = (d.combined_credits?.cast || []).filter(c => c.poster_path);
+  const filtered = allCast.filter(c => {
+    if (c.media_type === 'tv') {
+      const genres = c.genre_ids || [];
+      if (genres.some(g => EXCLUDED_TV_GENRES.includes(g))) return false;
+    }
+    return true;
+  });
+  const yearOf = c => { const date = c.release_date || c.first_air_date || ''; return parseInt(date.slice(0, 4)) || 0; };
+  const sortFn = (a, b) => yearOf(b) - yearOf(a) || (b.popularity || 0) - (a.popularity || 0);
+  const movies = filtered.filter(c => c.media_type === 'movie'); movies.sort(sortFn);
+  const tvs = filtered.filter(c => c.media_type === 'tv'); tvs.sort(sortFn);
+  if (!ctx.filmTab) ctx.filmTab = movies.length > 0 ? 'movies' : 'tv';
+  const wrap = el('div');
+  const subTabs = el('div', 'card-tabs');
+  const mTab = el('button', 'card-tab' + (ctx.filmTab === 'movies' ? ' active' : ''), `🎬 Фільми (${movies.length})`);
+  const tTab = el('button', 'card-tab' + (ctx.filmTab === 'tv' ? ' active' : ''), `📺 Серіали (${tvs.length})`);
+  mTab.addEventListener('click', () => { if (ctx.filmTab === 'movies') return; ctx.filmTab = 'movies'; renderCard(); });
+  tTab.addEventListener('click', () => { if (ctx.filmTab === 'tv') return; ctx.filmTab = 'tv'; renderCard(); });
+  subTabs.append(mTab, tTab); wrap.append(subTabs);
+  const items = ctx.filmTab === 'movies' ? movies : tvs;
+  if (!items.length) { wrap.append(el('div', 'avail-empty', 'Немає даних')); return [wrap]; }
+  const grid = el('div', 'filmography-grid'); grid.style.marginTop = '16px';
+  for (const credit of items.slice(0, 100)) {
+    const c = el('div', 'filmography-card');
+    const poster = el('img', 'filmography-poster'); poster.src = TMDB_IMG + 'w185' + credit.poster_path; poster.loading = 'lazy';
+    c.append(poster);
+    c.append(el('div', 'filmography-title', credit.title || credit.name || ''));
+    const year = yearOf(credit); if (year) c.append(el('div', 'filmography-year', year));
+    c.addEventListener('click', () => { const item = normalizeItem({ ...credit, media_type: credit.media_type }); openMediaFromStack(item); });
+    grid.append(c);
+  }
+  wrap.append(grid); return [wrap];
+}
+
+function renderPersonGallery(ctx) {
+  if (!ctx.images || ctx.images.length === 0) return [el('div', 'avail-empty', 'Фотографій немає')];
+  const gallery = el('div', 'photo-gallery');
+  ctx.images.slice(0, 30).forEach(img => {
+    const imgEl = el('img', 'gallery-photo');
+    imgEl.src = TMDB_IMG + 'w185' + img.file_path; imgEl.loading = 'lazy'; imgEl.alt = '';
+    imgEl.addEventListener('click', () => openImageZoom(img.file_path, 'w500'));
+    gallery.append(imgEl);
+  });
+  return [gallery];
+}
+
+// ============ UPDATE ============
+function updateCore(r, patch) {
+  const cur = lib[r.key] || { ...r, status: null, ratings: null, watchedEpisodes: [] };
+  lib[r.key] = { ...cur, ...patch, updated: Date.now() };
+  const ctx = cardStack[cardStack.length - 1];
+  if (ctx?.cast && !lib[r.key].cast) lib[r.key].cast = ctx.cast;
+  const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
+  const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
+  const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
+  const hasNotes = lib[r.key].notes && lib[r.key].notes.trim();
+  if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasNotes) delete lib[r.key];
+  save();
+}
+function update(r, patch) { updateCore(r, patch); renderCard(); }
+function updateNoRender(r, patch) { updateCore(r, patch); }
+
+function setCriterion(r, criterionKey, value) {
+  const s = lib[r.key] || {};
+  const ratings = { ...(s.ratings || {}) };
+  if (value > 0) ratings[criterionKey] = value; else delete ratings[criterionKey];
+  const avg = computeAverage(ratings);
+  let newStatus = s.status;
+  if (avg > 0 && s.status !== "watching") newStatus = "watched";
+  else if (avg === 0 && s.status === "watched") newStatus = null;
+  const patch = { ratings, status: newStatus };
+  const ctx = cardStack[cardStack.length - 1];
+  if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
+  if (!lib[r.key] && ctx?.cast) patch.cast = ctx.cast;
+  updateNoRender(r, patch);
+  const scroll = card.querySelector('.card-scroll'); if (!scroll) return;
+  refreshRatingBlockDOM(scroll, criterionKey, value);
+  refreshAverageBlockDOM(scroll, r);
+}
+
+function refreshRatingBlockDOM(scroll, critKey, value) {
+  const block = scroll.querySelector(`.rating-block[data-crit="${critKey}"]`);
+  if (!block) return;
+  const lights = block.querySelectorAll('.light');
+  lights.forEach((l, i) => l.classList.toggle('on', i + 1 <= value));
+  const valEl = block.querySelector('.rating-block-value');
+  if (valEl) { valEl.textContent = value || '—'; valEl.classList.toggle('empty', !value); }
+}
+
+function refreshAverageBlockDOM(scroll, r) {
+  const block = scroll.querySelector('.rating-block.average'); if (!block) return;
+  const s = lib[r.key] || {};
+  const ratings = s.ratings || {};
+  const avg = computeAverage(ratings);
+  const filled = countFilled(ratings);
+  let text = avg > 0 ? fmtNum(avg) : "—";
+  if (filled > 0 && filled < 5) text += ` (${filled}/5)`;
+  const valEl = block.querySelector('.rating-block-value');
+  if (valEl) { valEl.textContent = text; valEl.className = 'rating-block-value ' + (avg > 0 ? ratingClass(avg) : 'empty'); }
+  const lights = block.querySelectorAll('.light');
+  const full = Math.floor(avg); const frac = avg - full;
+  lights.forEach((l, i) => {
+    const idx = i + 1;
+    l.classList.remove('on', 'partial'); l.style.removeProperty('--fill');
+    if (idx <= full) l.classList.add('on');
+    else if (idx === full + 1 && frac > 0.01) { l.classList.add('partial'); l.style.setProperty('--fill', (frac * 100).toFixed(0) + '%'); }
+  });
+}
+
+function setSeasonCriterion(r, seasonNum, criterionKey, value) {
+  const s = lib[r.key] || {};
+  const sr = { ...(s.seasonRatings || {}) };
+  const cur = { ...(sr[seasonNum] || {}) };
+  if (value > 0) cur[criterionKey] = value; else delete cur[criterionKey];
+  if (Object.keys(cur).length > 0) sr[seasonNum] = cur; else delete sr[seasonNum];
+  const patch = { seasonRatings: sr };
+  const ctx = cardStack[cardStack.length - 1];
+  if (ctx?.details?.seasons && !s.totalSeasons) patch.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
+  if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
+  if (!lib[r.key] && ctx?.cast) patch.cast = ctx.cast;
+  update(r, patch);
+}
+
+function renderRatingBlock(crit, value, r) {
+  const block = el("div", "rating-block");
+  block.dataset.crit = crit.key;
+  const header = el("div", "rating-block-header");
+  header.append(el("span", "rating-block-label", crit.label));
+  header.append(el("span", "rating-block-value" + (value ? "" : " empty"), value ? String(value) : "—"));
+  block.append(header);
+  const lights = el("div", "rating-lights");
+  for (let i = 1; i <= 10; i++) {
+    const light = el("span", "light" + (i <= value ? " on" : ""));
+    light.addEventListener("click", () => setCriterion(r, crit.key, value === i ? 0 : i));
+    lights.append(light);
+  }
+  block.append(lights); return block;
+}
+
+function renderAverageBlock(avg, filled) {
+  const block = el("div", "rating-block average");
+  const header = el("div", "rating-block-header");
+  header.append(el("span", "rating-block-label", "Загальне (середнє)"));
+  let text = avg > 0 ? fmtNum(avg) : "—";
+  if (filled > 0 && filled < 5) text += ` (${filled}/5)`;
+  header.append(el("span", "rating-block-value " + (avg > 0 ? ratingClass(avg) : 'empty'), text));
+  block.append(header);
+  const lights = el("div", "rating-lights");
+  const full = Math.floor(avg); const frac = avg - full;
+  for (let i = 1; i <= 10; i++) {
+    const light = el("span", "light readonly");
+    if (i <= full) light.classList.add("on");
+    else if (i === full + 1 && frac > 0.01) { light.classList.add("partial"); light.style.setProperty("--fill", (frac * 100).toFixed(0) + "%"); }
+    lights.append(light);
+  }
+  block.append(lights); return block;
+}
+
+window.addEventListener('firebase-ready', syncFromCloud);
+refresh();
+routeFromHash();
+
+(function () {
+  const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (!CapApp || !CapApp.addListener) return;
+  CapApp.addListener('backButton', () => {
+    if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
+    if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
+    if (document.getElementById('sidebar').classList.contains('open')) { closeSidebar(); return; }
+    if (!autocomplete.classList.contains('hidden') && autocomplete.childElementCount) { hideAutocomplete(); return; }
+    if (cardStack.length) { history.back(); return; }
+    if (state.tab !== 'home') { setTab('home'); return; }
+    CapApp.exitApp();
+  });
+})();
+</script>
+</body>
+</html>
