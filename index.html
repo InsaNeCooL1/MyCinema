@@ -2152,37 +2152,34 @@ function renderMediaCard(ctx, scroll) {
   scroll.append(content);
 }
 
-function renderNotesTab(ctx) {
-  const r = ctx.item;
-  const s = lib[r.key] || {};
-  const wrap = el('div');
-  wrap.append(el('div', 'notes-hint', 'Ваші особисті нотатки до тайтлу. Автоматично зберігаються.'));
-  const textarea = document.createElement('textarea');
-  textarea.className = 'notes-textarea';
-  textarea.placeholder = 'Напишіть свої думки, враження, цитати...';
-  textarea.value = s.notes || '';
-  let notesTimer;
-  textarea.addEventListener('input', () => {
-    clearTimeout(notesTimer);
-    notesTimer = setTimeout(() => {
-      const cur = lib[r.key] || { ...r, status: null, watchedEpisodes: [] };
-      if (textarea.value.trim()) {
-        lib[r.key] = { ...cur, notes: textarea.value, updated: Date.now() };
-      } else if (lib[r.key]) {
-        delete lib[r.key].notes;
-        const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
-        const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
-        const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
-        if (!lib[r.key].status && !hasR && !hasSR && !hasEps) delete lib[r.key];
-      }
-      save();
-    }, 800);
-  });
-  wrap.append(textarea);
-  const status = el('div', 'notes-hint'); status.id = 'notes-status';
-  if (s.notes) status.textContent = 'Востаннє оновлено: ' + new Date(s.updated || Date.now()).toLocaleString('uk-UA');
-  wrap.append(status);
-  return [wrap];
+// ============ UAKINO INTEGRATION ============
+async function findUakinoLink(imdbId) {
+  if (!imdbId) return null;
+  const uakinoDomain = "https://uakino.best";
+  const searchUrl = `${uakinoDomain}/engine/lazydev/dle_search/ajax.php`;
+
+  try {
+    const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(searchUrl)}`;
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        story: imdbId,
+        subaction: 'search',
+        do: 'search'
+      })
+    });
+
+    if (!response.ok) throw new Error('Network response was not ok');
+    const htmlText = await response.text();
+    const match = htmlText.match(/href="(https?:\/\/uakino\.(?:best|me|club)\/\d+-[^"]+\.html)"/i);
+    
+    if (match && match[1]) return match[1];
+    return null;
+  } catch (error) {
+    console.warn('Помилка пошуку на UAKino:', error);
+    return null;
+  }
 }
 
 function renderOverviewTab(ctx, scroll) {
@@ -2209,6 +2206,7 @@ function renderOverviewTab(ctx, scroll) {
       nodes.push(br);
     }
   }
+  
   nodes.push(el("div", "label", "Статус"));
   const st = el("div", "row"); st.dataset.statusRow = "1";
   const statuses = r.type === "tv" ? [["watching", "Дивлюсь"], ["watched", "Переглянуто"], ["planned", "Планую"]] : [["watched", "Переглянуто"], ["planned", "Планую"]];
@@ -2241,6 +2239,45 @@ function renderOverviewTab(ctx, scroll) {
     st.append(b);
   }
   nodes.push(st);
+
+  // --- Блок UAKino ---
+  const uakinoRow = el("div", "row"); 
+  uakinoRow.style.marginTop = "16px";
+  const uakinoBtn = el("button", "btn", "🍿 Шукаю на UAKino...");
+  uakinoBtn.style.background = "#ff6b00";
+  uakinoBtn.style.color = "#fff";
+  uakinoBtn.disabled = true;
+  uakinoBtn.style.opacity = "0.7";
+  
+  uakinoBtn.addEventListener("click", () => {
+    if (uakinoBtn.dataset.url) {
+      window.open(uakinoBtn.dataset.url, '_blank');
+    }
+  });
+  
+  uakinoRow.append(uakinoBtn);
+  nodes.push(uakinoRow);
+  
+  const imdbId = d.external_ids?.imdb_id;
+  if (imdbId) {
+    findUakinoLink(imdbId).then(url => {
+      if (url) {
+        uakinoBtn.textContent = "🍿 Дивитися на UAKino";
+        uakinoBtn.dataset.url = url;
+        uakinoBtn.disabled = false;
+        uakinoBtn.style.opacity = "1";
+      } else {
+        uakinoBtn.textContent = "❌ Не знайдено на UAKino";
+        uakinoBtn.style.background = "#555";
+        uakinoBtn.disabled = true;
+      }
+    });
+  } else {
+    uakinoBtn.textContent = "❌ Немає IMDb ID";
+    uakinoBtn.style.background = "#555";
+  }
+  // ----------------------------------
+
   if (lib[r.key]) {
     const rw = el("div", "row"); rw.style.marginTop = "16px";
     const rb = el("button", "btn danger", "🗑️ Видалити з бібліотеки");
@@ -2273,6 +2310,39 @@ function renderOverviewTab(ctx, scroll) {
     nodes.push(rb);
   }
   return nodes;
+}
+
+function renderNotesTab(ctx) {
+  const r = ctx.item;
+  const s = lib[r.key] || {};
+  const wrap = el('div');
+  wrap.append(el('div', 'notes-hint', 'Ваші особисті нотатки до тайтлу. Автоматично зберігаються.'));
+  const textarea = document.createElement('textarea');
+  textarea.className = 'notes-textarea';
+  textarea.placeholder = 'Напишіть свої думки, враження, цитати...';
+  textarea.value = s.notes || '';
+  let notesTimer;
+  textarea.addEventListener('input', () => {
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(() => {
+      const cur = lib[r.key] || { ...r, status: null, watchedEpisodes: [] };
+      if (textarea.value.trim()) {
+        lib[r.key] = { ...cur, notes: textarea.value, updated: Date.now() };
+      } else if (lib[r.key]) {
+        delete lib[r.key].notes;
+        const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
+        const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
+        const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
+        if (!lib[r.key].status && !hasR && !hasSR && !hasEps) delete lib[r.key];
+      }
+      save();
+    }, 800);
+  });
+  wrap.append(textarea);
+  const status = el('div', 'notes-hint'); status.id = 'notes-status';
+  if (s.notes) status.textContent = 'Востаннє оновлено: ' + new Date(s.updated || Date.now()).toLocaleString('uk-UA');
+  wrap.append(status);
+  return [wrap];
 }
 
 function renderCastTab(ctx) {
