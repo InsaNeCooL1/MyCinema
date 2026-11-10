@@ -1,19 +1,19 @@
 {
   "name": "MyCinema",
   "short_name": "MyCinema",
-  "description": "Ваш особистий кінощоденник.",
+  "description": "Мій кінощоденник",
   "start_url": "/MyCinema/",
   "display": "standalone",
   "background_color": "#05060f",
   "theme_color": "#c6f432",
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/InsaneCool1/MyCinema/main/icon-192.png",
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/av/movie/materialicons/48dp/2x/baseline_movie_black_48dp.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://raw.githubusercontent.com/InsaneCool1/MyCinema/main/icon-512.png",
+      "src": "https://raw.githubusercontent.com/google/material-design-icons/master/png/av/movie/materialicons/48dp/2x/baseline_movie_black_48dp.png",
       "sizes": "512x512",
       "type": "image/png"
     }
