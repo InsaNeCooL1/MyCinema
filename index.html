@@ -97,8 +97,11 @@
   .row-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
   .rec-why { font-size: 11px; color: var(--accent); margin-top: 2px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .home-more { display: block; margin: 14px auto 0; padding: 10px 22px; border: 0; border-radius: 20px; background: var(--bg-3); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
-  .home-tabs { display: flex; gap: 8px; margin: 16px 0; }
-  .home-tab { flex: 1; padding: 12px; border: 0; border-radius: 20px; background: var(--bg-1); color: var(--text-muted); font-size: 15px; cursor: pointer; font-weight: 600; text-align: center; transition: all 0.2s; }
+  
+  /* Плаваючий острівець внизу */
+  .home-tabs-wrap { position: sticky; bottom: 16px; padding-top: 16px; z-index: 10; display: flex; justify-content: center; pointer-events: none; }
+  .home-tabs { pointer-events: auto; display: flex; gap: 6px; background: rgba(13, 16, 32, 0.85); backdrop-filter: blur(12px); padding: 6px; border-radius: 26px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); border: 1px solid var(--bg-3); margin: 0; }
+  .home-tab { padding: 10px 24px; border: 0; border-radius: 20px; background: transparent; color: var(--text-muted); font-size: 15px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
   .home-tab.active { background: var(--accent); color: var(--accent-fg); }
 
   .filter-panel { background: var(--bg-1); border-radius: 14px; padding: 14px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -1096,13 +1099,6 @@ function renderHomeContent() {
   
   const wrap = el('div', 'home-wrap');
   
-  const tabs = el('div', 'home-tabs');
-  const mTab = el('button', 'home-tab' + (state.home.tab === 'movie' ? ' active' : ''), '🎬 Фільми');
-  const tTab = el('button', 'home-tab' + (state.home.tab === 'tv' ? ' active' : ''), '📺 Серіали');
-  mTab.addEventListener('click', () => { if (state.home.tab !== 'movie') { state.home.tab = 'movie'; renderHomeContent(); } });
-  tTab.addEventListener('click', () => { if (state.home.tab !== 'tv') { state.home.tab = 'tv'; renderHomeContent(); } });
-  tabs.append(mTab, tTab); wrap.append(tabs);
-
   wrap.append(el('div', 'home-note', `На основі твоїх останніх оцінок 7+ (${recs.seedCount})`));
   const type = state.home.tab;
   const items = (recs[type] || []).filter(x => !lib[x.key]);
@@ -1121,7 +1117,19 @@ function renderHomeContent() {
       section.append(more);
     }
   }
-  wrap.append(section); box.append(wrap);
+  wrap.append(section);
+
+  const tabsWrap = el('div', 'home-tabs-wrap');
+  const tabs = el('div', 'home-tabs');
+  const mTab = el('button', 'home-tab' + (state.home.tab === 'movie' ? ' active' : ''), '🎬 Фільми');
+  const tTab = el('button', 'home-tab' + (state.home.tab === 'tv' ? ' active' : ''), '📺 Серіали');
+  mTab.addEventListener('click', () => { if (state.home.tab !== 'movie') { state.home.tab = 'movie'; renderHomeContent(); } });
+  tTab.addEventListener('click', () => { if (state.home.tab !== 'tv') { state.home.tab = 'tv'; renderHomeContent(); } });
+  tabs.append(mTab, tTab);
+  tabsWrap.append(tabs);
+  wrap.append(tabsWrap);
+
+  box.append(wrap);
 }
 
 function buildContinueWatchingSection() {
@@ -2699,7 +2707,6 @@ function renderAverageBlock(avg, filled) {
 }
 
 window.addEventListener('firebase-ready', syncFromCloud);
-// Додаємо штучний запис в історію, щоб свайп назад не закривав додаток одразу
 history.pushState({ mc: 0 }, '', location.pathname + location.search);
 refresh();
 routeFromHash();
