@@ -1,17 +1,22 @@
 {
-  "background_color": "#0b0e7a",
-  "dir": "ltr",
-  "display": "standalone",
-  "name": "My Cinema",
-  "orientation": "portrait",
-  "scope": "/MyCinema/",
+  "name": "MyCinema",
   "short_name": "MyCinema",
+  "description": "Мій кінощоденник",
   "start_url": "/MyCinema/",
-  "theme_color": "#7bf70b",
-  "id": "my_cinema",
-  "description": "Мій персональний кінощоденник",
-  "lang": "uk",
-  "categories": [
-    "social"
+  "scope": "/MyCinema/",
+  "display": "standalone",
+  "background_color": "#05060f",
+  "theme_color": "#c6f432",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2503/2503508.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2503/2503508.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
