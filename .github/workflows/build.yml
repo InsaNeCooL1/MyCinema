@@ -5,7 +5,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -13,17 +13,27 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Capacitor and Build
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Capacitor
         run: |
-          npm install -g @capacitor/cli @capacitor/core @capacitor/android
-          npx cap init MyCinema com.mycinema.app --web-dir=www
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Init Capacitor
+        run: |
           mkdir -p www
-          cp index.html www/ || true
-          cp manifest.json www/ || true
+          cp index.html www/
+          cp manifest.json www/
+          npx cap init MyCinema com.mycinema.app --web-dir=www
           npx cap add android
           npx cap sync android
 
-      - name: Build APK with Gradle
+      - name: Build APK
         run: |
           cd android
           chmod +x gradlew
