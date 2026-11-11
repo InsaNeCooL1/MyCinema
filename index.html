@@ -62,20 +62,25 @@
 <div id="poster-zoom"><button class="zoom-close" onclick="closeImageZoom()">✕</button><img alt=""></div>
 <input type="file" id="import-file" accept=".json" style="display:none;">
 
+<!-- ============ МОДАЛЬНІ ВІКНА ============ -->
+
 <div id="settings-modal">
   <div class="settings-box">
     <div class="settings-header">
       <h2>⚙️ Налаштування</h2>
       <button class="settings-close" onclick="closeSettings()">✕</button>
     </div>
+    
     <div class="settings-section">
       <div class="settings-section-title">🎨 Колір фону</div>
       <div id="bg-swatches" style="display:flex;gap:10px;flex-wrap:wrap"></div>
     </div>
+    
     <div class="settings-section">
       <div class="settings-section-title">✨ Колір виділення</div>
       <div id="accent-swatches" style="display:flex;gap:10px;flex-wrap:wrap"></div>
     </div>
+    
     <div class="settings-section">
       <div class="settings-section-title">🖼️ Вигляд</div>
       <label class="settings-toggle">
@@ -83,6 +88,20 @@
         <span>Постер як фон на картці тайтлу</span>
       </label>
     </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">🎬 Джерела перегляду</div>
+      <input type="text" id="jackett-url" class="auth-input" placeholder="Jackett URL (http://192.168.1.x:9117)" style="margin-bottom:8px;">
+      <input type="text" id="jackett-key" class="auth-input" placeholder="Jackett API Key" style="margin-bottom:8px;">
+      <input type="text" id="torrserver-url" class="auth-input" placeholder="TorrServer URL (http://127.0.0.1:8090)" style="margin-bottom:8px;">
+      <label class="settings-toggle" style="margin-bottom:8px;">
+        <input type="checkbox" id="player-pref">
+        <span>Відкривати у зовнішньому плеєрі (VLC)</span>
+      </label>
+      <button class="settings-btn" onclick="testJackettConn()" style="background:var(--bg-3);">🔌 Перевірити з'єднання</button>
+      <button class="settings-btn" onclick="savePlayerSettings()">💾 Зберегти налаштування</button>
+    </div>
+
     <div class="settings-section">
       <div class="settings-section-title">📁 Дані</div>
       <button class="settings-btn" onclick="exportLibrary()">💾 Експорт бібліотеки</button>
@@ -121,10 +140,33 @@
   </div>
 </div>
 
+<!-- Модалка зі списком торрентів -->
+<div id="torrents-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); z-index:2500; display:none; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--bg-1); width:100%; max-width:700px; max-height:85vh; border-radius:20px; display:flex; flex-direction:column; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+    <div style="padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="margin:0; font-family:var(--serif);">Вибір торрента</h3>
+      <button onclick="closeTorrentsModal()" style="background:none; border:0; color:var(--text-muted); font-size:24px; cursor:pointer;">✕</button>
+    </div>
+    <div id="torrents-list" style="padding:16px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+  </div>
+</div>
+
+<!-- Екран завантаження (Анімація) -->
+<div id="loading-modal" style="position:fixed; inset:0; background:var(--bg-0); z-index:3000; display:none; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
+  <div style="position:relative; width:280px; height:420px; border-radius:16px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.8);">
+    <img id="loading-poster" src="" style="width:100%; height:100%; object-fit:cover; filter:grayscale(100%); transition:filter 5s ease-in-out;">
+    <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.8), transparent);"></div>
+  </div>
+  <div id="loading-status" style="margin-top:30px; font-family:var(--mono); font-size:16px; color:var(--accent); font-weight:700;">Шукаю торенти...</div>
+  <div id="loading-substatus" style="margin-top:8px; font-family:var(--mono); font-size:12px; color:var(--text-muted);">Підключення до Jackett</div>
+</div>
+
+<!-- ============ FIREBASE MODULE ============ -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyCEFo7IwNEGAzkVnhtPXRJuxLgIksd187Q",
   authDomain: "mucinema-d9595.firebaseapp.com",
@@ -141,6 +183,7 @@ window.firestoreDB = db;
 window.firestoreDoc = doc;
 window.firestoreGetDoc = getDoc;
 window.firestoreSetDoc = setDoc;
+
 window.loginWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
   const err = document.getElementById('auth-error'); err.textContent = '';
@@ -149,6 +192,7 @@ window.loginWithGoogle = async () => {
 };
 getRedirectResult(auth).then((r) => { if (r) document.getElementById('auth-modal').style.display = 'none'; })
   .catch((error) => { const err = document.getElementById('auth-error'); if (err) err.textContent = "Помилка входу: " + error.message; });
+
 window.loginUser = async () => {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
@@ -157,6 +201,7 @@ window.loginUser = async () => {
   try { document.getElementById('btn-login').textContent = 'Вхід...'; await signInWithEmailAndPassword(auth, email, password); }
   catch (e) { err.textContent = "Невірний email або пароль"; document.getElementById('btn-login').textContent = 'Увійти'; }
 };
+
 window.registerUser = async () => {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
@@ -166,9 +211,11 @@ window.registerUser = async () => {
   try { document.getElementById('btn-register').textContent = 'Створення...'; await createUserWithEmailAndPassword(auth, email, password); }
   catch (e) { err.textContent = "Помилка: " + (e.code === 'auth/email-already-in-use' ? "Ця пошта вже зареєстрована" : e.message); document.getElementById('btn-register').textContent = 'Створити новий акаунт'; }
 };
+
 window.logoutUser = async () => { if(confirm('Ви впевнені, що хочете вийти?')) { await signOut(auth); location.reload(); } };
 window.openAuthModal = () => { document.getElementById('auth-modal').style.display = 'flex'; };
 window.closeAuthModal = () => { document.getElementById('auth-modal').style.display = 'none'; };
+
 onAuthStateChanged(auth, (user) => {
   if (user) {
     window.currentUser = user; window.firebaseReady = true;
@@ -202,6 +249,7 @@ onAuthStateChanged(auth, (user) => {
 <script src="src/person.js"></script>
 <script src="src/settings.js"></script>
 <script src="src/calendar.js"></script>
+<script src="src/player.js"></script>
 <script src="src/app.js"></script>
 
 </body>
