@@ -55,6 +55,8 @@ header {
 }
 .hamburger { background: none; border: 0; color: var(--text); font-size: 22px; cursor: pointer; padding: 6px 8px; line-height: 1; border-radius: 8px; transition: .2s; }
 .hamburger:hover { color: var(--accent); background: var(--bg-2); }
+
+/* РОЗШИРЕНИЙ ПОШУК */
 .search-container { position: relative; flex: 1; max-width: 100%; }
 input#q { width: 100%; padding: 11px 16px; font-size: 15px; border: 0; border-radius: 14px; background: var(--bg-1); color: var(--text); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .03); transition: .2s; }
 input#q:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px rgba(var(--accent-rgb), .08); }
@@ -81,8 +83,8 @@ input#q::placeholder { color: var(--text-dim); }
 
 #sidebar {
   position: fixed; top: 0; left: 0;
-  height: 100vh; /* Fallback */
-  height: 100dvh; /* Dynamic Viewport Height for mobile */
+  height: 100vh;
+  height: 100dvh;
   width: 290px; max-width: 82vw;
   background: linear-gradient(180deg, var(--bg-sidebar), #08070c);
   z-index: 101; transform: translateX(-100%); transition: transform .35s cubic-bezier(.4, 0, .2, 1);
@@ -97,9 +99,9 @@ input#q::placeholder { color: var(--text-dim); }
 
 .sidebar-nav {
   flex: 1 1 auto;
-  min-height: 0; /* CRITICAL FIX: Prevents infinite stretch/scroll */
+  min-height: 0;
   overflow-y: auto;
-  overscroll-behavior: contain; /* Stops page from scrolling under menu */
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: 14px 10px; display: flex; flex-direction: column; gap: 2px;
 }
@@ -132,8 +134,9 @@ input#q::placeholder { color: var(--text-dim); }
 #results { padding: 0 16px 16px; max-width: 720px; margin: auto; }
 
 /* =========================================
-   HOME PAGE
+   HOME PAGE & TASTE SUMMARY
    ========================================= */
+/* ВИПРАВЛЕНО ВІДСТУПИ ТА ШИРИНУ */
 .taste-summary-container { max-width: 720px; margin: 0 auto; padding: 16px 16px 12px; }
 .taste-summary { width: 100%; padding: 14px 18px; background: linear-gradient(135deg, rgba(var(--accent-rgb), .10), rgba(197, 163, 255, .06)); border: 1px solid rgba(var(--accent-rgb), .20); border-radius: 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all .25s; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); position: relative; overflow: hidden; }
 .taste-summary:hover { background: linear-gradient(135deg, rgba(var(--accent-rgb), .16), rgba(197, 163, 255, .10)); border-color: rgba(var(--accent-rgb), .35); transform: translateY(-1px); }
@@ -162,12 +165,12 @@ input#q::placeholder { color: var(--text-dim); }
 .taste-insight em { color: var(--accent); font-style: italic; font-weight: 600; }
 .taste-empty { text-align: center; padding: 24px 16px; color: var(--text-muted); font-size: 14px; }
 
-/* MOOD PILLS (FIXED STRETCHING BUG) */
+/* ВИПРАВЛЕНО ВІДСТУП ЗВЕРХУ ТА РОЗТЯГУВАННЯ ПЛИТОК */
 .mood-section { max-width: 720px; margin: 0 auto; padding: 12px 16px 22px; }
 .mood-title { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; }
-.mood-pills { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; align-items: flex-start; /* Fix vertical stretching */ }
+.mood-pills { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; align-items: flex-start; }
 .mood-pills::-webkit-scrollbar { display: none; }
-.mood-pill { flex: 0 0 auto; height: 38px; /* Fixed height */ display: flex; align-items: center; gap: 6px; padding: 0 16px; border-radius: 22px; background: var(--bg-1); color: var(--text-secondary); font-size: 13px; font-weight: 500; border: 1px solid rgba(255, 255, 255, .04); transition: .25s; }
+.mood-pill { flex: 0 0 auto; height: 38px; display: flex; align-items: center; gap: 6px; padding: 0 16px; border-radius: 22px; background: var(--bg-1); color: var(--text-secondary); font-size: 13px; font-weight: 500; border: 1px solid rgba(255, 255, 255, .04); transition: .25s; }
 .mood-pill:hover { background: var(--bg-2); transform: translateY(-1px); }
 .mood-pill.active { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: var(--accent-fg); font-weight: 700; border-color: transparent; box-shadow: 0 4px 16px rgba(var(--accent-rgb), .3); }
 
@@ -260,12 +263,10 @@ input#q::placeholder { color: var(--text-dim); }
 .card-poster-bg { position: absolute; inset: 0; background-size: cover; background-position: center; filter: blur(20px) brightness(.5) saturate(1.1); z-index: 0; pointer-events: none; }
 .card-poster-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 7, 10, .4), var(--bg-0) 60%); }
 
-/* Card Top Section (Mobile) */
 .card-top-section { display: flex; flex-direction: column; gap: 24px; margin-bottom: 24px; }
 .card-top-left { width: 100%; }
 .card-top-right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
-/* Hero / Backdrop */
 .card-hero { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 16px; overflow: hidden; background: #000; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); cursor: pointer; }
 .card-hero-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.2s; }
 .card-hero:hover .card-hero-img { opacity: 0.8; }
@@ -275,13 +276,11 @@ input#q::placeholder { color: var(--text-dim); }
 .card-hero:hover .card-hero-play svg { transform: scale(1.1); opacity: 1; }
 .hero-rating-badge { position: absolute; bottom: 16px; right: 16px; width: 54px; height: 54px; border-radius: 50%; background: rgba(8, 7, 10, 0.85); border: 3px solid var(--accent); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 800; font-size: 18px; color: var(--accent); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); z-index: 2; }
 
-/* Title & Logo */
 .card-title-wrap { display: flex; flex-direction: column; gap: 6px; }
 .title-logo { max-width: 100%; max-height: 140px; object-fit: contain; object-position: left center; margin-bottom: 8px; filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.6)); }
 .card-title-wrap .title { font-family: var(--serif); font-size: 34px; font-weight: 700; line-height: 1.1; margin: 0; background: linear-gradient(135deg, var(--text) 20%, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px; filter: drop-shadow(0 4px 10px rgba(var(--accent-rgb), 0.15)); }
 .meta-details { font-size: 13px; color: var(--text-muted); margin-top: 6px; font-family: var(--mono); letter-spacing: .2px; }
 
-/* Ratings & Studios */
 .ratings-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
 .rating-badge { padding: 6px 14px; border-radius: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 12px; }
 .rating-imdb { background: var(--imdb); color: #000; }
@@ -293,14 +292,12 @@ input#q::placeholder { color: var(--text-dim); }
 .streaming-emblems { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
 .streaming-emblem { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; background: var(--bg-3); }
 
-/* Overview */
 .overview { margin: 16px 0; line-height: 1.6; color: var(--text-secondary); font-size: 14.5px; }
 .overview-clamped { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; transition: all 0.3s ease; }
 .overview-expanded { display: block; overflow: visible; -webkit-line-clamp: unset; -webkit-box-orient: initial; }
 .btn-read-more { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 0; align-self: flex-start; margin-top: -8px; }
 .btn-read-more:hover { text-decoration: underline; }
 
-/* Action Row V7 */
 .action-row-v7 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg-1); padding: 12px 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.04); margin-top: 12px; }
 .action-icon-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--bg-3); border: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: 0.2s; color: var(--text); }
 .action-icon-btn:hover { background: var(--bg-4); }
@@ -313,7 +310,6 @@ input#q::placeholder { color: var(--text-dim); }
 .btn.uakino { background: var(--bg-1); border: 1px solid #ff6b00; color: #ff6b00; }
 .btn.uakino:hover { background: #ff6b00; color: #fff; }
 
-/* User Rating Block */
 .card-user-rating { background: var(--bg-1); padding: 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.04); margin-top: 12px; margin-bottom: 16px; }
 .ratings-block { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
 .rating-block { display: flex; flex-direction: column; gap: 6px; }
@@ -335,20 +331,17 @@ input#q::placeholder { color: var(--text-dim); }
 .rating-block.average .rating-block-label { font-weight: 700; color: var(--text); font-size: 14px; }
 .rating-block.average .rating-block-value { font-size: 18px; }
 
-/* Tabs */
 .card-tabs { display: flex; gap: 2px; margin: 24px 0 16px 0; border-bottom: 1px solid rgba(255, 255, 255, .05); overflow-x: auto; scrollbar-width: none; }
 .card-tabs::-webkit-scrollbar { display: none; }
 .card-tab { flex: 0 0 auto; padding: 10px 14px; background: transparent; color: var(--text-muted); font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; transition: .2s; font-weight: 500; }
 .card-tab:hover { color: var(--text); }
 .card-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
 
-/* Details Tab */
 .details-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 .detail-item { background: var(--bg-1); padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.03); }
 .detail-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 .detail-value { font-size: 14px; font-weight: 600; color: var(--text); }
 
-/* Cast / Similar / Seasons / Notes */
 .actor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; margin-top: 12px; }
 .actor-tile { cursor: pointer; text-align: center; transition: .2s; }
 .actor-tile:hover { transform: translateY(-2px); }
@@ -579,7 +572,7 @@ input#q::placeholder { color: var(--text-dim); }
 .game-over p { color: var(--text-muted); margin-bottom: 20px; }
 
 /* =========================================
-   MEDIA QUERIES (DESKTOP)
+   MEDIA QUERIES (DESKTOP) - УНІФІКОВАНО
    ========================================= */
 @media (max-width: 520px) {
   .taste-body { grid-template-columns: 1fr; gap: 10px; }
@@ -587,7 +580,9 @@ input#q::placeholder { color: var(--text-dim); }
 }
 
 @media (min-width: 900px) {
-  #results, .home-wrap, .home-hero, .mood-section, .game-container { max-width: 1000px; }
+  /* Тепер всі контейнери мають однакову ширину і не "їдуть" */
+  #results, .home-wrap, .home-hero, .mood-section, .game-container, .taste-summary-container { max-width: 1000px; }
+  
   .home-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px 14px; }
   .onb-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
   .stats-grid { grid-template-columns: repeat(4, 1fr); }
@@ -607,7 +602,7 @@ input#q::placeholder { color: var(--text-dim); }
 }
 
 @media (min-width: 1200px) {
-  #results, .home-wrap, .home-hero, .mood-section, .game-container { max-width: 1300px; }
+  #results, .home-wrap, .home-hero, .mood-section, .game-container, .taste-summary-container { max-width: 1300px; }
   .home-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
   .filter-bar { max-width: 1268px; }
 }
