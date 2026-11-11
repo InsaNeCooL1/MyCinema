@@ -244,16 +244,9 @@ function renderMediaCard(ctx, scroll) {
   // --- ПРАВА КОЛОНКА (Все інше) ---
   const topRight = el('div', 'card-top-right');
   
-  // 1. Назва (Логотип або Текст)
+  // 1. Назва (Тільки текст)
   const titleWrap = el('div', 'card-title-wrap');
-  if (ctx.logoPath) {
-    const logoImg = el('img', 'title-logo');
-    logoImg.src = TMDB_IMG + 'w500' + ctx.logoPath;
-    logoImg.alt = d.title || d.name || r.title;
-    titleWrap.append(logoImg);
-  } else {
-    titleWrap.append(el('h1', 'title', d.title || d.name || r.title));
-  }
+  titleWrap.append(el('h1', 'title', d.title || d.name || r.title));
   
   let metaStr = d.release_date ? d.release_date.slice(0, 4) : (d.first_air_date ? d.first_air_date.slice(0, 4) : "");
   if (d.runtime) metaStr += ` · ${d.runtime} хв`;
@@ -356,7 +349,7 @@ function renderMediaCard(ctx, scroll) {
           });
         } else if (newStatus === "planned" || newStatus === "dropped" || newStatus === null) newEps = [];
       }
-      const patch = { status: newStatus, watchedEpisodes: newEps };
+      const patch = { status: newStatus, watchedEpisodes: newEps, statusDate: Date.now() };
       if (!lib[r.key] && ctx.genres) patch.genres = ctx.genres;
       if (!lib[r.key] && ctx.cast) patch.cast = ctx.cast;
       if (r.type === "tv" && d.seasons && !lib[r.key]?.totalSeasons) patch.totalSeasons = d.seasons.filter(x => x.season_number !== 0).length;
