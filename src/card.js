@@ -325,6 +325,14 @@ function renderMediaCard(ctx, scroll) {
   uakinoBtn.addEventListener("click", () => window.open(searchUrl, '_blank'));
   actionRow.append(uakinoBtn);
 
+    // 1.5 Кнопка "Дивитись" (Torrent)
+  const watchBtn = el("button", "btn", "▶️ Дивитись");
+  watchBtn.style.background = "linear-gradient(135deg, var(--accent), var(--accent-hover))";
+  watchBtn.style.color = "var(--accent-fg)";
+  watchBtn.style.border = "0";
+  watchBtn.addEventListener("click", () => openTorrentSearch(r));
+  actionRow.append(watchBtn);
+
   const favBtn = el("button", "action-icon-btn" + (s.favorite ? " on" : ""), "❤️");
   favBtn.title = "В улюблене";
   favBtn.addEventListener("click", () => update(r, { favorite: !s.favorite }));
