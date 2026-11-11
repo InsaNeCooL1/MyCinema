@@ -200,7 +200,7 @@ function renderMediaCard(ctx, scroll) {
       heroWrap.style.aspectRatio = '16/9';
     }
     
-    // Кнопка Play (тільки іконка)
+    // Кнопка Play
     if (trailerList.length > 0) {
       const playBtn = el('div', 'card-hero-play');
       playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
@@ -212,7 +212,7 @@ function renderMediaCard(ctx, scroll) {
       });
     }
 
-    // Кружечок з оцінкою користувача
+    // Кружечок з оцінкою
     const userRating = computeItemRating(s);
     if (userRating.avg > 0) {
       heroWrap.append(el('div', 'hero-rating-badge', fmtNum(userRating.avg)));
@@ -220,7 +220,7 @@ function renderMediaCard(ctx, scroll) {
   }
   topLeft.append(heroWrap);
   
-  // 2. Права частина: Назва, Рейтинги, Опис
+  // 2. Права частина: Назва, Опис, Статуси та Оцінка
   const topRight = el('div', 'card-top-right');
   
   // Назва та мета
@@ -245,7 +245,7 @@ function renderMediaCard(ctx, scroll) {
     if (rt && rt.Value !== "N/A") { rr.append(el("div", "rating-badge rating-rt", `RT: ${rt.Value}`)); hasR = true; }
   }
   
-  // Додаємо ОДИН головний логотип (стрімінг для серіалу, студія для фільму)
+  // Додаємо ОДИН головний логотип
   if (r.type === 'tv' && ctx.watchProviders?.flatrate?.length) {
     const img = el('img', 'streaming-emblem');
     img.src = TMDB_IMG + 'w92' + ctx.watchProviders.flatrate[0].logo_path;
@@ -293,13 +293,9 @@ function renderMediaCard(ctx, scroll) {
     topRight.append(overviewWrap);
   }
 
-  topSection.append(topLeft, topRight);
-  scroll.append(topSection);
-
-  // === НИЖНІЙ ПОВЕРХ ===
-  
-  // Блок 7 (Дії та Статуси в один рядок)
+  // --- БЛОК 7 (Дії та Статуси) ПЕРЕНЕСЕНО СЮДИ ---
   const actionRow = el('div', 'action-row-v7');
+  actionRow.style.marginTop = '12px'; // Відступ від опису
   
   // 1. UAKino
   const searchTitle = d.title || d.name || r.title;
@@ -367,16 +363,16 @@ function renderMediaCard(ctx, scroll) {
     });
     actionRow.append(delBtn);
   }
+  topRight.append(actionRow);
 
-  scroll.append(actionRow);
-
-  // Оцінки (Моя оцінка)
+  // --- ОЦІНКИ ПЕРЕНЕСЕНО СЮДИ ---
   const ratingWrap = el('div', 'card-user-rating');
   ratingWrap.style.background = 'var(--bg-1)';
   ratingWrap.style.padding = '16px';
   ratingWrap.style.borderRadius = '16px';
   ratingWrap.style.border = '1px solid rgba(255,255,255,0.04)';
-  ratingWrap.style.marginBottom = '32px';
+  ratingWrap.style.marginTop = '12px';
+  ratingWrap.style.marginBottom = '16px';
 
   if (r.type === 'tv') {
     const ir = computeItemRating(s);
@@ -404,9 +400,13 @@ function renderMediaCard(ctx, scroll) {
     rb.append(renderAverageBlock(computeAverage(cur), countFilled(cur)));
     ratingWrap.append(rb);
   }
-  scroll.append(ratingWrap);
+  topRight.append(ratingWrap);
 
-  // Таби знизу
+  // Додаємо колонки в секцію
+  topSection.append(topLeft, topRight);
+  scroll.append(topSection);
+
+  // === НИЖНІЙ ПОВЕРХ (ТАБИ) ===
   const tabsList = [{ id: 'cast', label: 'Актори' }, { id: 'details', label: 'Детально' }];
   if (r.type === 'tv') tabsList.push({ id: 'seasons', label: 'Сезони' });
   if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
