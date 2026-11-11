@@ -18,7 +18,7 @@ function saveCardScroll() {
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
   overlay.classList.add("open");
-  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
+  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, logoPath: null };
   cardStack = [ctx];
   pushCardState();
   renderLoading();
@@ -29,7 +29,7 @@ async function openCard(r) {
 
 async function openMediaFromStack(item) {
   saveCardScroll();
-  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, logoPath: null };
   cardStack.push(ctx);
   pushCardState();
   renderLoading();
@@ -62,8 +62,9 @@ function renderLoading() {
 async function loadMediaCardData(ctx) {
   const r = ctx.item;
   try {
-    const d = await tmdbFetch(`/${r.type}/${r.id}?language=uk-UA&include_video_language=uk,en,null&append_to_response=credits,videos,external_ids,watch/providers,recommendations,similar`);
+    const d = await tmdbFetch(`/${r.type}/${r.id}?language=uk-UA&include_video_language=uk,en,null&append_to_response=credits,videos,external_ids,watch/providers,recommendations,similar,images`);
     ctx.details = d;
+    
     if (!r.title) {
       r.title = d.title || d.name || '';
       r.year = (d.release_date || d.first_air_date || '').slice(0, 4);
@@ -74,6 +75,7 @@ async function loadMediaCardData(ctx) {
       r.votes = d.vote_count || 0;
       r.popularity = d.popularity || 0;
     }
+    
     if (r.type === 'tv') r.episode_count = d.number_of_episodes || 0;
     if (d.genres) { ctx.genres = d.genres.map(g => g.id); if (lib[r.key]) { lib[r.key].genres = ctx.genres; save(); } }
     if (d.credits?.cast?.length) {
@@ -94,6 +96,14 @@ async function loadMediaCardData(ctx) {
       if (lib[r.key]) lib[r.key].totalSeasons = totalSeasons;
     }
     ctx.watchProviders = d['watch/providers']?.results?.UA || null;
+    
+    // Витягуємо логотип (uk -> en -> перший-ліпший)
+    const logos = d.images?.logos || [];
+    let bestLogo = logos.find(l => l.iso_639_1 === 'uk');
+    if (!bestLogo) bestLogo = logos.find(l => l.iso_639_1 === 'en');
+    if (!bestLogo) bestLogo = logos[0];
+    ctx.logoPath = bestLogo ? bestLogo.file_path : null;
+
     const recs = d.recommendations?.results || [];
     const sims = d.similar?.results || [];
     const pool = recs.length > 0 ? recs : sims;
@@ -102,6 +112,9 @@ async function loadMediaCardData(ctx) {
 }
 
 function closeCard() {
+  const iframe = card.querySelector('.card-hero-video');
+  if (iframe) iframe.src = 'about:blank';
+
   if (cardStack.length) history.go(-cardStack.length);
   else { overlay.classList.remove('open'); refresh(); }
 }
@@ -109,7 +122,7 @@ function closeCard() {
 async function loadMediaForForward(s) {
   overlay.classList.add("open");
   const item = { key: s.key, id: s.id, type: s.media_type, title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 };
-  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, logoPath: null };
   cardStack.push(ctx);
   renderLoading();
   await loadMediaCardData(ctx);
@@ -120,6 +133,10 @@ async function loadMediaForForward(s) {
 window.addEventListener('popstate', async (e) => {
   const depth = (e.state && e.state.mc) || 0;
   if (depth === cardStack.length) return;
+
+  const iframe = card.querySelector('.card-hero-video');
+  if (iframe) iframe.src = 'about:blank';
+
   if (depth > cardStack.length) {
     const s = e.state;
     if (!s || !s.ctx || depth - cardStack.length > 1) {
@@ -148,7 +165,11 @@ function routeFromHash() {
 
 function renderCard(restore) {
   const ctx = cardStack[cardStack.length - 1];
-  if (!ctx) { overlay.classList.remove('open'); return; }
+  if (!ctx) { overlay.classList.remove('open'); refresh(); return; }
+
+  const oldIframe = card.querySelector('.card-hero-video');
+  if (oldIframe) oldIframe.src = 'about:blank';
+
   const prevScroll = card.querySelector('.card-scroll');
   const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
   card.innerHTML = '';
@@ -200,7 +221,7 @@ function renderMediaCard(ctx, scroll) {
       heroWrap.style.aspectRatio = '16/9';
     }
     
-    // Кнопка Play (по центру)
+    // Кнопка Play
     if (trailerList.length > 0) {
       const playBtn = el('div', 'card-hero-play');
       playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
@@ -223,9 +244,17 @@ function renderMediaCard(ctx, scroll) {
   // --- ПРАВА КОЛОНКА (Все інше) ---
   const topRight = el('div', 'card-top-right');
   
-  // 1. Назва та мета
+  // 1. Назва (Логотип або Текст)
   const titleWrap = el('div', 'card-title-wrap');
-  titleWrap.append(el('h1', 'title', d.title || d.name || r.title));
+  if (ctx.logoPath) {
+    const logoImg = el('img', 'title-logo');
+    logoImg.src = TMDB_IMG + 'w500' + ctx.logoPath;
+    logoImg.alt = d.title || d.name || r.title;
+    titleWrap.append(logoImg);
+  } else {
+    titleWrap.append(el('h1', 'title', d.title || d.name || r.title));
+  }
+  
   let metaStr = d.release_date ? d.release_date.slice(0, 4) : (d.first_air_date ? d.first_air_date.slice(0, 4) : "");
   if (d.runtime) metaStr += ` · ${d.runtime} хв`;
   if (d.number_of_seasons) metaStr += ` · ${d.number_of_seasons} сезонів`;
@@ -245,6 +274,7 @@ function renderMediaCard(ctx, scroll) {
     if (rt && rt.Value !== "N/A") { rr.append(el("div", "rating-badge rating-rt", `RT: ${rt.Value}`)); hasR = true; }
   }
   
+  // Логотип студії/стрімінгу
   if (r.type === 'tv' && ctx.watchProviders?.flatrate?.length) {
     const img = el('img', 'streaming-emblem');
     img.src = TMDB_IMG + 'w92' + ctx.watchProviders.flatrate[0].logo_path;
@@ -291,9 +321,9 @@ function renderMediaCard(ctx, scroll) {
     topRight.append(overviewWrap);
   }
 
-  // 4. БЛОК 7 (Дії та Статуси) - ТЕПЕР ВСЕРЕДИНІ ПРАВОЇ КОЛОНКИ
+  // 4. БЛОК 7 (Дії та Статуси)
   const actionRow = el('div', 'action-row-v7');
-  actionRow.style.marginTop = '12px'; // Відступ від опису
+  actionRow.style.marginTop = '12px'; 
   
   const searchTitle = d.title || d.name || r.title;
   const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(searchTitle)}`;
@@ -358,7 +388,7 @@ function renderMediaCard(ctx, scroll) {
   }
   topRight.append(actionRow);
 
-  // 5. ОЦІНКА - ТЕЖ ВСЕРЕДИНІ ПРАВОЇ КОЛОНКИ
+  // 5. ОЦІНКА
   const ratingWrap = el('div', 'card-user-rating');
   ratingWrap.style.background = 'var(--bg-1)';
   ratingWrap.style.padding = '16px';
@@ -424,6 +454,7 @@ function renderMediaCard(ctx, scroll) {
   else if (ctx.activeTab === 'notes') tabContent.append(...renderNotesTab(ctx));
   scroll.append(tabContent);
 }
+
 // ==================== НОВА ВКЛАДКА: ДЕТАЛЬНО ====================
 function renderDetailsTab(ctx) {
   const d = ctx.details;
