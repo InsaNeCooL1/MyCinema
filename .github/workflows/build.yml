@@ -1,6 +1,9 @@
 name: Build Android APK
 on: [push, workflow_dispatch]
 
+permissions:
+  contents: write # Дозвіл на створення релізів
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,6 +21,16 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Install Capacitor
         run: |
@@ -44,8 +57,14 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Create Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
         with:
-          name: MyCinema-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          tag_name: build-${{ github.run_number }}
+          name: MyCinema Build ${{ github.run_number }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
