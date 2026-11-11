@@ -10,16 +10,21 @@ function renderCalendar() {
   head.append(el('h1', 'section-title', '📅 Календар'));
   wrap.append(head);
 
-  // Отримуємо всі тайтли зі статусами "Дивлюсь" або "Переглянуто"
-  const items = Object.values(lib).filter(x => x.status === 'watching' || x.status === 'watched');
+  // 1. Беремо всі тайтли з потрібними статусами
+  let allItems = Object.values(lib).filter(x => x.status === 'watching' || x.status === 'watched');
   
-  if (!items.length) {
+  if (!allItems.length) {
     wrap.append(el('div', 'avail-empty', 'Тут поки порожньо. Додай фільми зі статусом "Дивлюсь" або "Переглянуто".'));
     box.append(wrap);
     return;
   }
 
-  // Отримуємо унікальні місяці для фільтра
+  // 2. Фільтруємо за обраним статусом (якщо не 'all')
+  let items = allItems;
+  if (state.calendarStatus === 'watching') items = items.filter(x => x.status === 'watching');
+  else if (state.calendarStatus === 'watched') items = items.filter(x => x.status === 'watched');
+
+  // 3. Збираємо унікальні місяці вже з відфільтрованих елементів
   const monthsSet = new Set();
   items.forEach(item => {
     const date = new Date(item.statusDate || item.updated || Date.now());
@@ -33,42 +38,80 @@ function renderCalendar() {
     return yb - ya || mb - ma;
   });
 
-  // Якщо не вибрано місяць - беремо перший (найновіший)
+  // Якщо поточний вибраний місяць відсутній у новому списку - беремо перший
   if (!state.calendarMonth || !monthsSet.has(state.calendarMonth)) {
-    state.calendarMonth = months[0];
+    state.calendarMonth = months[0] || null;
   }
 
-  // Хедер з фільтром
+  // 4. Малюємо панель з фільтрами (Місяць + Статус)
   const calHeader = el('div', 'calendar-header');
-  const mSelect = document.createElement('select');
-  mSelect.className = 'calendar-select';
-  
-  const monthNames = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"];
-  
-  months.forEach(m => {
-    const [y, monthIdx] = m.split('-').map(Number);
+  calHeader.style.display = 'flex';
+  calHeader.style.gap = '10px';
+  calHeader.style.flexWrap = 'wrap';
+
+  // Селект статусу
+  const sSelect = document.createElement('select');
+  sSelect.className = 'calendar-select';
+  sSelect.style.flex = '1';
+  sSelect.style.minWidth = '150px';
+  [
+    { val: 'all', label: 'Всі статуси' },
+    { val: 'watching', label: '▶️ Дивлюсь' },
+    { val: 'watched', label: '✅ Переглянуто' }
+  ].forEach(optData => {
     const opt = document.createElement('option');
-    opt.value = m;
-    opt.textContent = `${monthNames[monthIdx]} ${y}`;
-    if (m === state.calendarMonth) opt.selected = true;
-    mSelect.append(opt);
+    opt.value = optData.val;
+    opt.textContent = optData.label;
+    if (state.calendarStatus === optData.val) opt.selected = true;
+    sSelect.append(opt);
   });
-  
-  mSelect.addEventListener('change', (e) => {
-    state.calendarMonth = e.target.value;
+  sSelect.addEventListener('change', (e) => {
+    state.calendarStatus = e.target.value;
+    state.calendarMonth = null; // Скидаємо місяць, щоб він обрався автоматично з нового списку
     renderCalendar();
   });
+  calHeader.append(sSelect);
+
+  // Селект місяця
+  if (months.length > 0) {
+    const mSelect = document.createElement('select');
+    mSelect.className = 'calendar-select';
+    mSelect.style.flex = '1';
+    mSelect.style.minWidth = '150px';
+    
+    const monthNames = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"];
+    
+    months.forEach(m => {
+      const [y, monthIdx] = m.split('-').map(Number);
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = `${monthNames[monthIdx]} ${y}`;
+      if (m === state.calendarMonth) opt.selected = true;
+      mSelect.append(opt);
+    });
+    
+    mSelect.addEventListener('change', (e) => {
+      state.calendarMonth = e.target.value;
+      renderCalendar();
+    });
+    calHeader.append(mSelect);
+  }
   
-  calHeader.append(mSelect);
   wrap.append(calHeader);
 
-  // Фільтруємо по вибраному місяцю
+  if (!items.length) {
+    wrap.append(el('div', 'avail-empty', 'Немає записів з таким статусом.'));
+    box.append(wrap);
+    return;
+  }
+
+  // 5. Фільтруємо по вибраному місяцю
   const filteredItems = items.filter(item => {
     const date = new Date(item.statusDate || item.updated || Date.now());
     return `${date.getFullYear()}-${date.getMonth()}` === state.calendarMonth;
   });
 
-  // Групуємо за днями
+  // 6. Групуємо за днями
   const groups = {};
   filteredItems.forEach(item => {
     const date = new Date(item.statusDate || item.updated || Date.now());
@@ -77,7 +120,7 @@ function renderCalendar() {
     groups[dayKey].push(item);
   });
 
-  // Сортуємо дні за спаданням (новіші зверху)
+  // Сортуємо дні за спаданням
   const sortedDays = Object.keys(groups).sort((a, b) => {
     return new Date(groups[b][0].statusDate || groups[b][0].updated) - new Date(groups[a][0].statusDate || groups[a][0].updated);
   });
@@ -90,11 +133,9 @@ function renderCalendar() {
     
     const dayItems = el('div', 'timeline-items');
     
-    // Сортуємо елементи всередині дня (спочатку ті, що дивишся зараз, потім переглянуті)
     groups[day].sort((a, b) => (b.statusDate || b.updated) - (a.statusDate || a.updated)).forEach(item => {
       const listItem = createListItem(item);
       
-      // Додаємо бейджик статусу
       const statusBadge = item.status === 'watching' ? '▶️ Дивлюсь' : '✅ Переглянуто';
       const info = listItem.querySelector('.info');
       if (info) {
