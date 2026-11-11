@@ -13,7 +13,16 @@ let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_AD
 let state = {
   tab: 'home', typeFilter: 'all', topTypeFilter: 'all',
   filter: { query: '', type: 'all', decade: 'any', genre: 'any', minRating: 0, sortBy: 'popularity.desc', streaming: null },
-  home: { loading: false, recs: null, sig: null, tab: 'movie', general: null, mood: null, tasteExpanded: false },
+  home: { 
+    loading: false, 
+    recs: null, 
+    sig: null, 
+    shown: { movie: 20, tv: 20 }, // <--- ДОДАНО ОСЬ ЦЕ
+    tab: 'movie', 
+    general: null, 
+    mood: null, 
+    tasteExpanded: false 
+  },
   game: { active: false, type: 'movie', round: 0, totalRounds: 20, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() },
   stats: { tab: 'taste', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } },
   librarySearch: '', librarySort: 'updated'
@@ -72,7 +81,7 @@ function hasWatched(item) {
 }
 function tasteDecay(updated) {
   const days = (Date.now() - (updated || Date.now())) / (24 * 60 * 60 * 1000);
-  return Math.pow(0.5, days / TASTE_HALFLIFE_DAYS);
+  return Math.pow(0.98, days); // -3% щодня
 }
 function averagedSeasonRatings(item) {
   const sr = item.seasonRatings || {};
