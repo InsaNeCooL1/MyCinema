@@ -18,7 +18,7 @@ function saveCardScroll() {
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
   overlay.classList.add("open");
-  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false };
+  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
   cardStack = [ctx];
   pushCardState();
   renderLoading();
@@ -29,7 +29,7 @@ async function openCard(r) {
 
 async function openMediaFromStack(item) {
   saveCardScroll();
-  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
   cardStack.push(ctx);
   pushCardState();
   renderLoading();
@@ -109,7 +109,7 @@ function closeCard() {
 async function loadMediaForForward(s) {
   overlay.classList.add("open");
   const item = { key: s.key, id: s.id, type: s.media_type, title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 };
-  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
   cardStack.push(ctx);
   renderLoading();
   await loadMediaCardData(ctx);
@@ -162,7 +162,7 @@ function renderCard(restore) {
   if (savedScroll > 0) scroll.scrollTop = savedScroll;
 }
 
-// ==================== НОВИЙ ДИЗАЙН КАРТКИ ====================
+// ==================== ГОЛОВНА ФУНКЦІЯ РЕНДЕРУ КАРТКИ ====================
 function renderMediaCard(ctx, scroll) {
   const r = ctx.item;
   const d = ctx.details;
@@ -199,19 +199,28 @@ function renderMediaCard(ctx, scroll) {
       heroWrap.style.background = 'var(--bg-2)';
       heroWrap.style.aspectRatio = '16/9';
     }
+    
+    // Кнопка Play (тільки іконка)
     if (trailerList.length > 0) {
-      const playBtn = el('button', 'card-hero-play');
-      playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span>Трейлер</span>`;
-      playBtn.addEventListener('click', () => {
+      const playBtn = el('div', 'card-hero-play');
+      playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+      heroWrap.append(playBtn);
+      
+      heroWrap.addEventListener('click', () => {
         ctx.playingTrailer = true;
         renderCard();
       });
-      heroWrap.append(playBtn);
+    }
+
+    // Кружечок з оцінкою користувача
+    const userRating = computeItemRating(s);
+    if (userRating.avg > 0) {
+      heroWrap.append(el('div', 'hero-rating-badge', fmtNum(userRating.avg)));
     }
   }
   topLeft.append(heroWrap);
   
-  // 2. Права частина: Інформація
+  // 2. Права частина: Назва, Рейтинги, Опис
   const topRight = el('div', 'card-top-right');
   
   // Назва та мета
@@ -222,14 +231,12 @@ function renderMediaCard(ctx, scroll) {
   if (d.number_of_seasons) metaStr += ` · ${d.number_of_seasons} сезонів`;
   if (d.genres) metaStr += ` · ${d.genres.map(g => g.name).join(", ")}`;
   titleWrap.append(el('div', 'meta-details', metaStr));
-  if (lib[r.key]?.elo && lib[r.key]?.eloGames > 0) {
-    titleWrap.append(el("div", "game-card-elo", `🏆 Elo ${Math.round(lib[r.key].elo)} · ${lib[r.key].eloGames} матчів`));
-  }
   topRight.append(titleWrap);
 
-  // Рейтинги
+  // Рейтинги + Одна студія/стрімінг
   const rr = el("div", "ratings-row");
   rr.style.marginTop = '0';
+  rr.style.alignItems = 'center';
   let hasR = false;
   if (d.vote_average) { rr.append(el("div", "rating-badge rating-tmdb", `TMDB: ${d.vote_average.toFixed(1)}`)); hasR = true; }
   if (ctx.omdb) {
@@ -237,39 +244,31 @@ function renderMediaCard(ctx, scroll) {
     const rt = ctx.omdb.Ratings?.find(x => x.Source === "Rotten Tomatoes");
     if (rt && rt.Value !== "N/A") { rr.append(el("div", "rating-badge rating-rt", `RT: ${rt.Value}`)); hasR = true; }
   }
-  if (hasR) topRight.append(rr);
-
-  // Студії та стрімінги
-  if (d.production_companies?.length || ctx.watchProviders?.flatrate?.length) {
-    const studiosRow = el("div", "studios-row");
-    studiosRow.style.marginTop = '0';
-    if (d.production_companies?.length) {
-      for (const c of d.production_companies.slice(0, 4)) {
-        const b = el("div", "studio-badge");
-        if (c.logo_path) {
-          const l = el("img", "studio-logo"); l.src = TMDB_IMG + "w92" + c.logo_path; l.loading = "lazy";
-          b.append(l);
-        }
-        b.append(el("span", "", c.name));
-        studiosRow.append(b);
-      }
-    }
-    if (ctx.watchProviders?.flatrate?.length) {
-      const provWrap = el('div', 'streaming-emblems');
-      provWrap.style.marginTop = '0';
-      for (const p of ctx.watchProviders.flatrate.slice(0, 4)) {
-        const img = el('img', 'streaming-emblem');
-        img.src = TMDB_IMG + 'w92' + p.logo_path;
-        img.title = p.provider_name;
-        img.loading = 'lazy';
-        provWrap.append(img);
-      }
-      topRight.append(studiosRow);
-      topRight.append(provWrap);
+  
+  // Додаємо ОДИН головний логотип (стрімінг для серіалу, студія для фільму)
+  if (r.type === 'tv' && ctx.watchProviders?.flatrate?.length) {
+    const img = el('img', 'streaming-emblem');
+    img.src = TMDB_IMG + 'w92' + ctx.watchProviders.flatrate[0].logo_path;
+    img.title = ctx.watchProviders.flatrate[0].provider_name;
+    img.style.width = '24px'; img.style.height = '24px';
+    img.style.marginLeft = '4px';
+    rr.append(img);
+  } else if (d.production_companies?.length) {
+    const c = d.production_companies[0];
+    const b = el("div", "studio-badge");
+    b.style.padding = '4px'; b.style.background = 'var(--bg-3)';
+    if (c.logo_path) {
+      const l = el("img", "studio-logo"); l.src = TMDB_IMG + "w92" + c.logo_path; l.loading = "lazy";
+      l.style.width = '24px'; l.style.height = '24px';
+      b.append(l);
     } else {
-      topRight.append(studiosRow);
+      b.append(el('span', '', c.name));
     }
+    b.style.marginLeft = '4px';
+    rr.append(b);
   }
+  
+  if (hasR || rr.children.length > 0) topRight.append(rr);
 
   // Опис із кнопкою "Читати далі"
   if (d.overview) {
@@ -279,15 +278,11 @@ function renderMediaCard(ctx, scroll) {
     
     const textEl = el('div', 'overview', d.overview);
     textEl.style.margin = '0';
-    if (isExpanded) {
-      textEl.classList.add('overview-expanded');
-    } else {
-      textEl.classList.add('overview-clamped');
-    }
+    if (isExpanded) textEl.classList.add('overview-expanded');
+    else textEl.classList.add('overview-clamped');
     overviewWrap.append(textEl);
 
-    // Показуємо кнопку, тільки якщо текст довгий (приблизно > 200 символів)
-    if (d.overview.length > 200) {
+    if (d.overview.length > 180) {
       const readMoreBtn = el('button', 'btn-read-more', isExpanded ? 'Згорнути' : 'Читати далі...');
       readMoreBtn.addEventListener('click', () => {
         ctx.overviewExpanded = !ctx.overviewExpanded;
@@ -302,18 +297,29 @@ function renderMediaCard(ctx, scroll) {
   scroll.append(topSection);
 
   // === НИЖНІЙ ПОВЕРХ ===
-  const bottomSection = el('div', 'card-bottom-section');
-
-  // 3. Ліва колонка: Острівець зі статусами та оцінкою
-  const controlPanel = el('div', 'card-control-panel');
   
-  controlPanel.append(el("div", "label", "Статус"));
-  const st = el("div", "row status-row");
-  st.style.padding = '0'; st.style.background = 'transparent'; st.style.border = 'none';
-  const statuses = r.type === "tv" ? [["watching", "Дивлюсь"], ["watched", "Переглянуто"], ["planned", "Планую"], ["dropped", "Закинуто"]] : [["watched", "Переглянуто"], ["planned", "Планую"], ["dropped", "Закинуто"]];
+  // Блок 7 (Дії та Статуси в один рядок)
+  const actionRow = el('div', 'action-row-v7');
+  
+  // 1. UAKino
+  const searchTitle = d.title || d.name || r.title;
+  const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(searchTitle)}`;
+  const uakinoBtn = el("button", "btn uakino", "🍿 UAKino");
+  uakinoBtn.style.padding = '6px 12px'; uakinoBtn.style.borderRadius = '12px';
+  uakinoBtn.addEventListener("click", () => window.open(searchUrl, '_blank'));
+  actionRow.append(uakinoBtn);
+
+  // 2. Heart (Улюблене)
+  const favBtn = el("button", "action-icon-btn" + (s.favorite ? " on" : ""), "❤️");
+  favBtn.title = "В улюблене";
+  favBtn.addEventListener("click", () => update(r, { favorite: !s.favorite }));
+  actionRow.append(favBtn);
+
+  // 3. Статуси
+  const statuses = r.type === "tv" ? [["watching", "▶️"], ["watched", "✅"], ["planned", "📅"], ["dropped", "🕸️"]] : [["watched", "✅"], ["planned", "📅"], ["dropped", "🕸️"]];
   for (const [val, text] of statuses) {
-    const b = el("button", "btn" + (s.status === val ? " on" : ""), text);
-    b.dataset.status = val;
+    const b = el("button", "action-icon-btn" + (s.status === val ? " on" : ""), text);
+    b.title = val === 'watching' ? 'Дивлюсь' : val === 'watched' ? 'Переглянуто' : val === 'planned' ? 'Планую' : 'Закинуто';
     b.addEventListener("click", () => {
       const cur = lib[r.key] || {};
       const newStatus = cur.status === val ? null : val;
@@ -333,45 +339,45 @@ function renderMediaCard(ctx, scroll) {
       if (!lib[r.key] && ctx.genres) patch.genres = ctx.genres;
       if (!lib[r.key] && ctx.cast) patch.cast = ctx.cast;
       if (r.type === "tv" && d.seasons && !lib[r.key]?.totalSeasons) patch.totalSeasons = d.seasons.filter(x => x.season_number !== 0).length;
-      updateNoRender(r, patch);
-      const srow = controlPanel.querySelector('.status-row');
-      if (srow) srow.querySelectorAll('.btn').forEach(btn => btn.classList.toggle('on', btn.dataset.status === newStatus));
+      update(r, patch);
     });
-    st.append(b);
+    actionRow.append(b);
   }
-  const favBtn = el("button", "btn" + (s.favorite ? " on" : ""), "❤️");
-  favBtn.title = "В улюблене";
-  favBtn.addEventListener("click", () => update(r, { favorite: !s.favorite }));
-  st.append(favBtn);
-  controlPanel.append(st);
 
-  // Кнопки дій (UAKino, Видалити)
-  const actionRow = el("div", "row action-row");
-  actionRow.style.marginTop = '0';
-  const searchTitle = d.title || d.name || r.title;
-  const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(searchTitle)}`;
-  const uakinoBtn = el("button", "btn uakino", "🍿 UAKino");
-  uakinoBtn.addEventListener("click", () => window.open(searchUrl, '_blank'));
-  actionRow.append(uakinoBtn);
+  // 4. Notes (Нотатки)
+  const notesBtn = el("button", "action-icon-btn", "📝");
+  notesBtn.title = "Нотатки";
+  notesBtn.addEventListener('click', () => { 
+    ctx.activeTab = 'notes'; 
+    renderCard();
+    setTimeout(() => { const content = card.querySelector('.card-tab-content'); if (content) content.scrollIntoView({ behavior: 'smooth' }); }, 100);
+  });
+  actionRow.append(notesBtn);
 
+  // Кнопка видалення
   if (lib[r.key]) {
-    const rb = el("button", "btn danger", "🗑️");
-    rb.title = "Видалити з профілю";
-    rb.addEventListener("click", () => {
+    const delBtn = el("button", "action-icon-btn", "🗑️");
+    delBtn.style.marginLeft = 'auto';
+    delBtn.title = "Видалити з профілю";
+    delBtn.addEventListener("click", () => {
       if (confirm('Повністю видалити тайтл з профілю?')) {
         delete lib[r.key];
-        saveNow();
-        refresh();
-        closeCard();
+        saveNow(); refresh(); closeCard();
       }
     });
-    actionRow.append(rb);
+    actionRow.append(delBtn);
   }
-  controlPanel.append(actionRow);
 
-  // Моя оцінка
+  scroll.append(actionRow);
+
+  // Оцінки (Моя оцінка)
   const ratingWrap = el('div', 'card-user-rating');
-  ratingWrap.style.padding = '0'; ratingWrap.style.background = 'transparent'; ratingWrap.style.border = 'none';
+  ratingWrap.style.background = 'var(--bg-1)';
+  ratingWrap.style.padding = '16px';
+  ratingWrap.style.borderRadius = '16px';
+  ratingWrap.style.border = '1px solid rgba(255,255,255,0.04)';
+  ratingWrap.style.marginBottom = '32px';
+
   if (r.type === 'tv') {
     const ir = computeItemRating(s);
     ratingWrap.append(el("div", "label", "Моя оцінка"));
@@ -398,37 +404,63 @@ function renderMediaCard(ctx, scroll) {
     rb.append(renderAverageBlock(computeAverage(cur), countFilled(cur)));
     ratingWrap.append(rb);
   }
-  controlPanel.append(ratingWrap);
-  bottomSection.append(controlPanel);
+  scroll.append(ratingWrap);
 
-  // 4. Права колонка: Таби
-  const tabsColumn = el('div');
-  
-  const tabsList = [{ id: 'cast', label: 'Актори' }];
+  // Таби знизу
+  const tabsList = [{ id: 'cast', label: 'Актори' }, { id: 'details', label: 'Детально' }];
   if (r.type === 'tv') tabsList.push({ id: 'seasons', label: 'Сезони' });
   if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
   tabsList.push({ id: 'notes', label: '📝 Нотатки' });
+
+  if (!ctx.activeTab) ctx.activeTab = tabsList[0].id;
   
   const tabs = el('div', 'card-tabs');
   tabs.style.margin = '0 0 16px 0';
   for (const t of tabsList) {
-    if (!ctx.activeTab) ctx.activeTab = t.id;
     const btn = el('button', 'card-tab' + (ctx.activeTab === t.id ? ' active' : ''), t.label);
     btn.addEventListener('click', () => { ctx.activeTab = t.id; renderCard(); });
     tabs.append(btn);
   }
-  tabsColumn.append(tabs);
+  scroll.append(tabs);
 
   const tabContent = el('div', 'card-tab-content');
   if (ctx.activeTab === 'cast') tabContent.append(...renderCastTab(ctx));
+  else if (ctx.activeTab === 'details') tabContent.append(...renderDetailsTab(ctx));
   else if (ctx.activeTab === 'seasons') tabContent.append(...renderSeasonsTab(ctx));
   else if (ctx.activeTab === 'similar') tabContent.append(...renderSimilarTab(ctx));
   else if (ctx.activeTab === 'notes') tabContent.append(...renderNotesTab(ctx));
-  tabsColumn.append(tabContent);
-
-  bottomSection.append(tabsColumn);
-  scroll.append(bottomSection);
+  scroll.append(tabContent);
 }
+
+// ==================== НОВА ВКЛАДКА: ДЕТАЛЬНО ====================
+function renderDetailsTab(ctx) {
+  const d = ctx.details;
+  const wrap = el('div', 'details-grid');
+  
+  const addItem = (label, value) => {
+    if (!value) return;
+    const item = el('div', 'detail-item');
+    item.append(el('div', 'detail-label', label));
+    item.append(el('div', 'detail-value', value));
+    wrap.append(item);
+  };
+
+  const directors = (d.credits?.crew || []).filter(c => c.job === 'Director').map(c => c.name).join(', ');
+  const producers = (d.credits?.crew || []).filter(c => c.job === 'Producer').slice(0, 5).map(c => c.name).join(', ');
+  const countries = (d.production_countries || []).map(c => c.name).join(', ');
+
+  addItem('Бюджет', d.budget ? '$' + d.budget.toLocaleString('en-US') : null);
+  addItem('Збори', d.revenue ? '$' + d.revenue.toLocaleString('en-US') : null);
+  addItem('Дата виходу', d.release_date || d.first_air_date);
+  addItem('Країна', countries);
+  addItem('Режисер', directors);
+  addItem('Продюсери', producers);
+  if (d.vote_count) addItem('Голосів TMDB', d.vote_count.toLocaleString('en-US'));
+
+  return [wrap];
+}
+
+// ==================== ІНШІ ВКЛАДКИ ====================
 
 function renderNotesTab(ctx) {
   const r = ctx.item;
