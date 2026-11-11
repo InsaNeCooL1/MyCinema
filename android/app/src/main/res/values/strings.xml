@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MyCinema</string>
+    <string name="title_activity_main">MyCinema</string>
+    <string name="package_name">com.mycinema.app</string>
+    <string name="custom_url_scheme">com.mycinema.app</string>
+</resources>

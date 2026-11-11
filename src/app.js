@@ -1,6 +1,5 @@
 'use strict';
 
-// ========== NAVIGATION ==========
 function setTab(t) {
   state.tab = t;
   closeSidebar();
@@ -25,29 +24,53 @@ function refresh() {
   else if (state.tab === "game") renderGame();
   else if (state.tab === "statistics") renderStatistics();
   else if (state.tab === "notes") renderNotesList();
-  else if (state.tab === "top") renderMyTop();
   else if (state.tab === "calendar") renderCalendar();
+  else if (state.tab === "top") renderMyTop();
   else renderLibrary();
 }
 
-// ========== INITIALIZATION ==========
 window.addEventListener('firebase-ready', syncFromCloud);
 
 history.pushState({ mc: 0 }, '', location.pathname + location.search);
 refresh();
 routeFromHash();
 
-// ========== CAPACITOR BACK BUTTON ==========
+// ========== CAPACITOR BACK BUTTON (FIXED) ==========
 (function () {
   const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
-  if (!CapApp || !CapApp.addListener) return;
+  if (!CapApp || !CapApp.addListener) {
+    console.warn('Capacitor App plugin not found. Back button handling disabled.');
+    return;
+  }
+  
   CapApp.addListener('backButton', () => {
+    // 1. Модальні вікна та оверлеї
     if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
     if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
+    if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }
+    
+    if (document.getElementById('torrents-modal') && document.getElementById('torrents-modal').style.display === 'flex') { closeTorrentsModal(); return; }
+    if (document.getElementById('files-modal') && document.getElementById('files-modal').style.display === 'flex') { closeFilesModal(); return; }
+    
+    // Якщо відкрите вікно завантаження - скасовуємо його
+    if (document.getElementById('loading-modal') && document.getElementById('loading-modal').style.display === 'flex') { 
+      if (typeof cancelLoading === 'function') cancelLoading(); 
+      return; 
+    }
+
+    // 2. Бокове меню
     if (document.getElementById('sidebar').classList.contains('open')) { closeSidebar(); return; }
+    
+    // 3. Автокомпліт
     if (!autocomplete.classList.contains('hidden') && autocomplete.childElementCount) { hideAutocomplete(); return; }
+    
+    // 4. Стек карток (модалка тайтлу/актора)
     if (cardStack.length) { history.back(); return; }
+    
+    // 5. Таби (якщо не на головній)
     if (state.tab !== 'home') { setTab('home'); return; }
+    
+    // 6. Вихід з додатку (тільки з головної)
     CapApp.exitApp();
   });
 })();

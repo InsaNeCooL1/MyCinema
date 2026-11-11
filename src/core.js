@@ -191,6 +191,23 @@ function setSyncStatus(status, text) {
   syncIndicator.textContent = text;
   if (status === 'saved') setTimeout(() => syncIndicator.classList.remove('visible'), 1800);
 }
+
+function showCenterToast(text) {
+  const toast = document.createElement('div');
+  toast.className = 'center-toast';
+  toast.textContent = text;
+  document.body.appendChild(toast);
+  
+  // Trigger animation
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  // Remove after 2 seconds
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
+}
+
 function showSyncToast(text) {
   syncIndicator.className = 'sync-indicator visible saved';
   syncIndicator.textContent = text;

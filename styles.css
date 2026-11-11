@@ -729,3 +729,351 @@ input#q::placeholder { color: var(--text-dim); }
   padding: 2px 8px;
   border-radius: 6px;
 }
+
+/* ============ FILE PICKER ============ */
+.file-item {
+  background: var(--bg-2);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.file-item:hover { background: var(--bg-3); border-color: var(--accent); }
+.file-item.watched { opacity: 0.55; }
+.file-num {
+  font-family: var(--mono);
+  font-weight: 800;
+  color: var(--accent);
+  font-size: 13px;
+  min-width: 70px;
+  flex-shrink: 0;
+}
+.file-item.watched .file-num { color: var(--mint); }
+.file-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.file-size {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.file-check { color: var(--mint); font-weight: bold; flex-shrink: 0; font-size: 16px; }
+
+/* ============ CENTER TOAST ============ */
+.center-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: rgba(15, 14, 19, 0.95);
+  color: var(--mint);
+  padding: 16px 32px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  z-index: 9999;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  border: 1px solid rgba(157, 229, 195, 0.3);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+.center-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ============ NEW ACTION ROW ============ */
+.card-action-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  background: var(--bg-1);
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.action-group-main {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.action-btn-main {
+  flex: 1;
+  min-width: 120px;
+  height: 44px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  transition: 0.2s;
+  cursor: pointer;
+  border: none;
+}
+
+.action-btn-main.watch {
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: var(--accent-fg);
+}
+.action-btn-main.watch:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(var(--accent-rgb), 0.3);
+}
+
+.action-btn-main.uakino {
+  background: transparent;
+  border: 2px solid #ff6b00;
+  color: #ff6b00;
+}
+.action-btn-main.uakino:hover {
+  background: #ff6b00;
+  color: #fff;
+}
+
+.action-group-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  padding-top: 16px;
+}
+
+.status-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: var(--bg-3);
+  color: var(--text);
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.status-btn:hover {
+  background: var(--bg-4);
+  transform: scale(1.05);
+}
+
+.status-btn.active {
+  background: rgba(157, 229, 195, 0.2);
+  color: var(--mint);
+  box-shadow: inset 0 0 0 1px rgba(157, 229, 195, 0.4);
+}
+
+.status-btn.favorite.active {
+  background: rgba(255, 123, 92, 0.2);
+  color: var(--coral);
+  box-shadow: inset 0 0 0 1px rgba(255, 123, 92, 0.4);
+}
+
+.status-btn.delete {
+  margin-left: auto;
+  background: rgba(255, 92, 92, 0.1);
+  color: var(--danger);
+}
+.status-btn.delete:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ============ NEW MOBILE ORDER STYLES ============ */
+.action-row-top {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.action-row-top .action-btn-main {
+  flex: 1;
+  height: 44px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  transition: 0.2s;
+  cursor: pointer;
+  border: none;
+}
+
+.action-row-top .action-btn-main.watch {
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: var(--accent-fg);
+}
+.action-row-top .action-btn-main.watch:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(var(--accent-rgb), 0.3);
+}
+
+.action-row-top .action-btn-main.uakino {
+  background: transparent;
+  border: 2px solid #ff6b00;
+  color: #ff6b00;
+}
+.action-row-top .action-btn-main.uakino:hover {
+  background: #ff6b00;
+  color: #fff;
+}
+
+.action-row-top .status-btn.favorite {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-3);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+  color: var(--text-dim);
+}
+.action-row-top .status-btn.favorite:hover {
+  background: var(--bg-4);
+}
+.action-row-top .status-btn.favorite.active {
+  background: rgba(255, 123, 92, 0.15);
+  color: var(--coral);
+}
+
+.status-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.status-btn-text {
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--bg-1);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: 0.2s;
+}
+
+.status-btn-text:hover {
+  background: var(--bg-3);
+}
+
+.status-btn-text.active {
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+/* ============ UPDATED RATINGS & STATUS ROW ============ */
+.status-btn-watched {
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(157, 229, 195, 0.15);
+  color: var(--mint);
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(157, 229, 195, 0.3);
+  cursor: pointer;
+  margin-left: auto; /* Притискає вправо */
+  display: flex;
+  align-items: center;
+  transition: 0.2s;
+}
+
+.status-btn-watched:hover {
+  background: rgba(157, 229, 195, 0.25);
+}
+
+.status-btn-watched.active {
+  background: var(--mint);
+  color: #052e16;
+  border-color: var(--mint);
+}
+
+/* Рядок для решти статусів */
+.status-section-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-top: 12px;
+  margin-bottom: 16px;
+  width: 100%;
+  overflow-x: auto; /* Щоб не ламалося на дуже вузьких екранах */
+  scrollbar-width: none;
+}
+.status-section-row::-webkit-scrollbar { display: none; }
+
+.status-section-row .status-btn-text {
+  flex: 1;
+  justify-content: center;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.status-section-row .status-btn-text.delete {
+  flex: 0 0 auto;
+  margin-left: auto; /* Притискає видалення вправо */
+}
+
+/* Оновлення для кнопки UAKino з картинкою */
+.action-btn-main.uakino {
+  background: transparent;
+  border: none;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.action-btn-main.uakino:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Оновлення для стилізованої кнопки UAKINO */
+.action-btn-main.uakino {
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.action-btn-main.uakino:hover {
+  background: var(--bg-3);
+  border-color: rgba(255, 255, 255, 0.2);
+}
