@@ -24,11 +24,13 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Prepare Web Folder
+            - name: Prepare Web Folder
         run: |
           mkdir -p www
-          cp index.html www/ || true
+          cp index.html www/
+          cp styles.css www/
           cp manifest.json www/ || true
+          cp -r src www/
 
       - name: Init Capacitor
         run: |
