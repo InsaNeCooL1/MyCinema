@@ -28,26 +28,42 @@ window.openSettings = function() {
   loadPlayerSettings();
 };
 
+// Допоміжна функція для нормалізації URL
+function normalizeUrl(url) {
+  if (!url) return '';
+  let u = url.trim();
+  if (!u.startsWith('http://') && !u.startsWith('https://')) {
+    u = 'https://' + u; // Додаємо https за замовчуванням
+  }
+  return u.replace(/\/$/, ''); // Прибираємо слеш в кінці, якщо є
+}
+
 async function testJackettConn() {
-  const jUrl = document.getElementById('jackett-url').value.trim();
+  let jUrl = document.getElementById('jackett-url').value;
   const jKey = document.getElementById('jackett-key').value.trim();
-  const tUrl = document.getElementById('torrserver-url').value.trim();
+  
+  jUrl = normalizeUrl(jUrl);
   
   if (!jUrl || !jKey) return alert('Заповніть Jackett URL та Key');
   
   showSyncToast('⏳ Перевіряю...');
   try {
     const res = await fetch(`${jUrl}/api/v2.0/indexers/all/results?apikey=${jKey}&Query=test`);
-    if (res.ok) showSyncToast('✅ Jackett OK');
-    else showSyncToast('❌ Помилка Jackett');
+    const contentType = res.headers.get("content-type");
+    
+    if (contentType && contentType.includes("application/json")) {
+      if (res.ok) showSyncToast('✅ Jackett OK');
+      else showSyncToast('❌ Помилка Jackett');
+    } else {
+      showSyncToast('❌ Повернулась HTML-сторінка (невірний URL)');
+    }
   } catch (e) {
     showSyncToast('❌ Немає зв\'язку з Jackett');
   }
 }
 
-// ============ TORRENT SEARCH (JACKETT) ============
 async function openTorrentSearch(item) {
-  const jUrl = localStorage.getItem('mycinema.jackett_url');
+  let jUrl = localStorage.getItem('mycinema.jackett_url');
   const jKey = localStorage.getItem('mycinema.jackett_key');
   
   if (!jUrl || !jKey) {
@@ -55,6 +71,52 @@ async function openTorrentSearch(item) {
     openSettings();
     return;
   }
+  
+  jUrl = normalizeUrl(jUrl); // Очищаємо URL від зайвих слешів
+
+  const lModal = document.getElementById('loading-modal');
+  const lPoster = document.getElementById('loading-poster');
+  const lStatus = document.getElementById('loading-status');
+  const lSub = document.getElementById('loading-substatus');
+  
+  lPoster.src = TMDB_IMG + 'w500' + (item.poster || item.backdrop || '');
+  lPoster.style.filter = 'grayscale(100%)';
+  lStatus.textContent = 'Шукаю торенти...';
+  lSub.textContent = 'Запит до Jackett';
+  lModal.style.display = 'flex';
+  
+  try {
+    const q = encodeURIComponent(item.title + (item.year ? ' ' + item.year : ''));
+    const res = await fetch(`${jUrl}/api/v2.0/indexers/all/results?apikey=${jKey}&Query=${q}`);
+    
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error('Сервер повернув не JSON. Перевірте правильність URL (можливо, потрібен свій локальний Jackett).');
+    }
+
+    const data = await res.json();
+    
+    let results = (data.Results || []).filter(r => r.MagnetUri);
+    results.sort((a, b) => (b.Seeders || 0) - (a.Seeders || 0));
+    
+    if (results.length === 0) {
+      lModal.style.display = 'none';
+      alert('Торентів не знайдено. Спробуйте інший трекер.');
+      return;
+    }
+
+    lPoster.style.filter = 'grayscale(0%)';
+    
+    setTimeout(() => {
+      lModal.style.display = 'none';
+      showTorrentsList(results, item);
+    }, 1500);
+
+  } catch (e) {
+    lModal.style.display = 'none';
+    alert('Помилка пошуку: ' + e.message);
+  }
+}
 
   // Показуємо екран завантаження
   const lModal = document.getElementById('loading-modal');
