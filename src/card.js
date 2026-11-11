@@ -174,13 +174,11 @@ function renderMediaCard(ctx, scroll) {
     card.insertBefore(bg, card.firstChild);
   }
 
-  const layout = el('div', 'card-layout');
-  const colLeft = el('div', 'card-col-left');
-  const colRight = el('div', 'card-col-right');
-
-  // --- ЛІВА КОЛОНКА ---
+  // === ВЕРХНІЙ ПОВЕРХ ===
+  const topSection = el('div', 'card-top-section');
   
-  // 1. Hero (Backdrop + Trailer)
+  // 1. Ліва частина: Банер (Backdrop)
+  const topLeft = el('div', 'card-top-left');
   const heroWrap = el('div', 'card-hero');
   const backdropPath = r.backdrop || d.backdrop_path || r.poster;
   const trailerList = findAllTrailers(d.videos, d.original_language);
@@ -199,6 +197,7 @@ function renderMediaCard(ctx, scroll) {
       heroWrap.append(img);
     } else {
       heroWrap.style.background = 'var(--bg-2)';
+      heroWrap.style.aspectRatio = '16/9';
     }
     if (trailerList.length > 0) {
       const playBtn = el('button', 'card-hero-play');
@@ -210,9 +209,12 @@ function renderMediaCard(ctx, scroll) {
       heroWrap.append(playBtn);
     }
   }
-  colLeft.append(heroWrap);
-
-  // 2. Title & Meta
+  topLeft.append(heroWrap);
+  
+  // 2. Права частина: Інформація
+  const topRight = el('div', 'card-top-right');
+  
+  // Назва та мета
   const titleWrap = el('div', 'card-title-wrap');
   titleWrap.append(el('h1', 'title', d.title || d.name || r.title));
   let metaStr = d.release_date ? d.release_date.slice(0, 4) : (d.first_air_date ? d.first_air_date.slice(0, 4) : "");
@@ -220,14 +222,14 @@ function renderMediaCard(ctx, scroll) {
   if (d.number_of_seasons) metaStr += ` · ${d.number_of_seasons} сезонів`;
   if (d.genres) metaStr += ` · ${d.genres.map(g => g.name).join(", ")}`;
   titleWrap.append(el('div', 'meta-details', metaStr));
-  
   if (lib[r.key]?.elo && lib[r.key]?.eloGames > 0) {
     titleWrap.append(el("div", "game-card-elo", `🏆 Elo ${Math.round(lib[r.key].elo)} · ${lib[r.key].eloGames} матчів`));
   }
-  colLeft.append(titleWrap);
+  topRight.append(titleWrap);
 
-  // 3. Ratings (TMDB, IMDb, RT)
+  // Рейтинги
   const rr = el("div", "ratings-row");
+  rr.style.marginTop = '0';
   let hasR = false;
   if (d.vote_average) { rr.append(el("div", "rating-badge rating-tmdb", `TMDB: ${d.vote_average.toFixed(1)}`)); hasR = true; }
   if (ctx.omdb) {
@@ -235,13 +237,14 @@ function renderMediaCard(ctx, scroll) {
     const rt = ctx.omdb.Ratings?.find(x => x.Source === "Rotten Tomatoes");
     if (rt && rt.Value !== "N/A") { rr.append(el("div", "rating-badge rating-rt", `RT: ${rt.Value}`)); hasR = true; }
   }
-  if (hasR) colLeft.append(rr);
+  if (hasR) topRight.append(rr);
 
-  // 4. Studios & Providers
+  // Студії та стрімінги
   if (d.production_companies?.length || ctx.watchProviders?.flatrate?.length) {
     const studiosRow = el("div", "studios-row");
+    studiosRow.style.marginTop = '0';
     if (d.production_companies?.length) {
-      for (const c of d.production_companies.slice(0, 3)) {
+      for (const c of d.production_companies.slice(0, 4)) {
         const b = el("div", "studio-badge");
         if (c.logo_path) {
           const l = el("img", "studio-logo"); l.src = TMDB_IMG + "w92" + c.logo_path; l.loading = "lazy";
@@ -252,19 +255,123 @@ function renderMediaCard(ctx, scroll) {
       }
     }
     if (ctx.watchProviders?.flatrate?.length) {
+      const provWrap = el('div', 'streaming-emblems');
+      provWrap.style.marginTop = '0';
       for (const p of ctx.watchProviders.flatrate.slice(0, 4)) {
         const img = el('img', 'streaming-emblem');
         img.src = TMDB_IMG + 'w92' + p.logo_path;
         img.title = p.provider_name;
         img.loading = 'lazy';
-        studiosRow.append(img);
+        provWrap.append(img);
       }
+      topRight.append(studiosRow);
+      topRight.append(provWrap);
+    } else {
+      topRight.append(studiosRow);
     }
-    colLeft.append(studiosRow);
   }
 
-  // 5. User Rating
+  // Опис із кнопкою "Читати далі"
+  if (d.overview) {
+    const overviewWrap = el('div');
+    overviewWrap.style.marginTop = '8px';
+    const isExpanded = !!ctx.overviewExpanded;
+    
+    const textEl = el('div', 'overview', d.overview);
+    textEl.style.margin = '0';
+    if (isExpanded) {
+      textEl.classList.add('overview-expanded');
+    } else {
+      textEl.classList.add('overview-clamped');
+    }
+    overviewWrap.append(textEl);
+
+    // Показуємо кнопку, тільки якщо текст довгий (приблизно > 200 символів)
+    if (d.overview.length > 200) {
+      const readMoreBtn = el('button', 'btn-read-more', isExpanded ? 'Згорнути' : 'Читати далі...');
+      readMoreBtn.addEventListener('click', () => {
+        ctx.overviewExpanded = !ctx.overviewExpanded;
+        renderCard();
+      });
+      overviewWrap.append(readMoreBtn);
+    }
+    topRight.append(overviewWrap);
+  }
+
+  topSection.append(topLeft, topRight);
+  scroll.append(topSection);
+
+  // === НИЖНІЙ ПОВЕРХ ===
+  const bottomSection = el('div', 'card-bottom-section');
+
+  // 3. Ліва колонка: Острівець зі статусами та оцінкою
+  const controlPanel = el('div', 'card-control-panel');
+  
+  controlPanel.append(el("div", "label", "Статус"));
+  const st = el("div", "row status-row");
+  st.style.padding = '0'; st.style.background = 'transparent'; st.style.border = 'none';
+  const statuses = r.type === "tv" ? [["watching", "Дивлюсь"], ["watched", "Переглянуто"], ["planned", "Планую"], ["dropped", "Закинуто"]] : [["watched", "Переглянуто"], ["planned", "Планую"], ["dropped", "Закинуто"]];
+  for (const [val, text] of statuses) {
+    const b = el("button", "btn" + (s.status === val ? " on" : ""), text);
+    b.dataset.status = val;
+    b.addEventListener("click", () => {
+      const cur = lib[r.key] || {};
+      const newStatus = cur.status === val ? null : val;
+      let newEps = cur.watchedEpisodes || [];
+      if (r.type === "tv") {
+        if (newStatus === "watched") {
+          newEps = [];
+          d.seasons.forEach(season => {
+            if (season.season_number !== 0) {
+              const cnt = season.episodes ? season.episodes.length : season.episode_count;
+              for (let i = 1; i <= cnt; i++) newEps.push(season.season_number + "-" + i);
+            }
+          });
+        } else if (newStatus === "planned" || newStatus === "dropped" || newStatus === null) newEps = [];
+      }
+      const patch = { status: newStatus, watchedEpisodes: newEps };
+      if (!lib[r.key] && ctx.genres) patch.genres = ctx.genres;
+      if (!lib[r.key] && ctx.cast) patch.cast = ctx.cast;
+      if (r.type === "tv" && d.seasons && !lib[r.key]?.totalSeasons) patch.totalSeasons = d.seasons.filter(x => x.season_number !== 0).length;
+      updateNoRender(r, patch);
+      const srow = controlPanel.querySelector('.status-row');
+      if (srow) srow.querySelectorAll('.btn').forEach(btn => btn.classList.toggle('on', btn.dataset.status === newStatus));
+    });
+    st.append(b);
+  }
+  const favBtn = el("button", "btn" + (s.favorite ? " on" : ""), "❤️");
+  favBtn.title = "В улюблене";
+  favBtn.addEventListener("click", () => update(r, { favorite: !s.favorite }));
+  st.append(favBtn);
+  controlPanel.append(st);
+
+  // Кнопки дій (UAKino, Видалити)
+  const actionRow = el("div", "row action-row");
+  actionRow.style.marginTop = '0';
+  const searchTitle = d.title || d.name || r.title;
+  const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(searchTitle)}`;
+  const uakinoBtn = el("button", "btn uakino", "🍿 UAKino");
+  uakinoBtn.addEventListener("click", () => window.open(searchUrl, '_blank'));
+  actionRow.append(uakinoBtn);
+
+  if (lib[r.key]) {
+    const rb = el("button", "btn danger", "🗑️");
+    rb.title = "Видалити з профілю";
+    rb.addEventListener("click", () => {
+      if (confirm('Повністю видалити тайтл з профілю?')) {
+        delete lib[r.key];
+        saveNow();
+        refresh();
+        closeCard();
+      }
+    });
+    actionRow.append(rb);
+  }
+  controlPanel.append(actionRow);
+
+  // Моя оцінка
   const ratingWrap = el('div', 'card-user-rating');
+  ratingWrap.style.padding = '0'; ratingWrap.style.background = 'transparent'; ratingWrap.style.border = 'none';
   if (r.type === 'tv') {
     const ir = computeItemRating(s);
     ratingWrap.append(el("div", "label", "Моя оцінка"));
@@ -291,99 +398,36 @@ function renderMediaCard(ctx, scroll) {
     rb.append(renderAverageBlock(computeAverage(cur), countFilled(cur)));
     ratingWrap.append(rb);
   }
-  colLeft.append(ratingWrap);
+  controlPanel.append(ratingWrap);
+  bottomSection.append(controlPanel);
 
-
-  // --- ПРАВА КОЛОНКА ---
-
-  // 1. Overview Text
-  if (d.overview) {
-    colRight.append(el("div", "overview", d.overview));
-  }
-
-  // 2. Actions (Statuses, UAKino, Delete, Favorite)
-  const st = el("div", "row status-row");
-  const statuses = r.type === "tv" ? [["watching", "Дивлюсь"], ["watched", "Переглянуто"], ["planned", "Планую"], ["dropped", "Закинуто"]] : [["watched", "Переглянуто"], ["planned", "Планую"], ["dropped", "Закинуто"]];
-  for (const [val, text] of statuses) {
-    const b = el("button", "btn" + (s.status === val ? " on" : ""), text);
-    b.dataset.status = val;
-    b.addEventListener("click", () => {
-      const cur = lib[r.key] || {};
-      const newStatus = cur.status === val ? null : val;
-      let newEps = cur.watchedEpisodes || [];
-      if (r.type === "tv") {
-        if (newStatus === "watched") {
-          newEps = [];
-          d.seasons.forEach(season => {
-            if (season.season_number !== 0) {
-              const cnt = season.episodes ? season.episodes.length : season.episode_count;
-              for (let i = 1; i <= cnt; i++) newEps.push(season.season_number + "-" + i);
-            }
-          });
-        } else if (newStatus === "planned" || newStatus === "dropped" || newStatus === null) newEps = [];
-      }
-      const patch = { status: newStatus, watchedEpisodes: newEps };
-      if (!lib[r.key] && ctx.genres) patch.genres = ctx.genres;
-      if (!lib[r.key] && ctx.cast) patch.cast = ctx.cast;
-      if (r.type === "tv" && d.seasons && !lib[r.key]?.totalSeasons) patch.totalSeasons = d.seasons.filter(x => x.season_number !== 0).length;
-      updateNoRender(r, patch);
-      const srow = colRight.querySelector('.status-row');
-      if (srow) srow.querySelectorAll('.btn').forEach(btn => btn.classList.toggle('on', btn.dataset.status === newStatus));
-    });
-    st.append(b);
-  }
-  const favBtn = el("button", "btn" + (s.favorite ? " on" : ""), "❤️");
-  favBtn.title = "В улюблене";
-  favBtn.addEventListener("click", () => update(r, { favorite: !s.favorite }));
-  st.append(favBtn);
-  colRight.append(st);
-
-  const actionRow = el("div", "row action-row");
-  const searchTitle = d.title || d.name || r.title;
-  const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(searchTitle)}`;
-  const uakinoBtn = el("button", "btn uakino", "🍿 UAKino");
-  uakinoBtn.addEventListener("click", () => window.open(searchUrl, '_blank'));
-  actionRow.append(uakinoBtn);
-
-  if (lib[r.key]) {
-    const rb = el("button", "btn danger", "🗑️ Видалити");
-    rb.addEventListener("click", () => {
-      if (confirm('Повністю видалити тайтл з профілю?')) {
-        delete lib[r.key];
-        saveNow();
-        refresh();
-        closeCard();
-      }
-    });
-    actionRow.append(rb);
-  }
-  colRight.append(actionRow);
-
-  // 3. Tabs & Tab Content
+  // 4. Права колонка: Таби
+  const tabsColumn = el('div');
+  
   const tabsList = [{ id: 'cast', label: 'Актори' }];
   if (r.type === 'tv') tabsList.push({ id: 'seasons', label: 'Сезони' });
   if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
   tabsList.push({ id: 'notes', label: '📝 Нотатки' });
   
   const tabs = el('div', 'card-tabs');
+  tabs.style.margin = '0 0 16px 0';
   for (const t of tabsList) {
     if (!ctx.activeTab) ctx.activeTab = t.id;
     const btn = el('button', 'card-tab' + (ctx.activeTab === t.id ? ' active' : ''), t.label);
     btn.addEventListener('click', () => { ctx.activeTab = t.id; renderCard(); });
     tabs.append(btn);
   }
-  colRight.append(tabs);
+  tabsColumn.append(tabs);
 
-  const tabContent = el('div', 'card-tab-content'); 
-  tabContent.style.marginTop = '16px';
+  const tabContent = el('div', 'card-tab-content');
   if (ctx.activeTab === 'cast') tabContent.append(...renderCastTab(ctx));
   else if (ctx.activeTab === 'seasons') tabContent.append(...renderSeasonsTab(ctx));
   else if (ctx.activeTab === 'similar') tabContent.append(...renderSimilarTab(ctx));
   else if (ctx.activeTab === 'notes') tabContent.append(...renderNotesTab(ctx));
-  colRight.append(tabContent);
+  tabsColumn.append(tabContent);
 
-  layout.append(colLeft, colRight);
-  scroll.append(layout);
+  bottomSection.append(tabsColumn);
+  scroll.append(bottomSection);
 }
 
 function renderNotesTab(ctx) {
