@@ -18,7 +18,7 @@ function saveCardScroll() {
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
   overlay.classList.add("open");
-  const ctx = { type: 'media', item: r, activeTab: 'overview', seasonState: {} };
+  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false };
   cardStack = [ctx];
   pushCardState();
   renderLoading();
@@ -29,7 +29,7 @@ async function openCard(r) {
 
 async function openMediaFromStack(item) {
   saveCardScroll();
-  const ctx = { type: 'media', item, activeTab: 'overview', seasonState: {} };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false };
   cardStack.push(ctx);
   pushCardState();
   renderLoading();
@@ -68,6 +68,7 @@ async function loadMediaCardData(ctx) {
       r.title = d.title || d.name || '';
       r.year = (d.release_date || d.first_air_date || '').slice(0, 4);
       r.poster = d.poster_path;
+      r.backdrop = d.backdrop_path;
       r.overview = d.overview || '';
       r.tmdbRating = d.vote_average || 0;
       r.votes = d.vote_count || 0;
@@ -107,8 +108,8 @@ function closeCard() {
 
 async function loadMediaForForward(s) {
   overlay.classList.add("open");
-  const item = { key: s.key, id: s.id, type: s.media_type, title: '', year: '', poster: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 };
-  const ctx = { type: 'media', item, activeTab: 'overview', seasonState: {} };
+  const item = { key: s.key, id: s.id, type: s.media_type, title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false };
   cardStack.push(ctx);
   renderLoading();
   await loadMediaCardData(ctx);
@@ -142,7 +143,7 @@ function routeFromHash() {
   history.replaceState({}, '', location.pathname + location.search);
   const id = parseInt(m[2]);
   if (m[1] === 'person') openPerson(id, {});
-  else openCard({ key: m[1] + '-' + id, id, type: m[1], title: '', year: '', poster: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 });
+  else openCard({ key: m[1] + '-' + id, id, type: m[1], title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 });
 }
 
 function renderCard(restore) {
@@ -161,47 +162,71 @@ function renderCard(restore) {
   if (savedScroll > 0) scroll.scrollTop = savedScroll;
 }
 
+// ==================== НОВИЙ ДИЗАЙН КАРТКИ ====================
 function renderMediaCard(ctx, scroll) {
   const r = ctx.item;
   const d = ctx.details;
+  const s = lib[r.key] || {};
+
   if (settings.posterBg && r.poster && !isLightTheme(settings.themeBg)) {
     const bg = el('div', 'card-poster-bg');
     bg.style.backgroundImage = `url(${TMDB_IMG}w500${r.poster})`;
     card.insertBefore(bg, card.firstChild);
   }
-  const top = el("div", "top");
-  const poster = posterEl(r, "poster");
-  if (r.poster) {
-    poster.classList.add('zoomable');
-    poster.addEventListener('click', () => openImageZoom(r.poster, 'w500'));
-  }
-  top.append(poster);
-  const head = el("div");
-  head.append(el("div", "title", d.title || d.name || r.title));
-  let ms = d.release_date ? d.release_date.slice(0, 4) : (d.first_air_date ? d.first_air_date.slice(0, 4) : "");
-  if (d.runtime) ms += ` · ${d.runtime} хв`;
-  if (d.number_of_seasons) ms += ` · ${d.number_of_seasons} сезонів`;
-  if (d.genres) ms += ` · ${d.genres.map(g => g.name).join(", ")}`;
-  head.append(el("div", "meta-details", ms));
-  if (lib[r.key]?.elo && lib[r.key]?.eloGames > 0) {
-    head.append(el("div", "game-card-elo", `🏆 Elo ${Math.round(lib[r.key].elo)} · ${lib[r.key].eloGames} матчів`));
-  }
-  top.append(head);
-  scroll.append(top);
+
+  const layout = el('div', 'card-layout');
+  const colLeft = el('div', 'card-col-left');
+  const colRight = el('div', 'card-col-right');
+
+  // --- ЛІВА КОЛОНКА ---
   
-  if (d.production_companies?.length) {
-    const sr = el("div", "studios-row");
-    for (const c of d.production_companies.slice(0, 4)) {
-      const b = el("div", "studio-badge");
-      if (c.logo_path) {
-        const l = el("img", "studio-logo"); l.src = TMDB_IMG + "w92" + c.logo_path; l.loading = "lazy";
-        b.append(l);
-      }
-      b.append(el("span", "", c.name));
-      sr.append(b);
+  // 1. Hero (Backdrop + Trailer)
+  const heroWrap = el('div', 'card-hero');
+  const backdropPath = r.backdrop || d.backdrop_path || r.poster;
+  const trailerList = findAllTrailers(d.videos, d.original_language);
+  
+  if (ctx.playingTrailer && trailerList.length > 0) {
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube.com/embed/${trailerList[0].key}?autoplay=1`;
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    iframe.allowFullscreen = true;
+    iframe.className = 'card-hero-video';
+    heroWrap.append(iframe);
+  } else {
+    if (backdropPath) {
+      const img = el('img', 'card-hero-img');
+      img.src = TMDB_IMG + 'w1280' + backdropPath;
+      heroWrap.append(img);
+    } else {
+      heroWrap.style.background = 'var(--bg-2)';
     }
-    scroll.append(sr);
+    if (trailerList.length > 0) {
+      const playBtn = el('button', 'card-hero-play');
+      playBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span>Трейлер</span>`;
+      playBtn.addEventListener('click', () => {
+        ctx.playingTrailer = true;
+        renderCard();
+      });
+      heroWrap.append(playBtn);
+    }
   }
+  colLeft.append(heroWrap);
+
+  // 2. Title & Meta
+  const titleWrap = el('div', 'card-title-wrap');
+  titleWrap.append(el('h1', 'title', d.title || d.name || r.title));
+  let metaStr = d.release_date ? d.release_date.slice(0, 4) : (d.first_air_date ? d.first_air_date.slice(0, 4) : "");
+  if (d.runtime) metaStr += ` · ${d.runtime} хв`;
+  if (d.number_of_seasons) metaStr += ` · ${d.number_of_seasons} сезонів`;
+  if (d.genres) metaStr += ` · ${d.genres.map(g => g.name).join(", ")}`;
+  titleWrap.append(el('div', 'meta-details', metaStr));
+  
+  if (lib[r.key]?.elo && lib[r.key]?.eloGames > 0) {
+    titleWrap.append(el("div", "game-card-elo", `🏆 Elo ${Math.round(lib[r.key].elo)} · ${lib[r.key].eloGames} матчів`));
+  }
+  colLeft.append(titleWrap);
+
+  // 3. Ratings (TMDB, IMDb, RT)
   const rr = el("div", "ratings-row");
   let hasR = false;
   if (d.vote_average) { rr.append(el("div", "rating-badge rating-tmdb", `TMDB: ${d.vote_average.toFixed(1)}`)); hasR = true; }
@@ -210,74 +235,74 @@ function renderMediaCard(ctx, scroll) {
     const rt = ctx.omdb.Ratings?.find(x => x.Source === "Rotten Tomatoes");
     if (rt && rt.Value !== "N/A") { rr.append(el("div", "rating-badge rating-rt", `RT: ${rt.Value}`)); hasR = true; }
   }
-  if (hasR) scroll.append(rr);
-  if (ctx.watchProviders?.flatrate?.length) {
-    const w = el('div', 'streaming-emblems');
-    for (const p of ctx.watchProviders.flatrate.slice(0, 6)) {
-      const img = el('img', 'streaming-emblem');
-      img.src = TMDB_IMG + 'w92' + p.logo_path;
-      img.title = p.provider_name;
-      img.loading = 'lazy';
-      w.append(img);
-    }
-    scroll.append(w);
-  }
-  
-  const tabsList = [{ id: 'overview', label: 'Опис' }, { id: 'cast', label: 'Актори' }];
-  if (r.type === 'tv') tabsList.push({ id: 'seasons', label: 'Сезони' });
-  if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
-  tabsList.push({ id: 'notes', label: '📝 Нотатки' });
-  const tabs = el('div', 'card-tabs');
-  for (const t of tabsList) {
-    const btn = el('button', 'card-tab' + (ctx.activeTab === t.id ? ' active' : ''), t.label);
-    btn.addEventListener('click', () => { ctx.activeTab = t.id; renderCard(); });
-    tabs.append(btn);
-  }
-  scroll.append(tabs);
-  const content = el('div'); content.style.marginTop = '16px';
-  if (ctx.activeTab === 'overview') content.append(...renderOverviewTab(ctx, scroll));
-  else if (ctx.activeTab === 'cast') content.append(...renderCastTab(ctx));
-  else if (ctx.activeTab === 'seasons') content.append(...renderSeasonsTab(ctx));
-  else if (ctx.activeTab === 'similar') content.append(...renderSimilarTab(ctx));
-  else if (ctx.activeTab === 'notes') content.append(...renderNotesTab(ctx));
-  scroll.append(content);
-}
+  if (hasR) colLeft.append(rr);
 
-function renderOverviewTab(ctx, scroll) {
-  const d = ctx.details;
-  const r = ctx.item;
-  const s = lib[r.key] || {};
-  const nodes = [];
-  nodes.push(el("div", "overview", d.overview || "Опису нема."));
-  
-  const trailers = findAllTrailers(d.videos, d.original_language);
-  if (trailers.length > 0) {
-    nodes.push(el("div", "label", trailers.length > 1 ? "Трейлери" : "Трейлер"));
-    const td = el("div", "trailer-container");
-    const iframe = document.createElement("iframe");
-    iframe.src = `https://www.youtube.com/embed/${trailers[0].key}`;
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-    iframe.allowFullscreen = true;
-    td.append(iframe);
-    nodes.push(td);
-    if (trailers.length > 1) {
-      const br = el("div", "trailer-buttons");
-      trailers.forEach((t, i) => {
-        const btn = el("button", "trailer-btn" + (i === 0 ? " active" : ""), trailerLabel(t));
-        btn.title = t.name || '';
-        btn.addEventListener("click", () => {
-          iframe.src = `https://www.youtube.com/embed/${t.key}`;
-          br.querySelectorAll('.trailer-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-        });
-        br.append(btn);
-      });
-      nodes.push(br);
+  // 4. Studios & Providers
+  if (d.production_companies?.length || ctx.watchProviders?.flatrate?.length) {
+    const studiosRow = el("div", "studios-row");
+    if (d.production_companies?.length) {
+      for (const c of d.production_companies.slice(0, 3)) {
+        const b = el("div", "studio-badge");
+        if (c.logo_path) {
+          const l = el("img", "studio-logo"); l.src = TMDB_IMG + "w92" + c.logo_path; l.loading = "lazy";
+          b.append(l);
+        }
+        b.append(el("span", "", c.name));
+        studiosRow.append(b);
+      }
     }
+    if (ctx.watchProviders?.flatrate?.length) {
+      for (const p of ctx.watchProviders.flatrate.slice(0, 4)) {
+        const img = el('img', 'streaming-emblem');
+        img.src = TMDB_IMG + 'w92' + p.logo_path;
+        img.title = p.provider_name;
+        img.loading = 'lazy';
+        studiosRow.append(img);
+      }
+    }
+    colLeft.append(studiosRow);
   }
-  
-  nodes.push(el("div", "label", "Статус"));
-  const st = el("div", "row"); st.dataset.statusRow = "1";
+
+  // 5. User Rating
+  const ratingWrap = el('div', 'card-user-rating');
+  if (r.type === 'tv') {
+    const ir = computeItemRating(s);
+    ratingWrap.append(el("div", "label", "Моя оцінка"));
+    if (ir.avg > 0) {
+      const block = el("div", "ratings-block");
+      const infoEl = el("div");
+      infoEl.style.padding = "8px 0"; infoEl.style.fontSize = "15px"; infoEl.style.color = "var(--text-secondary)";
+      const suffix = ir.complete ? '' : ` <span style="color:var(--warning)">(${ir.rated}/${ir.total} сезонів)</span>`;
+      infoEl.innerHTML = `${fmtNum(ir.avg)}/10${suffix}`;
+      block.append(infoEl);
+      block.append(renderAverageBlock(ir.avg, 5));
+      ratingWrap.append(block);
+    }
+    const row = el("div", "row"); row.style.marginTop = "8px";
+    const btn = el("button", "btn", ir.avg > 0 ? "⭐ Змінити оцінки" : "⭐ Оцінити сезони");
+    btn.addEventListener('click', () => { ctx.activeTab = 'seasons'; renderCard(); });
+    row.append(btn);
+    ratingWrap.append(row);
+  } else {
+    ratingWrap.append(el("div", "label", "Моя оцінка"));
+    const rb = el("div", "ratings-block");
+    const cur = s.ratings || {};
+    for (const crit of RATING_CRITERIA) rb.append(renderRatingBlock(crit, cur[crit.key] || 0, r));
+    rb.append(renderAverageBlock(computeAverage(cur), countFilled(cur)));
+    ratingWrap.append(rb);
+  }
+  colLeft.append(ratingWrap);
+
+
+  // --- ПРАВА КОЛОНКА ---
+
+  // 1. Overview Text
+  if (d.overview) {
+    colRight.append(el("div", "overview", d.overview));
+  }
+
+  // 2. Actions (Statuses, UAKino, Delete, Favorite)
+  const st = el("div", "row status-row");
   const statuses = r.type === "tv" ? [["watching", "Дивлюсь"], ["watched", "Переглянуто"], ["planned", "Планую"], ["dropped", "Закинуто"]] : [["watched", "Переглянуто"], ["planned", "Планую"], ["dropped", "Закинуто"]];
   for (const [val, text] of statuses) {
     const b = el("button", "btn" + (s.status === val ? " on" : ""), text);
@@ -302,28 +327,26 @@ function renderOverviewTab(ctx, scroll) {
       if (!lib[r.key] && ctx.cast) patch.cast = ctx.cast;
       if (r.type === "tv" && d.seasons && !lib[r.key]?.totalSeasons) patch.totalSeasons = d.seasons.filter(x => x.season_number !== 0).length;
       updateNoRender(r, patch);
-      const srow = scroll.querySelector('[data-status-row]');
+      const srow = colRight.querySelector('.status-row');
       if (srow) srow.querySelectorAll('.btn').forEach(btn => btn.classList.toggle('on', btn.dataset.status === newStatus));
     });
     st.append(b);
   }
-  const favBtn = el("button", "btn" + (s.favorite ? " on" : ""), "❤️ В улюблене");
+  const favBtn = el("button", "btn" + (s.favorite ? " on" : ""), "❤️");
+  favBtn.title = "В улюблене";
   favBtn.addEventListener("click", () => update(r, { favorite: !s.favorite }));
   st.append(favBtn);
-  nodes.push(st);
+  colRight.append(st);
 
-  const uakinoRow = el("div", "row");
-  uakinoRow.style.marginTop = "12px";
+  const actionRow = el("div", "row action-row");
   const searchTitle = d.title || d.name || r.title;
   const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(searchTitle)}`;
   const uakinoBtn = el("button", "btn uakino", "🍿 UAKino");
   uakinoBtn.addEventListener("click", () => window.open(searchUrl, '_blank'));
-  uakinoRow.append(uakinoBtn);
-  nodes.push(uakinoRow);
+  actionRow.append(uakinoBtn);
 
   if (lib[r.key]) {
-    const rw = el("div", "row"); rw.style.marginTop = "12px";
-    const rb = el("button", "btn danger", "🗑️ Видалити з профілю");
+    const rb = el("button", "btn danger", "🗑️ Видалити");
     rb.addEventListener("click", () => {
       if (confirm('Повністю видалити тайтл з профілю?')) {
         delete lib[r.key];
@@ -332,39 +355,35 @@ function renderOverviewTab(ctx, scroll) {
         closeCard();
       }
     });
-    rw.append(rb);
-    nodes.push(rw);
+    actionRow.append(rb);
   }
+  colRight.append(actionRow);
+
+  // 3. Tabs & Tab Content
+  const tabsList = [{ id: 'cast', label: 'Актори' }];
+  if (r.type === 'tv') tabsList.push({ id: 'seasons', label: 'Сезони' });
+  if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
+  tabsList.push({ id: 'notes', label: '📝 Нотатки' });
   
-  if (r.type === 'tv') {
-    const ir = computeItemRating(s);
-    if (ir.avg > 0) {
-      nodes.push(el("div", "label", "Моя оцінка"));
-      const block = el("div", "ratings-block");
-      const infoEl = el("div");
-      infoEl.style.padding = "8px 0";
-      infoEl.style.fontSize = "15px";
-      infoEl.style.color = "var(--text-secondary)";
-      const suffix = ir.complete ? '' : ` <span style="color:var(--warning)">(${ir.rated}/${ir.total} сезонів)</span>`;
-      infoEl.innerHTML = `${fmtNum(ir.avg)}/10${suffix}`;
-      block.append(infoEl);
-      block.append(renderAverageBlock(ir.avg, 5));
-      nodes.push(block);
-    }
-    const row = el("div", "row"); row.style.marginTop = "8px";
-    const btn = el("button", "btn", ir.avg > 0 ? "⭐ Змінити оцінки" : "⭐ Оцінити сезони");
-    btn.addEventListener('click', () => { ctx.activeTab = 'seasons'; renderCard(); });
-    row.append(btn);
-    nodes.push(row);
-  } else {
-    nodes.push(el("div", "label", "Моя оцінка"));
-    const rb = el("div", "ratings-block");
-    const cur = s.ratings || {};
-    for (const crit of RATING_CRITERIA) rb.append(renderRatingBlock(crit, cur[crit.key] || 0, r));
-    rb.append(renderAverageBlock(computeAverage(cur), countFilled(cur)));
-    nodes.push(rb);
+  const tabs = el('div', 'card-tabs');
+  for (const t of tabsList) {
+    if (!ctx.activeTab) ctx.activeTab = t.id;
+    const btn = el('button', 'card-tab' + (ctx.activeTab === t.id ? ' active' : ''), t.label);
+    btn.addEventListener('click', () => { ctx.activeTab = t.id; renderCard(); });
+    tabs.append(btn);
   }
-  return nodes;
+  colRight.append(tabs);
+
+  const tabContent = el('div', 'card-tab-content'); 
+  tabContent.style.marginTop = '16px';
+  if (ctx.activeTab === 'cast') tabContent.append(...renderCastTab(ctx));
+  else if (ctx.activeTab === 'seasons') tabContent.append(...renderSeasonsTab(ctx));
+  else if (ctx.activeTab === 'similar') tabContent.append(...renderSimilarTab(ctx));
+  else if (ctx.activeTab === 'notes') tabContent.append(...renderNotesTab(ctx));
+  colRight.append(tabContent);
+
+  layout.append(colLeft, colRight);
+  scroll.append(layout);
 }
 
 function renderNotesTab(ctx) {
