@@ -601,6 +601,81 @@ input#q::placeholder { color: var(--text-dim); }
   .card-top-right { flex: 1; gap: 16px; padding-top: 10px; }
 }
 
+/* =========================================
+   CALENDAR / TIMELINE
+   ========================================= */
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.calendar-title {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 600;
+}
+.calendar-select {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-1);
+  color: var(--text);
+  border: 1px solid var(--bg-3);
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+}
+.timeline {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 40px;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 6px; bottom: 0;
+  width: 2px;
+  background: var(--bg-3);
+  border-radius: 2px;
+}
+.timeline-day-group {
+  margin-bottom: 24px;
+  position: relative;
+}
+.timeline-date {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 12px;
+  position: relative;
+}
+.timeline-date::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg-0);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.5);
+}
+.timeline-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Перевикористовуємо стилі .item, але трохи адаптуємо */
+.timeline-items .item {
+  margin-bottom: 0;
+  background: rgba(15, 14, 19, 0.6);
+  backdrop-filter: blur(10px);
+}
+
 @media (min-width: 1200px) {
   #results, .home-wrap, .home-hero, .mood-section, .game-container, .taste-summary-container { max-width: 1300px; }
   .home-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
