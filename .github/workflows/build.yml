@@ -24,7 +24,7 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-            - name: Prepare Web Folder
+      - name: Prepare Web Folder
         run: |
           mkdir -p www
           cp index.html www/
