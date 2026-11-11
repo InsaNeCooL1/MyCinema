@@ -593,6 +593,171 @@ input#q::placeholder{color:var(--text-dim)}
   .filter-bar{max-width:1268px}
 }
 
+/* =========================================
+   NEW CARD LAYOUT (Variant 2)
+   ========================================= */
+
+.card-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-top: 10px;
+}
+
+.card-col-left, .card-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Hero (Backdrop + Trailer) */
+.card-hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.card-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card-hero-video {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.card-hero-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.3);
+  color: #fff;
+  border: 0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.card-hero-play:hover {
+  background: rgba(0,0,0,0.1);
+}
+
+.card-hero-play svg {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6));
+  transition: transform 0.2s;
+}
+
+.card-hero-play:hover svg {
+  transform: scale(1.1);
+}
+
+.card-hero-play span {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+}
+
+/* Title & Meta */
+.card-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-title-wrap .title {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0;
+}
+
+/* User Rating block */
+.card-user-rating {
+  background: var(--bg-1);
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Actions (Statuses) */
+.status-row {
+  background: var(--bg-1);
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.04);
+  margin-top: 0;
+}
+
+.action-row {
+  margin-top: 0;
+}
+
+/* --- DESKTOP LAYOUT --- */
+@media (min-width: 900px) {
+  #overlay {
+    padding: 40px;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+  }
+  
+  #card {
+    max-width: 1050px;
+    height: 92vh;
+    border-radius: 24px;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .card-scroll {
+    padding: 0 32px 32px;
+  }
+
+  .card-layout {
+    display: grid;
+    grid-template-columns: 440px 1fr; /* Ліва колонка 440px, права - решта */
+    gap: 32px;
+    align-items: start;
+  }
+
+  /* Робимо ліву колонку "липкою" */
+  .card-col-left {
+    position: sticky;
+    top: 0;
+  }
+
+  /* Ліва колонка скролиться окремо, якщо вона занадто довга */
+  .card-col-left::-webkit-scrollbar { width: 0; }
+  
+  /* Стилі для табів всередині правої колонки */
+  .card-tabs {
+    margin: 0;
+    padding: 0;
+  }
+  
+  .card-tab {
+    padding: 12px 16px;
+  }
+}
+
 .ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.35);transform:scale(0);animation:ripple-anim .7s ease-out;pointer-events:none;z-index:1}
 @keyframes ripple-anim{to{transform:scale(1);opacity:0}}
 .nav-item,.filter-btn,.home-tab,.card-tab,.btn,.card-x,.filter-actions button,.query-bar button,.trailer-btn,.auth-btn,.onb-btn,.game-btn,.login-btn-side,.logout-btn-side,.season-tab-btn,.settings-btn,.cast-loader-btn,.mood-pill{position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent}
