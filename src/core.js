@@ -18,6 +18,7 @@ let state = {
     recs: null, 
     sig: null, 
     shown: { movie: 20, tv: 20 }, // <--- ДОДАНО ОСЬ ЦЕ
+    calendarMonth: null,
     tab: 'movie', 
     general: null, 
     mood: null, 
