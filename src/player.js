@@ -16,10 +16,15 @@ function savePlayerSettings() {
 }
 
 function loadPlayerSettings() {
-  document.getElementById('jackett-url').value = localStorage.getItem('mycinema.jackett_url') || '';
-  document.getElementById('jackett-key').value = localStorage.getItem('mycinema.jackett_key') || '';
-  document.getElementById('torrserver-url').value = localStorage.getItem('mycinema.torrserver_url') || 'http://127.0.0.1:8090';
-  document.getElementById('player-pref').checked = localStorage.getItem('mycinema.external_player') !== 'false';
+  const jUrl = document.getElementById('jackett-url');
+  const jKey = document.getElementById('jackett-key');
+  const tUrl = document.getElementById('torrserver-url');
+  const extPlayer = document.getElementById('player-pref');
+
+  if (jUrl) jUrl.value = localStorage.getItem('mycinema.jackett_url') || '';
+  if (jKey) jKey.value = localStorage.getItem('mycinema.jackett_key') || '';
+  if (tUrl) tUrl.value = localStorage.getItem('mycinema.torrserver_url') || 'http://127.0.0.1:8090';
+  if (extPlayer) extPlayer.checked = localStorage.getItem('mycinema.external_player') !== 'false';
 }
 
 // Перехоплюємо відкриття налаштувань, щоб підтягнути збережені дані
@@ -100,12 +105,13 @@ async function openTorrentSearch(item) {
   lModal.style.display = 'flex';
   
   try {
+    // Формуємо запит (назва + рік)
     const q = encodeURIComponent(item.title + (item.year ? ' ' + item.year : ''));
     const res = await fetch(`${jUrl}/api/v2.0/indexers/all/results?apikey=${jKey}&Query=${q}`);
     
     const contentType = res.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      throw new Error('Сервер повернув не JSON. Перевірте правильність URL.');
+      throw new Error('Сервер Jackett повернув не JSON. Перевірте правильність URL.');
     }
 
     const data = await res.json();
@@ -119,6 +125,7 @@ async function openTorrentSearch(item) {
       return;
     }
 
+    // Постер стає кольоровим
     lPoster.style.filter = 'grayscale(0%)';
     
     setTimeout(() => {
@@ -184,25 +191,60 @@ async function playTorrent(magnet, item) {
   lModal.style.display = 'flex';
 
   try {
+    // 1. Додаємо торрент
     const addRes = await fetch(`${tUrl}/torrents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'add', link: magnet, save_to_db: true })
     });
     
-    if (!addRes.ok) throw new Error('Не вдалося підключитися до TorrServer');
-    const addData = await addRes.json();
+    // Читаємо як текст, щоб запобігти помилці парсингу JSON
+    const responseText = await addRes.text();
+    console.log("TorrServer відповідь (додавання):", responseText);
+
+    if (responseText.includes('<!DOCTYPE html>') || responseText.includes('<html>')) {
+      throw new Error(`TorrServer повернув HTML-сторінку замість JSON. URL: ${tUrl}`);
+    }
+
+    let addData = {};
+    if (responseText.trim() !== '') {
+      try {
+        addData = JSON.parse(responseText);
+      } catch (e) {
+        console.warn("Не вдалося розпарсити JSON, але текст є:", responseText);
+      }
+    }
+
     const hash = addData.hash;
+    if (!hash) {
+      throw new Error('Не вдалося отримати хеш. Сервер відповів: ' + responseText.substring(0, 50));
+    }
 
-    if (!hash) throw new Error('Не вдалося отримати хеш торрента');
-
+    // 2. Чекаємо на метадані файлів
     let files = [];
     let attempts = 0;
     
     while (attempts < 10) {
       lSub.textContent = `Отримую список файлів... (спроба ${attempts + 1})`;
+      
       const statRes = await fetch(`${tUrl}/torrents/${hash}`);
-      const statData = await statRes.json();
+      if (!statRes.ok) {
+         await new Promise(r => setTimeout(r, 2000));
+         attempts++;
+         continue;
+      }
+
+      const statText = await statRes.text();
+      console.log("TorrServer відповідь (файли):", statText);
+
+      let statData = {};
+      if (statText.trim() !== '') {
+          try {
+            statData = JSON.parse(statText);
+          } catch (e) {
+            throw new Error(`Помилка парсингу файлів: ${statText.substring(0, 50)}`);
+          }
+      }
       
       if (statData.file_stats && statData.file_stats.length > 0) {
         files = statData.file_stats.filter(f => f.path.match(/\.(mkv|mp4|avi)$/i));
@@ -213,17 +255,18 @@ async function playTorrent(magnet, item) {
       attempts++;
     }
 
-    if (files.length === 0) throw new Error('Відеофайлів не знайдено в торренті');
+    if (files.length === 0) throw new Error('Відеофайлів не знайдено (TorrServer не завантажив метадані).');
 
+    // 3. Беремо найбільший файл
     const videoFile = files.sort((a, b) => b.length - a.length)[0];
     const streamUrl = `${tUrl}/stream/${hash}/${videoFile.id}`;
     
     lStatus.textContent = 'Запуск плеєра...';
     lSub.textContent = 'Передача потоку...';
     
+    // 4. Відкриваємо зовнішній плеєр або браузер
     setTimeout(() => {
       lModal.style.display = 'none';
-      
       if (extPlayer) {
         const intentUrl = `intent:${streamUrl}#Intent;action=android.intent.action.VIEW;type=video/*;S.title=${encodeURIComponent(item.title)};end`;
         window.location.href = intentUrl;
@@ -234,10 +277,6 @@ async function playTorrent(magnet, item) {
 
   } catch (e) {
     lModal.style.display = 'none';
-    let msg = e.message;
-    if (msg === 'Failed to fetch') {
-      msg = 'Не вдалося підключитися до TorrServer.\n\nЯкщо ви на сайті (HTTPS), браузер блокує HTTP-запити (Mixed Content).\nСпробуйте запустити сайт локально (http://localhost) або перевірте в APK.';
-    }
-    alert('Помилка TorrServer: ' + msg);
+    alert('Помилка TorrServer: ' + e.message);
   }
 }
