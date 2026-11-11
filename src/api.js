@@ -10,7 +10,9 @@ function normalizeItem(r) {
   return {
     key: type + '-' + r.id, id: r.id, type,
     title: r.title || r.name, year: (r.release_date || r.first_air_date || '').slice(0, 4),
-    poster: r.poster_path, overview: r.overview || '', tmdbRating: r.vote_average || 0,
+    poster: r.poster_path, 
+    backdrop: r.backdrop_path, // <--- ДОДАЙ ЦЕ
+    overview: r.overview || '', tmdbRating: r.vote_average || 0,
     votes: r.vote_count || 0, popularity: r.popularity || 0,
     genres: r.genre_ids || (r.genres ? r.genres.map(g => g.id) : [])
   };
