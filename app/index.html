@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08070a">
+<title>MyCinema · Cinema Observatory</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="sidebar-backdrop" onclick="closeSidebar()"></div>
+<div id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">MyCinema</div>
+    <div class="sidebar-email" id="sidebar-email">Гість</div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> Головна</div>
+    <div class="nav-item" data-tab="filter" onclick="setTab('filter')"><span class="nav-icon">🔎</span> Фільтр</div>
+    <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> Дивлюсь</div>
+    <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> Переглянуто</div>
+    <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> Планую</div>
+    <div class="nav-item" data-tab="dropped" onclick="setTab('dropped')"><span class="nav-icon">🕸️</span> Закинуто</div>
+    <div class="nav-item" data-tab="favorites" onclick="setTab('favorites')"><span class="nav-icon">❤️</span> Улюблене</div>
+    <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> Мій топ</div>
+    <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> Календар</div>
+    <div class="nav-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> Нотатки</div>
+    <div class="nav-item" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> Обсерваторія</div>
+    <div class="nav-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> Цар гори</div>
+  </div>
+  <div class="sidebar-footer">
+    <button class="login-btn-side" id="sidebar-login-btn" onclick="openAuthModal()">Увійти в акаунт</button>
+    <button class="logout-btn-side" id="sidebar-logout-btn" style="display:none;" onclick="logoutUser()">Вийти з акаунту</button>
+    <button class="logout-btn-side" style="border-color:var(--accent);color:var(--accent)" onclick="openSettings()">⚙️ Налаштування</button>
+  </div>
+</div>
+
+<header>
+  <button class="hamburger" onclick="openSidebar()">☰</button>
+  <div class="search-container">
+    <input id="q" type="search" placeholder="Від чого кайфонем сьогодні?" autocomplete="off">
+    <div id="autocomplete" class="autocomplete hidden"></div>
+  </div>
+</header>
+
+<div id="auth-banner">
+  Ви не увійшли. Дані зберігаються лише на цьому пристрої.
+  <button onclick="openAuthModal()">Увійти</button>
+</div>
+
+<div id="type-filter" class="filter-bar hidden">
+  <button class="filter-btn active" data-filter="all">Всі</button>
+  <button class="filter-btn" data-filter="movie">Фільми</button>
+  <button class="filter-btn" data-filter="tv">Серіали</button>
+</div>
+
+<div id="results"></div>
+<div id="overlay"><div id="card"></div></div>
+<div id="sync-indicator" class="sync-indicator"></div>
+<div id="poster-zoom"><button class="zoom-close" onclick="closeImageZoom()">✕</button><img alt=""></div>
+<input type="file" id="import-file" accept=".json" style="display:none;">
+
+<!-- ============ МОДАЛЬНІ ВІКНА ============ -->
+
+<div id="settings-modal">
+  <div class="settings-box">
+    <div class="settings-header">
+      <h2>⚙️ Налаштування</h2>
+      <button class="settings-close" onclick="closeSettings()">✕</button>
+    </div>
+    
+    <div class="settings-section">
+      <div class="settings-section-title">🎨 Колір фону</div>
+      <div id="bg-swatches" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+    </div>
+    
+    <div class="settings-section">
+      <div class="settings-section-title">✨ Колір виділення</div>
+      <div id="accent-swatches" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+    </div>
+    
+    <div class="settings-section">
+      <div class="settings-section-title">🖼️ Вигляд</div>
+      <label class="settings-toggle">
+        <input type="checkbox" id="poster-bg-toggle" onchange="onPosterBgToggle(this.checked)">
+        <span>Постер як фон на картці тайтлу</span>
+      </label>
+    </div>
+
+
+    <div class="settings-section">
+      <div class="settings-section-title">📁 Дані</div>
+      <button class="settings-btn" onclick="exportLibrary()">💾 Експорт бібліотеки</button>
+      <button class="settings-btn" onclick="importLibrary()">📥 Імпорт бібліотеки</button>
+      <button class="settings-btn" onclick="restartOnboardingFromSettings()">🔄 Пройти онбординг знову</button>
+    </div>
+  </div>
+</div>
+
+<div id="auth-modal">
+  <div class="auth-box">
+    <h2>Вхід до MyCinema</h2>
+    <button class="auth-btn google" onclick="loginWithGoogle()">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Увійти через Google
+    </button>
+    <div class="auth-divider">або через Email</div>
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email" autocomplete="email">
+    <input type="password" id="auth-password" class="auth-input" placeholder="Пароль" autocomplete="current-password">
+    <div id="auth-error" class="auth-error"></div>
+    <button id="btn-login" class="auth-btn primary" onclick="loginUser()">Увійти</button>
+    <button id="btn-register" class="auth-btn secondary" onclick="registerUser()">Створити новий акаунт</button>
+    <button class="auth-btn secondary" onclick="closeAuthModal()" style="margin-top:8px;">Продовжити без входу</button>
+  </div>
+</div>
+
+<div id="onboarding-modal">
+  <div class="onb-header">
+    <h1>Ласкаво просимо!</h1>
+    <p>Оберіть мінімум 5 тайтлів, які вам подобаються.</p>
+  </div>
+  <div class="onb-scroll" id="onb-scroll"></div>
+  <div class="onb-footer">
+    <button class="onb-btn" id="onb-submit" onclick="submitOnboarding()">Продовжити</button>
+    <button class="onb-btn skip" onclick="skipOnboarding()">Пропустити</button>
+  </div>
+</div>
+
+<!-- Модалка зі списком торрентів -->
+
+<!-- Екран завантаження (Анімація) -->
+
+
+<!-- ============ FIREBASE MODULE ============ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCEFo7IwNEGAzkVnhtPXRJuxLgIksd187Q",
+  authDomain: "mucinema-d9595.firebaseapp.com",
+  projectId: "mucinema-d9595",
+  storageBucket: "mucinema-d9595.firebasestorage.app",
+  messagingSenderId: "353318067827",
+  appId: "1:353318067827:web:e5c58dc9c67ad354d2d406",
+  measurementId: "G-L14CFME65J"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+window.firestoreDB = db;
+window.firestoreDoc = doc;
+window.firestoreGetDoc = getDoc;
+window.firestoreSetDoc = setDoc;
+
+window.loginWithGoogle = async () => {
+  const provider = new GoogleAuthProvider();
+  const err = document.getElementById('auth-error'); err.textContent = '';
+  try { await signInWithRedirect(auth, provider); }
+  catch (e) { err.textContent = e.code === 'auth/unauthorized-domain' ? "Домен не авторизовано." : "Помилка Google: " + e.message; }
+};
+getRedirectResult(auth).then((r) => { if (r) document.getElementById('auth-modal').style.display = 'none'; })
+  .catch((error) => { const err = document.getElementById('auth-error'); if (err) err.textContent = "Помилка входу: " + error.message; });
+
+window.loginUser = async () => {
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const err = document.getElementById('auth-error'); err.textContent = '';
+  if (!email || !password) { err.textContent = "Введіть email та пароль"; return; }
+  try { document.getElementById('btn-login').textContent = 'Вхід...'; await signInWithEmailAndPassword(auth, email, password); }
+  catch (e) { err.textContent = "Невірний email або пароль"; document.getElementById('btn-login').textContent = 'Увійти'; }
+};
+
+window.registerUser = async () => {
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const err = document.getElementById('auth-error'); err.textContent = '';
+  if (!email || !password) { err.textContent = "Введіть email та пароль"; return; }
+  if (password.length < 6) { err.textContent = "Пароль має бути мінімум 6 символів"; return; }
+  try { document.getElementById('btn-register').textContent = 'Створення...'; await createUserWithEmailAndPassword(auth, email, password); }
+  catch (e) { err.textContent = "Помилка: " + (e.code === 'auth/email-already-in-use' ? "Ця пошта вже зареєстрована" : e.message); document.getElementById('btn-register').textContent = 'Створити новий акаунт'; }
+};
+
+window.logoutUser = async () => { if(confirm('Ви впевнені, що хочете вийти?')) { await signOut(auth); location.reload(); } };
+window.openAuthModal = () => { document.getElementById('auth-modal').style.display = 'flex'; };
+window.closeAuthModal = () => { document.getElementById('auth-modal').style.display = 'none'; };
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    window.currentUser = user; window.firebaseReady = true;
+    document.getElementById('auth-modal').style.display = 'none';
+    document.getElementById('auth-banner').classList.remove('visible');
+    document.getElementById('sidebar-email').textContent = user.email || user.displayName || 'Користувач';
+    document.getElementById('sidebar-login-btn').style.display = 'none';
+    document.getElementById('sidebar-logout-btn').style.display = 'block';
+    window.dispatchEvent(new CustomEvent('firebase-ready'));
+  } else {
+    window.currentUser = null; window.firebaseReady = false;
+    document.getElementById('auth-banner').classList.add('visible');
+    document.getElementById('sidebar-email').textContent = 'Гість';
+    document.getElementById('sidebar-login-btn').style.display = 'block';
+    document.getElementById('sidebar-logout-btn').style.display = 'none';
+  }
+});
+</script>
+
+<!-- ============ MYCINEMA MODULES ============ -->
+<script src="src/config.js"></script>
+<script src="src/core.js"></script>
+<script src="src/api.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/search.js"></script>
+<script src="src/home.js"></script>
+<script src="src/library.js"></script>
+<script src="src/stats.js"></script>
+<script src="src/game.js"></script>
+<script src="src/card.js"></script>
+<script src="src/person.js"></script>
+<script src="src/settings.js"></script>
+<script src="src/calendar.js"></script>
+<script src="src/app.js"></script>
+  <script src="src/snow.js"></script>
+</body>
+</html>
