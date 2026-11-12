@@ -1,18 +1,12 @@
 name: Build Android APK
-on:
-  push:
-    branches: [main, restructure-v3]
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 permissions:
-  contents: write
+  contents: write # Дозвіл на створення релізів
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -34,29 +28,32 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('app/android/**/*.gradle*', 'app/android/gradle/wrapper/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Install npm deps
-        run: npm install
-
-      - name: Assemble www/
+      - name: Install Capacitor
         run: |
-          rm -rf www
-          mkdir -p www/src
-          cp ../shared/src/*.js www/src/
-          cp src/*.js www/src/
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Prepare Web Folder
+        run: |
+          mkdir -p www
           cp index.html www/
           cp styles.css www/
           cp manifest.json www/ || true
+          cp -r src www/
 
-      - name: Capacitor Sync
-        run: npx cap sync android
+      - name: Init Capacitor
+        run: |
+          npx cap init MyCinema com.mycinema.app --web-dir=www
+          npx cap add android
+          npx cap sync android
 
       - name: Build APK
-        working-directory: app/android
         run: |
+          cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
@@ -66,7 +63,7 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: MyCinema Build ${{ github.run_number }}
-          files: app/android/app/build/outputs/apk/debug/app-debug.apk
+          files: android/app/build/outputs/apk/debug/app-debug.apk
           draft: false
           prerelease: false
         env:
