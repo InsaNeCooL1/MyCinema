@@ -1,0 +1,29 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Build site
+        run: |
+          # Тут можна додати кроки збірки, якщо потрібно
+          mkdir -p _site
+          cp -r web/* _site/  # Копіюємо вміст папки web
+          cp -r shared/src _site/src/ # Додаємо спільні скрипти
+          cp app/manifest.json _site/ # Додаємо маніфест
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
