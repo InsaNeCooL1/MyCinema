@@ -89,18 +89,6 @@
       </label>
     </div>
 
-    <div class="settings-section">
-      <div class="settings-section-title">🎬 Джерела перегляду</div>
-      <input type="text" id="jackett-url" class="auth-input" placeholder="Jackett URL (http://192.168.1.x:9117)" style="margin-bottom:8px;">
-      <input type="text" id="jackett-key" class="auth-input" placeholder="Jackett API Key" style="margin-bottom:8px;">
-      <input type="text" id="torrserver-url" class="auth-input" placeholder="TorrServer URL (http://127.0.0.1:8090)" style="margin-bottom:8px;">
-      <label class="settings-toggle" style="margin-bottom:8px;">
-        <input type="checkbox" id="player-pref">
-        <span>Відкривати у зовнішньому плеєрі (VLC)</span>
-      </label>
-      <button class="settings-btn" onclick="testJackettConn()" style="background:var(--bg-3);">🔌 Перевірити з'єднання</button>
-      <button class="settings-btn" onclick="savePlayerSettings()">💾 Зберегти налаштування</button>
-    </div>
 
     <div class="settings-section">
       <div class="settings-section-title">📁 Дані</div>
@@ -141,36 +129,9 @@
 </div>
 
 <!-- Модалка зі списком торрентів -->
-<div id="torrents-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); z-index:2500; display:none; align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--bg-1); width:100%; max-width:700px; max-height:85vh; border-radius:20px; display:flex; flex-direction:column; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
-    <div style="padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center;">
-      <h3 style="margin:0; font-family:var(--serif);">Вибір торрента</h3>
-      <button onclick="closeTorrentsModal()" style="background:none; border:0; color:var(--text-muted); font-size:24px; cursor:pointer;">✕</button>
-    </div>
-    <div id="torrents-list" style="padding:16px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:10px;"></div>
-  </div>
-</div>
 
 <!-- Екран завантаження (Анімація) -->
-<div id="loading-modal" style="position:fixed; inset:0; background:var(--bg-0); z-index:3000; display:none; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
-  <div style="position:relative; width:280px; height:420px; border-radius:16px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.8);">
-    <img id="loading-poster" src="" style="width:100%; height:100%; object-fit:cover; filter:grayscale(100%); transition:filter 5s ease-in-out;">
-    <div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.8), transparent);"></div>
-  </div>
-  <div id="loading-status" style="margin-top:30px; font-family:var(--mono); font-size:16px; color:var(--accent); font-weight:700;">Шукаю торенти...</div>
-  <div id="loading-substatus" style="margin-top:8px; font-family:var(--mono); font-size:12px; color:var(--text-muted);">Підключення до Jackett</div>
-  <button id="cancel-loading-btn" onclick="cancelLoading()" style="margin-top: 20px; padding: 10px 24px; border-radius: 12px; background: var(--bg-3); color: var(--text); border: 1px solid rgba(255,255,255,0.1); font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s;">Скасувати</button>
-</div>
 
-<div id="files-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); z-index:2500; display:none; align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--bg-1); width:100%; max-width:700px; max-height:85vh; border-radius:20px; display:flex; flex-direction:column; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
-    <div style="padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center;">
-      <h3 style="margin:0; font-family:var(--serif);">Вибір серії</h3>
-      <button onclick="closeFilesModal()" style="background:none; border:0; color:var(--text-muted); font-size:24px; cursor:pointer;">✕</button>
-    </div>
-    <div id="files-list" style="padding:16px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:10px;"></div>
-  </div>
-</div>
 
 <!-- ============ FIREBASE MODULE ============ -->
 <script type="module">
@@ -260,8 +221,7 @@ onAuthStateChanged(auth, (user) => {
 <script src="src/person.js"></script>
 <script src="src/settings.js"></script>
 <script src="src/calendar.js"></script>
-<script src="src/player.js"></script>
 <script src="src/app.js"></script>
-
+  <script src="src/snow.js"></script>
 </body>
 </html>

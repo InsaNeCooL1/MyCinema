@@ -49,14 +49,6 @@ routeFromHash();
     if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
     if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }
     
-    if (document.getElementById('torrents-modal') && document.getElementById('torrents-modal').style.display === 'flex') { closeTorrentsModal(); return; }
-    if (document.getElementById('files-modal') && document.getElementById('files-modal').style.display === 'flex') { closeFilesModal(); return; }
-    
-    // Якщо відкрите вікно завантаження - скасовуємо його
-    if (document.getElementById('loading-modal') && document.getElementById('loading-modal').style.display === 'flex') { 
-      if (typeof cancelLoading === 'function') cancelLoading(); 
-      return; 
-    }
 
     // 2. Бокове меню
     if (document.getElementById('sidebar').classList.contains('open')) { closeSidebar(); return; }

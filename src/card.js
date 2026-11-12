@@ -18,7 +18,7 @@ function saveCardScroll() {
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
   overlay.classList.add("open");
-  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, logoPath: null };
+  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
   cardStack = [ctx];
   pushCardState();
   renderLoading();
@@ -29,13 +29,30 @@ async function openCard(r) {
 
 async function openMediaFromStack(item) {
   saveCardScroll();
-  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, logoPath: null };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
   cardStack.push(ctx);
   pushCardState();
   renderLoading();
   await loadMediaCardData(ctx);
   if (cardStack[cardStack.length - 1] !== ctx) return;
   renderCard();
+}
+
+// ---- Lampa ----
+async function openInLampa(item) {
+  const plugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExternalPlayer;
+  if (plugin && plugin.openLampa) {
+    try {
+      const res = await plugin.openLampa({ id: item.id, type: item.type });
+      if (res && res.via === 'launch-only') showSyncToast('Lampa відкрита, але без картки — знайдіть тайтл вручну');
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      showCenterToast(msg.includes('NOT_INSTALLED') ? '❌ Lampa не встановлена' : '❌ Не вдалося відкрити Lampa');
+    }
+    return;
+  }
+  // браузер (ПК): веб-версія Lampa
+  window.open(`http://lampa.mx/?card=${item.id}&media=${item.type}&source=tmdb`, '_blank');
 }
 
 function cardBar() {
@@ -117,7 +134,7 @@ function closeCard() {
 async function loadMediaForForward(s) {
   overlay.classList.add("open");
   const item = { key: s.key, id: s.id, type: s.media_type, title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 };
-  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, logoPath: null };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
   cardStack.push(ctx);
   renderLoading();
   await loadMediaCardData(ctx);
@@ -242,17 +259,18 @@ function renderMediaCard(ctx, scroll) {
   const watchBtn = el('button', 'action-btn-main watch');
   watchBtn.innerHTML = `
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" opacity="0.5"/>
-      <path d="M7 10l5-5 5 5H7zm10 4l-5 5-5-5h10z" />
+      <path d="M8 5v14l11-7z"/>
     </svg>
-    Дивитись
+    Лампа
   `;
-  watchBtn.addEventListener('click', () => openTorrentSearch(r));
+  watchBtn.title = 'Відкрити в Lampa';
+  watchBtn.addEventListener('click', () => openInLampa(r));
   actionRowTop.append(watchBtn);
   
   const searchTitle = d.title || d.name || r.title;
-  const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(searchTitle)}`;
+  // Очищаємо назву від дужок, двокрапок, лапок та інших спецсимволів
+  const cleanSearchTitle = searchTitle.replace(/[^a-zA-Zа-яА-ЯіІїЇєЄґҐ0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(cleanSearchTitle)}`;
   const uakinoBtn = el('button', 'action-btn-main uakino');
   uakinoBtn.innerHTML = '<span style="color: #0057b8; font-weight: 900; font-size: 16px; font-style: italic; letter-spacing: -0.5px;">UA</span><span style="color: #ffd700; font-weight: 900; font-size: 16px; font-style: italic; letter-spacing: -0.5px;">KINO</span>';
   uakinoBtn.style.display = 'flex';
@@ -261,8 +279,11 @@ function renderMediaCard(ctx, scroll) {
   uakinoBtn.addEventListener('click', () => window.open(searchUrl, '_blank'));
   actionRowTop.append(uakinoBtn);
   
-  const favBtn = el('button', 'status-btn favorite' + (s.favorite ? ' active' : ''), '❤️');
+  const favBtn = el('button', 'status-btn favorite' + (s.favorite ? ' active' : ''));
   favBtn.title = "В улюблене";
+  favBtn.innerHTML = s.favorite
+    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>'
+    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
   favBtn.addEventListener('click', () => update(r, { favorite: !s.favorite }));
   actionRowTop.append(favBtn);
   
@@ -287,8 +308,6 @@ function renderMediaCard(ctx, scroll) {
   if (d.vote_average) { rr.append(el("div", "rating-badge rating-tmdb", `TMDB: ${d.vote_average.toFixed(1)}`)); hasR = true; }
   if (ctx.omdb) {
     if (ctx.omdb.imdbRating && ctx.omdb.imdbRating !== "N/A") { rr.append(el("div", "rating-badge rating-imdb", `IMDb: ${ctx.omdb.imdbRating}`)); hasR = true; }
-    const rt = ctx.omdb.Ratings?.find(x => x.Source === "Rotten Tomatoes");
-    if (rt && rt.Value !== "N/A") { rr.append(el("div", "rating-badge rating-rt", `RT: ${rt.Value}`)); hasR = true; }
   }
   
   if (r.type === 'tv' && ctx.watchProviders?.flatrate?.length) {
@@ -380,7 +399,7 @@ function renderMediaCard(ctx, scroll) {
     delBtn.title = "Видалити";
     delBtn.addEventListener("click", () => {
       if (confirm('Повністю видалити тайтл з профілю?')) {
-        delete lib[r.key];
+        removeLibItem(r.key);
         saveNow(); refresh(); closeCard();
       }
     });
@@ -528,7 +547,7 @@ function renderNotesTab(ctx) {
         const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
         const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
         const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
-        if (!lib[r.key].status && !hasR && !hasSR && !hasEps) delete lib[r.key];
+        if (!lib[r.key].status && !hasR && !hasSR && !hasEps) removeLibItem(r.key);
       }
       save();
     }, 800);
@@ -790,7 +809,9 @@ function renderSeasonAverageBlock(sr) {
 function updateCore(r, patch) {
   const cur = lib[r.key] || { ...r, status: null, ratings: null, watchedEpisodes: [] };
   if (!cur.createdAt) cur.createdAt = Date.now();
-  lib[r.key] = { ...cur, ...patch, updated: Date.now() };
+  const merged = { ...cur, ...patch, updated: Date.now() };
+  if (patch.status !== undefined && patch.status !== cur.status) merged.statusDate = Date.now();
+  lib[r.key] = merged;
   const ctx = cardStack[cardStack.length - 1];
   if (ctx?.cast && !lib[r.key].cast) lib[r.key].cast = ctx.cast;
   const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
@@ -798,7 +819,8 @@ function updateCore(r, patch) {
   const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
   const hasNotes = lib[r.key].notes && lib[r.key].notes.trim();
   const hasElo = lib[r.key].eloGames && lib[r.key].eloGames > 0;
-  if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasNotes && !hasElo) delete lib[r.key];
+  const hasFav = lib[r.key].favorite === true;
+  if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasNotes && !hasElo && !hasFav) removeLibItem(r.key);
   save();
 }
 function update(r, patch) { updateCore(r, patch); renderCard(); }
@@ -811,8 +833,10 @@ function setCriterion(r, criterionKey, value) {
   else delete ratings[criterionKey];
   const avg = computeAverage(ratings);
   let newStatus = s.status;
-  if (avg > 0 && s.status !== "watching") newStatus = "watched";
-  else if (avg === 0 && s.status === "watched") newStatus = null;
+  if (avg > 0) {
+    if (r.type === "tv") { if (s.status !== "watched") newStatus = "watching"; }
+    else newStatus = "watched";
+  } else if (avg === 0 && s.status === "watched") newStatus = null;
   const patch = { ratings, status: newStatus };
   const ctx = cardStack[cardStack.length - 1];
   if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
@@ -871,6 +895,7 @@ function setSeasonCriterion(r, seasonNum, criterionKey, value) {
   if (Object.keys(cur).length > 0) sr[seasonNum] = cur;
   else delete sr[seasonNum];
   const patch = { seasonRatings: sr };
+  if (value > 0 && s.status !== 'watched') patch.status = 'watching'; // оцінка сезону -> «Дивлюсь»
   const ctx = cardStack[cardStack.length - 1];
   if (ctx?.details?.seasons && !s.totalSeasons) patch.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
   if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;

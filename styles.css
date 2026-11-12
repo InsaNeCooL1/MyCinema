@@ -17,7 +17,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { overscroll-behavior: contain; }
+html, body { overscroll-behavior: auto; }
 
 body {
   font-family: var(--sans); background: var(--bg-0); color: var(--text);
@@ -1077,3 +1077,608 @@ input#q::placeholder { color: var(--text-dim); }
   background: var(--bg-3);
   border-color: rgba(255, 255, 255, 0.2);
 }
+
+
+/* MYCINEMA: compact back button */
+.card-bar { padding-top: 4px !important; padding-bottom: 0 !important; min-height: 0 !important; margin-bottom: 0 !important; }
+.card-x { width: 34px !important; height: 34px !important; min-width: 0 !important; font-size: 17px !important; margin: 0 !important; }
+
+
+
+
+/* Робимо картку ширшою на десктопі */
+@media (min-width: 900px) {
+    /* Розширюємо контейнер, в якому лежить картка */
+    .card {
+        max-width: 1340px !important;
+    }
+    
+    /* Ліва частина (постер/трейлер) тягнеться, права (контент) — фіксована */
+    .card-top-section {
+        display: grid !important;
+        grid-template-columns: 1fr 480px !important; /* 480px - ширина правого блоку */
+        gap: 32px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    .card-top-left, .card-top-right {
+        width: 100% !important;
+        min-width: 0 !important; /* Запобігає виходу за межі */
+    }
+
+    /* Збільшуємо назву фільму на 10% */
+    .card-top-right .title {
+        font-size: 2.2rem !important; 
+    }
+}
+
+/* Рядок з рейтингами та кнопкою "Переглянуто" */
+.ratings-row {
+    display: flex !important;
+    flex-wrap: wrap !important; /* Дозволяємо переносити елементи, якщо не влазять */
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.status-btn-watched {
+    height: auto !important;
+    min-height: 32px !important;
+    padding: 6px 12px !important;
+    margin-left: auto !important; /* Притискаємо кнопку до правого краю, якщо є місце */
+}
+
+/* Рядок статусів (Дивлюсь, Планую, Закинуто) */
+.status-section-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    align-items: center !important;
+}
+
+/* Уніфікуємо всі кнопки статусів за висотою */
+.status-btn-text {
+    height: auto !important;
+    min-height: 32px !important;
+    padding: 6px 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Оцінки: шрифт +12% */
+.rating-block-label, .rating-block-value {
+    font-size: 1.12em !important;
+}
+
+/* Підкладки під оцінками (12px замість 10px) */
+.light {
+    height: 12px !important;
+    border-radius: 6px !important;
+    flex: 1 !important; /* Щоб не виходили за межі */
+}
+
+.rating-lights {
+    display: flex !important;
+    gap: 4px !important;
+    align-items: center !important;
+    width: 100% !important;
+}
+
+/* --- ФІНАЛЬНЕ ВИПРАВЛЕННЯ ВІЗУАЛУ --- */
+
+/* 1. Повертаємо "Переглянуто" на місце (прибираємо зсув вправо) */
+.status-btn-watched {
+    margin-left: 0 !important; 
+    height: auto !important;
+    min-height: 38px !important; /* Збільшено на ~18% */
+    padding: 8px 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* 2. Повертаємо чорно-білий ефект для НЕАКТИВНИХ статусів */
+.status-btn-text:not(.active),
+.status-btn-watched:not(.active) {
+    filter: grayscale(100%) opacity(0.4) !important;
+    background: transparent !important;
+    border: 1px solid var(--bg-3) !important;
+    color: var(--text-muted) !important;
+}
+
+/* Кольоровий для АКТИВНИХ статусів */
+.status-btn-text.active,
+.status-btn-watched.active {
+    filter: none !important;
+    opacity: 1 !important;
+    background: rgba(var(--accent-rgb), 0.15) !important;
+    border: 1px solid var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+/* 3. Збільшуємо висоту інших кнопок статусів (+18%) */
+.status-btn-text {
+    height: auto !important;
+    min-height: 38px !important;
+    padding: 8px 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* 4. Збільшуємо підкладки оцінок (+18% до 14px) */
+.light {
+    height: 14px !important;
+    border-radius: 7px !important;
+}
+
+/* 5. Рейтинги: шрифт +12% */
+.rating-block-label, .rating-block-value {
+    font-size: 1.12em !important;
+}
+
+
+/* 1. Розширюємо саму картку */
+    .card {
+        max-width: 95vw !important; /* Займає майже весь екран */
+    }
+
+    /* 2. Розподіляємо простір: постер тягнеться, права колонка фіксована */
+    .card-top-section {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 32px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+
+    .card-top-left {
+        flex: 1 !important; /* Постер займає весь вільний простір */
+        min-width: 0 !important;
+    }
+
+    .card-top-right {
+        flex: 0 0 480px !important; /* Права частина фіксована */
+        width: 480px !important;
+        max-width: 480px !important;
+    }
+
+    /* 3. Вирівнюємо кнопку "Назад" */
+    .card-bar {
+        padding: 0 16px !important;
+        margin-top: 16px !important;
+        margin-bottom: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+}
+
+/* 4. Трохи збільшуємо шрифт назви для балансу */
+.card-top-right .title {
+    font-size: 2.2rem !important;
+}
+
+
+/* 1. Розширюємо саму картку */
+    .card {
+        max-width: 95vw !important; /* Займає майже весь екран */
+    }
+
+    /* 2. Розподіляємо простір: постер тягнеться, права колонка фіксована */
+    .card-top-section {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 32px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+
+    .card-top-left {
+        flex: 1 !important; /* Постер займає весь вільний простір */
+        min-width: 0 !important;
+    }
+
+    .card-top-right {
+        flex: 0 0 480px !important; /* Права частина фіксована */
+        width: 480px !important;
+        max-width: 480px !important;
+    }
+
+    /* 3. Вирівнюємо кнопку "Назад" */
+    .card-bar {
+        padding: 0 16px !important;
+        margin-top: 16px !important;
+        margin-bottom: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+}
+
+/* 4. Трохи збільшуємо шрифт назви для балансу */
+.card-top-right .title {
+    font-size: 2.2rem !important;
+}
+
+
+/* --- ЗБІЛЬШЕННЯ КНОПОК ТА ОЦІНОК (+18%) --- */
+/* Підкладки оцінок */
+.light {
+    height: 14px !important;
+    border-radius: 7px !important;
+}
+
+/* Кнопки статусів */
+.status-btn-text, .status-btn-watched {
+    min-height: 38px !important;
+    padding: 8px 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Шрифт оцінок */
+.rating-block-label, .rating-block-value {
+    font-size: 1.12em !important;
+}
+
+
+/* --- Історія пошуку --- */
+.ac-header {
+    padding: 12px 16px 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+.ac-history {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    color: var(--text-secondary) !important;
+}
+.ac-history:hover {
+    color: var(--text) !important;
+}
+.ac-history svg {
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+
+/* ========================================================= */
+/* ЧИСТА ВЕРСТКА КАРТКИ (DESKTOP)                            */
+/* ========================================================= */
+
+@media (min-width: 900px) {
+    /* 1. Розмір картки */
+    #overlay #card {
+        max-width: 95vw !important;
+        width: 95vw !important;
+    }
+
+    /* 2. Ідеальна сітка (Grid) замість Flex */
+    #overlay #card .card-top-section {
+        display: grid !important;
+        grid-template-columns: 1fr 480px !important; /* Ліва тягнеться, права фіксована */
+        gap: 40px !important;
+        align-items: start !important;
+        margin-top: 20px !important; /* Опускаємо весь контент */
+        padding-bottom: 20px !important;
+    }
+
+    /* 3. Скидаємо зайві маргіни всередині */
+    #overlay #card .card-top-left,
+    #overlay #card .card-top-right,
+    #overlay #card .card-hero,
+    #overlay #card .action-row-top {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        width: 100% !important;
+    }
+
+    /* 4. Кнопка "Назад" (Абсолютна, поверх постера) */
+    #overlay #card .card-bar {
+        position: absolute !important;
+        top: 34px !important; /* Вирівняно з контентом */
+        left: 24px !important;
+        z-index: 100 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    #overlay #card .card-x {
+        width: 44px !important;
+        height: 44px !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #fff !important;
+        font-size: 20px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    }
+
+    /* 5. Розміри шрифтів (згідно з останніми правками) */
+    #overlay #card .card-top-right .title {
+        font-size: 2.92rem !important; /* Назва +10% */
+    }
+    
+    #overlay #card .card-top-right .meta-details {
+        font-size: 0.81rem !important; /* Рік/жанри -15% */
+    }
+    
+    #overlay #card .card-top-right .rating-badge,
+    #overlay #card .card-top-right .status-btn-watched {
+        font-size: 0.945rem !important; /* Рейтинги -10% */
+    }
+    
+    #overlay #card .card-top-right .status-btn-text {
+        font-size: 0.945rem !important; /* Статуси -10% */
+    }
+    
+    #overlay #card .card-top-right .overview {
+        font-size: 14.6px !important; /* Опис +10% */
+    }
+    
+    #overlay #card .card-top-right .btn-read-more {
+        font-size: 13.6px !important; /* Читати далі +10% */
+    }
+}
+
+/* --- ГЛОБАЛЬНІ СТИЛІ (не залежать від ширини екрану) --- */
+/* Кнопки статусів */
+.status-btn-text, .status-btn-watched {
+    min-height: 38px !important;
+    padding: 8px 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Чорно-білі неактивні статуси */
+.status-btn-text:not(.active),
+.status-btn-watched:not(.active) {
+    filter: grayscale(100%) opacity(0.4) !important;
+    background: transparent !important;
+    border: 1px solid var(--bg-3) !important;
+    color: var(--text-muted) !important;
+}
+
+/* Кольорові активні статуси */
+.status-btn-text.active,
+.status-btn-watched.active {
+    filter: none !important;
+    opacity: 1 !important;
+    background: rgba(var(--accent-rgb), 0.15) !important;
+    border: 1px solid var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+/* Оцінки */
+.light { 
+    height: 14px !important; 
+    border-radius: 7px !important; 
+}
+.rating-block-label, .rating-block-value { 
+    font-size: 1.12em !important; 
+}
+
+
+/* ========================================================= */
+/* ЖОРСТКЕ ОБМЕЖЕННЯ РОЗМІРІВ ДЛЯ APK ТА ВУЗЬКИХ ЕКРАНІВ     */
+/* ========================================================= */
+
+@media (min-width: 900px) {
+    /* 1. Картка ніколи не ширша за екран */
+    #overlay #card {
+        max-width: 95vw !important;
+        width: 95vw !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    /* 2. Сітка: ліва тягнеться, права МОЖЕ звужуватися */
+    #overlay #card .card-top-section {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 480px) !important;
+        gap: 24px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 3. Всі великі блоки всередині мають поважати межі */
+    #overlay #card .card-top-left,
+    #overlay #card .card-top-right,
+    #overlay #card .card-hero,
+    #overlay #card .action-row-top {
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    /* 4. Кнопки зверху - дозволяємо переноситись */
+    #overlay #card .action-row-top {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+
+    /* 5. Робимо кнопки "Лампа" та "UAKINO" гнучкими */
+    #overlay #card .action-btn-main {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        padding: 0 10px !important;
+    }
+    
+    /* 6. Рядки з рейтингами та статусами */
+    #overlay #card .ratings-row,
+    #overlay #card .status-section-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+}
+
+
+/* ========================================================= */
+/* ГЛОБАЛЬНИЙ ФІКС ПЕРЕПОВНЕННЯ (ДЛЯ APK ТА МОБІЛЬНИХ)       */
+/* ========================================================= */
+
+/* 1. Забороняємо горизонтальний скрол на рівні всього додатку */
+html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+}
+
+/* 2. Картка ніколи не ширша за екран */
+#overlay #card {
+    max-width: 100vw !important;
+    width: 100vw !important;
+    overflow-x: hidden !important;
+}
+
+/* 3. Внутрішній скрол-контейнер має нормальні відступи */
+#overlay #card .card-scroll {
+    padding: 16px !important;
+    box-sizing: border-box !important;
+}
+
+/* 4. Секція з постером та текстом */
+#overlay #card .card-top-section {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important; /* На вузьких екранах - в стовпчик */
+    gap: 20px !important;
+}
+
+@media (min-width: 900px) {
+    #overlay #card .card-top-section {
+        flex-direction: row !important; /* На широких - в ряд */
+    }
+}
+
+/* 5. Всі блоки всередині строго по ширині батька */
+#overlay #card .card-top-left,
+#overlay #card .card-top-right,
+#overlay #card .card-hero {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important; /* Дозволяємо flex/grid елементам стискатися */
+}
+
+/* 6. Рядок з кнопками (Лампа, UAKINO, Серце) */
+#overlay #card .action-row-top {
+    display: flex !important;
+    flex-wrap: wrap !important; /* Дозволяємо перенос */
+    gap: 8px !important;
+    width: 100% !important;
+}
+
+/* 7. Кнопки не більші за свій контейнер */
+#overlay #card .action-btn-main {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+/* 8. Рядки статусів та рейтингів */
+#overlay #card .ratings-row,
+#overlay #card .status-section-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* === MCM Snow v3 (2-layer parallax, GPU-composited) ================= */
+/* Налаштування інтенсивності: додавай/прибирай рядки radial-gradient.  */
+/* Швидкість: змінюй duration в animation (менше = швидше).             */
+
+.mcm-snow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;   /* не бере участі в hit-testing */
+  z-index: 1;
+  overflow: hidden;       /* ховає виступи шарів за viewport */
+}
+
+.mcm-snow::before,
+.mcm-snow::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Витягуємо шар на TILE_SIZE вгору і вниз — щоб анімація була безшовною */
+  top: calc(-1 * var(--tile, 600px));
+  bottom: calc(-1 * var(--tile, 600px));
+  background-repeat: repeat;
+  will-change: transform;  /* явно кажемо браузеру: буде анімація transform */
+  pointer-events: none;
+}
+
+/* ─── ДАЛЕКИЙ ШАР: маленькі, тьмяні, повільні ─── */
+.mcm-snow::before {
+  --tile: 500px;
+  background-size: 500px 500px;
+  opacity: 0.55;
+  animation: mcm-snow-far 45s linear infinite;
+  background-image:
+    radial-gradient(1px 1px at  40px  90px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1px 1px at 180px  30px, rgba(255,255,255,0.75), transparent),
+    radial-gradient(1px 1px at 320px 210px, rgba(255,255,255,0.70), transparent),
+    radial-gradient(1px 1px at 100px 380px, rgba(255,255,255,0.80), transparent),
+    radial-gradient(1px 1px at 430px 450px, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at 250px 300px, rgba(255,255,255,0.75), transparent),
+    radial-gradient(1px 1px at 480px 130px, rgba(255,255,255,0.70), transparent),
+    radial-gradient(1px 1px at  30px 260px, rgba(255,255,255,0.80), transparent),
+    radial-gradient(1px 1px at 380px  60px, rgba(255,255,255,0.70), transparent),
+    radial-gradient(1px 1px at 200px 470px, rgba(255,255,255,0.75), transparent);
+}
+
+/* ─── БЛИЖНІЙ ШАР: більші, яскраві, швидші ─── */
+.mcm-snow::after {
+  --tile: 600px;
+  background-size: 600px 600px;
+  opacity: 0.9;
+  animation: mcm-snow-near 22s linear infinite;
+  background-image:
+    radial-gradient(2.5px 2.5px at  70px 120px, rgba(255,255,255,0.95), transparent),
+    radial-gradient(2px   2px   at 260px  50px, rgba(255,255,255,0.90), transparent),
+    radial-gradient(2px   2px   at 410px 230px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(3px   3px   at 150px 340px, rgba(255,255,255,0.95), transparent),
+    radial-gradient(2px   2px   at 500px 470px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2.5px 2.5px at 560px 200px, rgba(255,255,255,0.90), transparent),
+    radial-gradient(2px   2px   at 330px 520px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px   2px   at  50px 440px, rgba(255,255,255,0.90), transparent),
+    radial-gradient(2.5px 2.5px at 470px 340px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px   2px   at 220px 260px, rgba(255,255,255,0.90), transparent);
+}
+
+@keyframes mcm-snow-far {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, 500px, 0); }
+}
+@keyframes mcm-snow-near {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, 600px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mcm-snow::before,
+  .mcm-snow::after { animation: none; }
+}
+/* === /MCM Snow v3 === */

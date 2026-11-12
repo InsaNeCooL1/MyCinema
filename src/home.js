@@ -131,7 +131,19 @@ async function buildSmartRecommendations(seeds, mood) {
 }
 
 const RECS_CACHE = 'mycinema.recs.v2';
-const RECS_TTL = 6 * 60 * 60 * 1000;
+const GEN_CACHE = 'mycinema.home.general.v1';
+const GEN_TTL = 24 * 60 * 60 * 1000;
+function readGeneralCache() {
+  try { const c = JSON.parse(localStorage.getItem(GEN_CACHE)); if (c && Date.now() - c.ts < GEN_TTL) return c.data; } catch {}
+  return null;
+}
+function writeGeneralCache(g) {
+  try {
+    if (!Object.values(g).some(a => a && a.length)) return; // не кешуємо порожній результат
+    localStorage.setItem(GEN_CACHE, JSON.stringify({ ts: Date.now(), data: g }));
+  } catch {}
+}
+const RECS_TTL = 24 * 60 * 60 * 1000; // 1 раз на добу
 
 function getSeeds() {
   return Object.values(lib).map(x => ({ ...x, avg: computeItemRating(x).avg }))
@@ -288,6 +300,7 @@ async function loadHome() {
   const taste = computeTasteVector();
   const sig = (seeds.map(s => s.key + ':' + s.avg.toFixed(1)).join('|')) + '|mood:' + (state.home.mood || 'any');
 
+  if (!state.home.general) { const gc = readGeneralCache(); if (gc) state.home.general = gc; }
   if (!state.home.general) {
     try {
       const [trM, newM, topM, trT, newT, topT] = await Promise.all([
@@ -306,6 +319,7 @@ async function loadHome() {
         newTV: newT.results.map(r => normalizeItem({ ...r, media_type: 'tv' })).filter(x => x.poster).slice(0, 10),
         topTV: topT.results.map(r => normalizeItem({ ...r, media_type: 'tv' })).filter(x => x.poster).slice(0, 10)
       };
+      writeGeneralCache(state.home.general);
     } catch (e) { console.error(e); }
   }
 

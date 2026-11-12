@@ -230,7 +230,7 @@ function removeFromLibrary(key) {
     lib[key].updated = Date.now();
     saveNow();
   } else {
-    delete lib[key];
+    removeLibItem(key);
     saveNow();
   }
   refresh();

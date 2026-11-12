@@ -83,7 +83,7 @@ function hasWatched(item) {
 }
 function tasteDecay(updated) {
   const days = (Date.now() - (updated || Date.now())) / (24 * 60 * 60 * 1000);
-  return Math.pow(0.98, days); // -3% щодня
+  return Math.pow(0.97, days); // -3% щодня
 }
 function averagedSeasonRatings(item) {
   const sr = item.seasonRatings || {};
@@ -156,36 +156,82 @@ function load() {
   }
   return data;
 }
+// ---- tombstones (видалені тайтли) ----
+const LS_DEL = 'mycinema.deleted';
+const TOMBSTONE_TTL = 90 * 24 * 60 * 60 * 1000;
+let libTombstones = (() => { try { return JSON.parse(localStorage.getItem(LS_DEL)) || {}; } catch { return {}; } })();
+
 function saveLocalOnly() {
-  try { localStorage.setItem(LS, JSON.stringify(lib)); }
-  catch (e) { console.error(e); showSyncToast('⚠ Сховище переповнене'); }
+  try {
+    localStorage.setItem(LS, JSON.stringify(lib));
+    localStorage.setItem(LS_DEL, JSON.stringify(libTombstones));
+  } catch (e) { console.error(e); showSyncToast('⚠ Сховище переповнене'); }
 }
+
+// Єдина точка видалення тайтлу з lib
+function removeLibItem(key) {
+  delete lib[key];
+  libTombstones[key] = Date.now();
+}
+
+function mergeLibraries(localItems, localDel, cloudItems, cloudDel) {
+  const now = Date.now();
+  const del = { ...cloudDel };
+  for (const [k, t] of Object.entries(localDel)) if (!(del[k] >= t)) del[k] = t;
+  for (const k of Object.keys(del)) if (now - del[k] > TOMBSTONE_TTL) delete del[k];
+
+  const items = {};
+  for (const k of new Set([...Object.keys(localItems), ...Object.keys(cloudItems)])) {
+    const a = localItems[k], b = cloudItems[k];
+    const win = !a ? b : !b ? a : ((b.updated || 0) > (a.updated || 0) ? b : a);
+    if (del[k] && del[k] >= (win.updated || 0)) continue; // видалено після останньої правки
+    items[k] = win;
+  }
+  return { items, deleted: del };
+}
+
+// Читає хмару, зливає з локальним, застосовує і пише назад. true — якщо локальне змінилось.
+async function reconcileWithCloud() {
+  const ref = window.firestoreDoc(window.firestoreDB, 'libraries', window.currentUser.uid);
+  const snap = await window.firestoreGetDoc(ref);
+  const cloud = snap.exists() ? snap.data() : {};
+  const merged = mergeLibraries(lib, libTombstones, cloud.items || {}, cloud.deleted || {});
+
+  const changedLocal = JSON.stringify(merged.items) !== JSON.stringify(lib);
+  lib = merged.items;
+  libTombstones = merged.deleted;
+  saveLocalOnly();
+
+  await window.firestoreSetDoc(ref, {
+    items: lib, deleted: libTombstones, updatedAt: new Date(), email: window.currentUser.email
+  });
+  return changedLocal;
+}
+
 let _saveTimer = null;
 function save() { saveLocalOnly(); clearTimeout(_saveTimer); _saveTimer = setTimeout(saveToCloud, 800); }
 function saveNow() { saveLocalOnly(); clearTimeout(_saveTimer); return saveToCloud(); }
-async function saveToCloud() {
-  if (!window.currentUser || !window.firebaseReady) return;
-  try {
-    setSyncStatus('saving', 'Зберігаю...');
-    const ref = window.firestoreDoc(window.firestoreDB, 'libraries', window.currentUser.uid);
-    await window.firestoreSetDoc(ref, { items: lib, updatedAt: new Date(), email: window.currentUser.email });
-    setSyncStatus('saved', '✓');
-  } catch (e) { setSyncStatus('error', '⚠ Помилка'); console.error(e); }
+
+let _syncing = Promise.resolve();
+function saveToCloud() {
+  if (!window.currentUser || !window.firebaseReady) return Promise.resolve();
+  _syncing = _syncing.then(async () => { // черга, щоб запити не перетиналися
+    try {
+      setSyncStatus('saving', 'Зберігаю...');
+      const changed = await reconcileWithCloud();
+      if (changed) refresh();
+      setSyncStatus('saved', '✓');
+    } catch (e) { setSyncStatus('error', '⚠ Помилка'); console.error(e); }
+  });
+  return _syncing;
 }
+
 async function syncFromCloud() {
   if (!window.currentUser || !window.firebaseReady) return;
-  try {
-    setSyncStatus('saving', 'Синхронізую...');
-    const ref = window.firestoreDoc(window.firestoreDB, 'libraries', window.currentUser.uid);
-    const snap = await window.firestoreGetDoc(ref);
-    if (snap.exists()) {
-      const cloudItems = snap.data().items || {};
-      if (Object.keys(cloudItems).length > 0) { lib = cloudItems; saveLocalOnly(); refresh(); }
-      setSyncStatus('saved', '✓');
-    } else if (Object.keys(lib).length > 0) await saveToCloud();
-    if (Object.keys(lib).length === 0 && !localStorage.getItem('onboardingDone')) startOnboarding();
-  } catch (e) { setSyncStatus('error', '⚠'); }
+  await saveToCloud(); // читання + злиття + запис
+  if (Object.keys(lib).length === 0 && !localStorage.getItem('onboardingDone')) startOnboarding();
 }
+
 function setSyncStatus(status, text) {
   syncIndicator.className = 'sync-indicator visible ' + status;
   syncIndicator.textContent = text;

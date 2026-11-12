@@ -5,19 +5,60 @@ function hideAutocomplete() {
   autocomplete.replaceChildren(); 
 }
 
+function addToHistory(q) {
+  let hist = JSON.parse(localStorage.getItem('mycinema.search_history')) || [];
+  hist = hist.filter(x => x !== q); // Видаляємо дублікат, якщо вже був
+  hist.unshift(q); // Додаємо на початок
+  if (hist.length > 10) hist = hist.slice(0, 10); // Обмежуємо 10 записами
+  localStorage.setItem('mycinema.search_history', JSON.stringify(hist));
+}
+
+function showHistory() {
+  const hist = JSON.parse(localStorage.getItem('mycinema.search_history')) || [];
+  if (!hist.length) { hideAutocomplete(); return; }
+  
+  autocomplete.replaceChildren();
+  autocomplete.classList.remove("hidden");
+  
+  autocomplete.append(el("div", "ac-header", "Останні запити"));
+  
+  hist.forEach(q => {
+    const row = el("div", "ac-item ac-history");
+    row.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> <span>${q}</span>`;
+    row.addEventListener("click", () => {
+      input.value = q;
+      performFullSearch();
+    });
+    autocomplete.append(row);
+  });
+  
+  const clearBtn = el("div", "ac-footer", "Очистити історію");
+  clearBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    localStorage.removeItem('mycinema.search_history');
+    hideAutocomplete();
+  });
+  autocomplete.append(clearBtn);
+}
+
 function performFullSearch() {
   const q = input.value.trim();
   if (!q) return;
+  addToHistory(q); // <-- Додаємо в історію при пошуку
   hideAutocomplete();
   state.filter.query = q;
   if (state.tab !== "filter") setTab("filter"); else renderFilter();
 }
 
 let acTimer;
+input.addEventListener("focus", () => {
+  if (!input.value.trim()) showHistory();
+});
+
 input.addEventListener("input", () => {
   clearTimeout(acTimer);
   const q = input.value.trim();
-  if (!q) { hideAutocomplete(); return; }
+  if (!q) { showHistory(); return; }
   acTimer = setTimeout(async () => {
     try {
       const data = await tmdbFetch(`/search/multi?language=uk-UA&query=${encodeURIComponent(q)}&include_adult=false`);
@@ -56,7 +97,7 @@ function showAutocomplete(rawResults, query) {
     info.append(el("div", "ac-title", p.name));
     info.append(el("div", "ac-meta ac-type-person", "Актор/Акторка"));
     row.append(info);
-    row.addEventListener("click", () => { hideAutocomplete(); openPerson(p.id, p); });
+    row.addEventListener("click", () => { addToHistory(query); hideAutocomplete(); openPerson(p.id, p); });
     autocomplete.append(row);
   }
   
@@ -69,7 +110,7 @@ function showAutocomplete(rawResults, query) {
     if (item.tmdbRating) meta += ` · ${item.tmdbRating.toFixed(1)}`;
     info.append(el("div", "ac-meta", meta));
     row.append(info);
-    row.addEventListener("click", () => { hideAutocomplete(); openCard(item); });
+    row.addEventListener("click", () => { addToHistory(query); hideAutocomplete(); openCard(item); });
     autocomplete.append(row);
   }
   

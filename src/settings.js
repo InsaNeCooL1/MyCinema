@@ -5,6 +5,7 @@ function openSettings() {
   closeSidebar();
   renderSettingsSwatches();
   document.getElementById('poster-bg-toggle').checked = settings.posterBg;
+  injectSnowToggle();
   document.getElementById('settings-modal').classList.add('open');
 }
 
@@ -77,6 +78,7 @@ function importLibrary() {
       if (typeof data !== 'object' || Array.isArray(data)) throw new Error('Невірний формат');
       const count = Object.keys(data).length;
       if (!confirm('Імпортувати ' + count + ' тайтлів? Поточні буде замінено.')) return;
+      for (const k of Object.keys(lib)) if (!(k in data)) libTombstones[k] = Date.now();
       lib = data;
       await saveNow();
       refresh();
@@ -170,4 +172,38 @@ function skipOnboarding() {
     localStorage.setItem('onboardingDone', 'true');
     document.getElementById('onboarding-modal').style.display = 'none';
   }
+}
+
+
+// ========== SNOW TOGGLE (injected dynamically, no HTML in index.html) ==========
+function injectSnowToggle() {
+  const modal = document.getElementById('settings-modal');
+  if (!modal) return;
+  if (modal.querySelector('#snow-toggle')) return;
+
+  const sections = modal.querySelectorAll('.settings-section');
+  let target = null;
+  sections.forEach(function (sec) {
+    const title = sec.querySelector('.settings-section-title');
+    if (title && /Вигляд/i.test(title.textContent)) target = sec;
+  });
+  if (!target) return;
+
+  const label = document.createElement('label');
+  label.className = 'settings-toggle';
+
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.id = 'snow-toggle';
+  input.checked = (typeof SnowFeature !== 'undefined') ? SnowFeature.isEnabled() : true;
+  input.addEventListener('change', function () {
+    if (typeof SnowFeature !== 'undefined') SnowFeature.setEnabled(this.checked);
+  });
+
+  const span = document.createElement('span');
+  span.textContent = '❄️ Сніг на фоні';
+
+  label.appendChild(input);
+  label.appendChild(span);
+  target.appendChild(label);
 }
