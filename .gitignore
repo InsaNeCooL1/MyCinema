@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+www/
+dist/
+app/www/
+web/dist/
+
+# Android build
+android/build/
+android/app/build/
+android/.gradle/
+app/android/build/
+app/android/app/build/
+app/android/.gradle/
+*.apk
+*.aab
+
+# Capacitor
+.capacitor/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Env
+.env
+.env.local
+
+# Backups
+*.tgz
+*.tar.gz
