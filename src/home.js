@@ -35,7 +35,7 @@ function getSeeds() {
   if (!candidates.length) return [];
 
   // 50% свіжі оцінки (останні дії) + 50% якірні (найсильніша любов)
-  const fresh = [...candidates].sort((a, b) => (b.updated || 0) - (a.updated || 0)).slice(0, 4);
+  const fresh = [...candidates].sort((a, b) => (b.updated || 0) - (a.updated || 0)).slice(0, 3);
   const anchors = [...candidates].sort((a, b) => b.strength - a.strength || (b.updated || 0) - (a.updated || 0));
 
   const picked = [];
@@ -44,7 +44,7 @@ function getSeeds() {
     if (!seen.has(s.key)) { seen.add(s.key); picked.push(s); }
   }
   for (const s of anchors) {
-    if (picked.length >= 8) break;
+    if (picked.length >= 5) break;
     if (!seen.has(s.key)) { seen.add(s.key); picked.push(s); }
   }
   return picked;
@@ -55,7 +55,7 @@ function getAntiSeeds() {
     .map(x => ({ ...x, avg: computeItemRating(x).avg }))
     .filter(x => x.id && (x.status === 'dropped' || (x.avg > 0 && x.avg <= 4.5)))
     .sort((a, b) => (a.avg || 3) - (b.avg || 3) || (b.updated || 0) - (a.updated || 0))
-    .slice(0, 4);
+    .slice(0, 2);
 }
 
 function getDominantCriterion(taste) {
@@ -157,7 +157,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     .sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id]) => parseInt(id));
   const topCast = Object.entries(signals.cast)
     .filter(([, sc]) => sc > 0)
-    .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => parseInt(id));
+    .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id]) => parseInt(id));
   const topDirectors = Object.entries(signals.directors)
     .filter(([id]) => !anti.directors[id])
     .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id]) => parseInt(id));
@@ -220,7 +220,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   };
 
   const fetchPromises = [];
-  const pages = [1, 2];
+  const pages = [1];
 
   // Movies & TV Discover за ключовими словами + жанрами
   ['movie', 'tv'].forEach(type => {
@@ -585,7 +585,7 @@ async function loadHome() {
 function recCard(item, allowDismiss) {
   const c = el('div', 'rec-card');
   const wrap = el('div', 'rec-poster-wrap');
-  const p = el('img', 'rec-poster'); p.src = TMDB_IMG + 'w342' + item.poster; p.loading = 'lazy';
+  const p = el('img', 'rec-poster'); p.src = TMDB_IMG + 'w342' + item.poster; p.loading = 'lazy'; p.decoding = 'async';
   wrap.append(p);
   if (allowDismiss && typeof dismissRec === 'function') {
     const disBtn = el('button', 'rec-dismiss', '✕');

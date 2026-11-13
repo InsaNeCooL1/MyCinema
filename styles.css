@@ -2584,3 +2584,36 @@ input#q { padding-right: 44px !important; }
   background: var(--accent);
   color: var(--accent-fg);
 }
+
+/* ========================================================= */
+/* PERF OPTIMIZATION (FPS & MOBILE WEBVIEW)                  */
+/* ========================================================= */
+.rec-dismiss {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(8, 7, 10, .78) !important;
+}
+
+.timeline-items .item {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--bg-1) !important;
+}
+
+.item, .elo-row, .actor-rank-item, .note-card, .series-prog-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 96px;
+}
+
+@media (max-width: 899px) {
+  body::before { display: none !important; }
+  header, .taste-summary, .home-tabs {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+body:has(#overlay.open) .mcm-snow::before,
+body:has(#overlay.open) .mcm-snow::after {
+  animation-play-state: paused !important;
+}

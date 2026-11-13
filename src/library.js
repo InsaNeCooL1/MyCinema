@@ -89,12 +89,16 @@ function renderLibrary() {
   searchInp.className = 'lib-search';
   searchInp.placeholder = 'Пошук по бібліотеці...';
   searchInp.value = state.librarySearch;
+  let libSearchTimer;
   searchInp.addEventListener('input', (e) => {
     state.librarySearch = e.target.value;
     const val = e.target.value;
-    renderLibrary();
-    const newInp = box.querySelector('.lib-search');
-    if (newInp) { newInp.focus(); newInp.value = val; newInp.setSelectionRange(val.length, val.length); }
+    clearTimeout(libSearchTimer);
+    libSearchTimer = setTimeout(() => {
+      renderLibrary();
+      const newInp = box.querySelector('.lib-search');
+      if (newInp) { newInp.focus(); newInp.value = val; newInp.setSelectionRange(val.length, val.length); }
+    }, 150);
   });
   box.append(searchInp);
 
@@ -235,7 +239,7 @@ function createPersonResult(p) {
 function posterEl(r, cls) {
   const tag = r.poster ? "img" : "div";
   const e = el(tag, cls);
-  if (r.poster) { e.src = TMDB_IMG + "w342" + r.poster; e.loading = "lazy"; }
+  if (r.poster) { e.src = TMDB_IMG + "w342" + r.poster; e.loading = "lazy"; e.decoding = "async"; }
   else e.classList.add('poster-empty');
   return e;
 }

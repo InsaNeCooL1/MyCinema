@@ -72,14 +72,25 @@ function toggleNavGroup(groupName, e) {
 
   const topItems = Array.from(nav.querySelectorAll(':scope > .nav-top-item'));
   const desktopMQ = window.matchMedia('(min-width: 900px) and (min-height: 600px)');
+  let hasMoved = false;
 
   function updatePriorityNav() {
-    // Повертаємо всі пункти назад у панель в початковому порядку
-    topItems.forEach(item => nav.insertBefore(item, moreGroup));
+    if (!desktopMQ.matches) {
+      if (hasMoved) {
+        topItems.forEach(item => nav.insertBefore(item, moreGroup));
+        moreGroup.style.display = 'none';
+        moreGroup.classList.remove('open', 'has-active');
+        hasMoved = false;
+      }
+      return;
+    }
+
+    if (hasMoved) {
+      topItems.forEach(item => nav.insertBefore(item, moreGroup));
+      hasMoved = false;
+    }
     moreGroup.style.display = 'none';
     moreGroup.classList.remove('open', 'has-active');
-
-    if (!desktopMQ.matches) return;
 
     const avail = nav.clientWidth;
     if (!avail) return;
@@ -108,7 +119,7 @@ function toggleNavGroup(groupName, e) {
     }
 
     for (let i = overflowStart; i < topItems.length; i++) {
-      moreMenu.appendChild(topItems[i]);
+      moreMenu.appendChild(topItems[i]); hasMoved = true;
     }
 
     if (moreMenu.querySelector('.nav-item.active')) {

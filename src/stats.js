@@ -55,7 +55,9 @@ function buildMetaLoaderBanner() {
 
   const loader = el('div', 'cast-loader');
   if (state.stats.castLoading) {
-    loader.append(el('div', 'cast-loader-text', `Оновлюю метадані (актори, час, стрімінги): ${state.stats.castProgress.done}/${state.stats.castProgress.total}...`));
+    const lt = el('div', 'cast-loader-text', `Оновлюю метадані (актори, час, стрімінги): ${state.stats.castProgress.done}/${state.stats.castProgress.total}...`);
+    lt.id = 'meta-loader-progress-text';
+    loader.append(lt);
   } else {
     loader.append(el('div', 'cast-loader-text', `Для ${missing.length} з ${items.length} тайтлів ще немає повних метаданих (час, стрімінги або актори)`));
     const btn = el('button', 'cast-loader-btn', '📥 Завантажити метадані з TMDB');
@@ -91,7 +93,8 @@ async function fetchAllMissingMeta() {
       } catch {}
     }));
     state.stats.castProgress.done = Math.min(missing.length, i + batchSize);
-    if (['actors', 'series', 'streaming', 'detail'].includes(state.stats.tab)) renderStatistics();
+    const lt = document.getElementById('meta-loader-progress-text');
+    if (lt) lt.textContent = `Оновлюю метадані (актори, час, стрімінги): ${state.stats.castProgress.done}/${state.stats.castProgress.total}...`;
     await new Promise(r => setTimeout(r, 200));
   }
   save();
