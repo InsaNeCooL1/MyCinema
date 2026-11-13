@@ -551,30 +551,70 @@ function applyCloudAppearance(app) {
   return true;
 }
 
+// [SYNC-SUPABASE]
 async function reconcileWithCloud() {
-  const ref = window.firestoreDoc(window.firestoreDB, 'libraries', window.currentUser.uid);
-  const snap = await window.firestoreGetDoc(ref);
-  const cloud = snap.exists() ? snap.data() : {};
-  const merged = mergeLibraries(lib, libTombstones, cloud.items || {}, cloud.deleted || {});
+  const uid = window.currentUser.uid;
+  
+  // 1. Читаємо хмару
+  const { data: cloudItems, error: err1 } = await window.supabase
+    .from('user_library').select('*').eq('user_id', uid);
+  if (err1) throw err1;
 
+  const { data: profile, error: err2 } = await window.supabase
+    .from('profiles').select('*').eq('id', uid).single();
+  if (err2 && err2.code !== 'PGRST116') throw err2; // PGRST116 = no rows
+
+  // 2. Формуємо об'єкт cloudLib
+  const cloudLib = {};
+  (cloudItems || []).forEach(row => { cloudLib[row.item_key] = row.user_data; });
+  
+  const cloudExtras = profile?.settings || {};
+
+  // 3. Зливаємо
+  const merged = mergeLibraries(lib, libTombstones, cloudLib, cloudExtras.deleted || {});
   const libChanged = JSON.stringify(merged.items) !== JSON.stringify(lib);
+  
   lib = merged.items;
   libTombstones = merged.deleted;
   saveLocalOnly();
 
-  const extrasChanged = mergeCloudExtras(cloud);
+  const extrasChanged = mergeCloudExtras(cloudExtras);
 
-  await window.firestoreSetDoc(ref, {
-    items: lib,
-    deleted: libTombstones,
-    dismissed: dismissedRecs,
-    dismissedClearedAt,
-    actorAdjust,
-    actorAdjustTs,
-    appearance: getAppearancePayload(),
-    updatedAt: new Date(),
-    email: window.currentUser.email
+  // 4. Пишемо назад (Upsert)
+  const upsertData = Object.entries(lib).map(([key, val]) => ({
+    user_id: uid,
+    item_key: key,
+    user_data: val
+  }));
+
+  if (upsertData.length > 0) {
+    const { error: errUp } = await window.supabase
+      .from('user_library')
+      .upsert(upsertData, { onConflict: 'user_id,item_key' });
+    if (errUp) throw errUp;
+  }
+
+  // Видаляємо tombstones з бази
+  const deletedKeys = Object.keys(libTombstones);
+  if (deletedKeys.length > 0) {
+    await window.supabase.from('user_library').delete().eq('user_id', uid).in('item_key', deletedKeys);
+  }
+
+  const { error: errProf } = await window.supabase.from('profiles').upsert({
+    id: uid,
+    email: window.currentUser.email,
+    settings: {
+      dismissed: dismissedRecs,
+      dismissedClearedAt,
+      actorAdjust,
+      actorAdjustTs,
+      appearance: getAppearancePayload(),
+      deleted: libTombstones
+    },
+    updated_at: new Date().toISOString()
   });
+  if (errProf) throw errProf;
+
   return libChanged || extrasChanged;
 }
 

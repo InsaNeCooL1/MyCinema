@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>MyCinema Supabase Migration</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body style="background:#08070a; color:#f2eee9; font-family:sans-serif; text-align:center; padding:50px;">
+  <h1>Міграція даних у Supabase</h1>
+  <p style="color:#8d877f; margin-bottom: 30px;">Оберіть ваш JSON-файл бекапу. Скрипт завантажить дані в нову хмару.</p>
+  
+  <input type="file" id="fileInput" accept=".json" style="display:none;">
+  <button id="btn" style="padding: 16px 32px; font-size: 18px; cursor: pointer; background: #ffb86c; color: #1a1207; border: none; border-radius: 12px; font-weight: bold;">Обрати JSON та Мігрувати</button>
+  <div id="status" style="margin-top: 20px; font-size: 16px; color: #9de5c3;"></div>
+
+  <script>
+    const supabaseUrl = 'https://ssvfsjnzbrgvnknixejf.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzdmZzam56YnJndm5rbml4ZWpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1OTQ3MjksImV4cCI6MjExMDE3MDcyOX0.riSxxrcFozFlSQbjdFC8ZYOccjSeFv89HV2yIVzJBeE';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    document.getElementById('btn').onclick = () => document.getElementById('fileInput').click();
+
+    document.getElementById('fileInput').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const status = document.getElementById('status');
+      status.textContent = 'Читаємо файл...';
+      
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const lib = data.mycinema_library || {};
+        
+        status.textContent = 'Авторизація...';
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !authData.user) throw new Error('Спочатку увійдіть в акаунт через основний застосунок (localhost:8080)!');
+        
+        const uid = authData.user.id;
+        status.textContent = 'Завантажуємо ' + Object.keys(lib).length + ' тайтлів у хмару...';
+        
+        const upsertData = Object.keys(lib).map(key => ({
+          user_id: uid,
+          item_key: key,
+          user_data: lib[key]
+        }));
+        
+        for (let i = 0; i < upsertData.length; i += 100) {
+          const chunk = upsertData.slice(i, i + 100);
+          const { error } = await supabase.from('user_library').upsert(chunk, { onConflict: 'user_id,item_key' });
+          if (error) throw error;
+          status.textContent = 'Завантажено ' + Math.min(i + 100, upsertData.length) + ' з ' + upsertData.length;
+        }
+
+        // Зберігаємо extras
+        const settings = {
+          dismissed: data.mycinema_dismissed || {},
+          actorAdjust: data.mycinema_actorAdjustments || {},
+          deleted: data.mycinema_deleted || {}
+        };
+        await supabase.from('profiles').upsert({ id: uid, settings });
+
+        status.textContent = '✅ Успішно мігровано ' + upsertData.length + ' тайтлів! Можете повертатися в застосунок.';
+        status.style.color = '#9de5c3';
+      } catch (err) {
+        status.textContent = '❌ Помилка: ' + err.message;
+        status.style.color = '#ff5c5c';
+      }
+    };
+  </script>
+</body>
+</html>

@@ -144,20 +144,26 @@
   </div>
 </div>
 
+<!-- [AUTH-MODAL-V2] -->
 <div id="auth-modal">
   <div class="auth-box">
-    <h2>Вхід до MyCinema</h2>
-    <button class="auth-btn google" onclick="loginWithGoogle()">
-      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-      Увійти через Google
-    </button>
-    <div class="auth-divider">або через Email</div>
+    <h2 id="auth-title">Вхід до MyCinema</h2>
+    
     <input type="email" id="auth-email" class="auth-input" placeholder="Email" autocomplete="email">
+    <input type="text" id="auth-username" class="auth-input" placeholder="Логін (тільки для реєстрації)" style="display:none;" autocomplete="username">
     <input type="password" id="auth-password" class="auth-input" placeholder="Пароль" autocomplete="current-password">
+    
     <div id="auth-error" class="auth-error"></div>
+    
     <button id="btn-login" class="auth-btn primary" onclick="loginUser()">Увійти</button>
     <button id="btn-register" class="auth-btn secondary" onclick="registerUser()">Створити новий акаунт</button>
-    <button class="auth-btn secondary" onclick="closeAuthModal()" style="margin-top:8px;">Продовжити без входу</button>
+    
+    <div id="auth-links" style="display:flex; justify-content:space-between; margin-top:8px;">
+      <button class="auth-btn secondary" onclick="switchAuthMode('login')" id="btn-back-login" style="display:none; width:auto; padding:0; font-size:12px;">← Назад до входу</button>
+      <button class="auth-btn secondary" onclick="switchAuthMode('forgot')" id="btn-forgot" style="width:auto; padding:0; font-size:12px; margin-left:auto;">Забули пароль?</button>
+    </div>
+
+    <button class="auth-btn secondary" onclick="closeAuthModal()" style="margin-top:16px; border-top:1px solid var(--bg-3); padding-top:12px;">Продовжити без входу</button>
   </div>
 </div>
 
@@ -175,67 +181,149 @@
 
 
 
-<!-- ============ FIREBASE MODULE ============ -->
+<!-- ============ SUPABASE MODULE ============ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCEFo7IwNEGAzkVnhtPXRJuxLgIksd187Q",
-  authDomain: "mucinema-d9595.firebaseapp.com",
-  projectId: "mucinema-d9595",
-  storageBucket: "mucinema-d9595.firebasestorage.app",
-  messagingSenderId: "353318067827",
-  appId: "1:353318067827:web:e5c58dc9c67ad354d2d406",
-  measurementId: "G-L14CFME65J"
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-window.firestoreDB = db;
-window.firestoreDoc = doc;
-window.firestoreGetDoc = getDoc;
-window.firestoreSetDoc = setDoc;
+const supabaseUrl = 'https://ssvfsjnzbrgvnknixejf.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzdmZzam56YnJndm5rbml4ZWpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1OTQ3MjksImV4cCI6MjExMDE3MDcyOX0.riSxxrcFozFlSQbjdFC8ZYOccjSeFv89HV2yIVzJBeE';
+const supabase = createClient(supabaseUrl, supabaseKey);
+window.supabase = supabase;
 
-window.loginWithGoogle = async () => {
-  const provider = new GoogleAuthProvider();
-  const err = document.getElementById('auth-error'); err.textContent = '';
-  try { await signInWithRedirect(auth, provider); }
-  catch (e) { err.textContent = e.code === 'auth/unauthorized-domain' ? "Домен не авторизовано." : "Помилка Google: " + e.message; }
-};
-getRedirectResult(auth).then((r) => { if (r) document.getElementById('auth-modal').style.display = 'none'; })
-  .catch((error) => { const err = document.getElementById('auth-error'); if (err) err.textContent = "Помилка входу: " + error.message; });
+
 
 window.loginUser = async () => {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
   const err = document.getElementById('auth-error'); err.textContent = '';
   if (!email || !password) { err.textContent = "Введіть email та пароль"; return; }
-  try { document.getElementById('btn-login').textContent = 'Вхід...'; await signInWithEmailAndPassword(auth, email, password); }
-  catch (e) { err.textContent = "Невірний email або пароль"; document.getElementById('btn-login').textContent = 'Увійти'; }
+  
+  try { 
+    document.getElementById('btn-login').textContent = 'Вхід...'; 
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  } catch (e) { 
+    err.textContent = e.message === 'Invalid login credentials' ? "Невірний email або пароль" : "Помилка: " + e.message; 
+    document.getElementById('btn-login').textContent = 'Увійти'; 
+  }
 };
 
 window.registerUser = async () => {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
+  const username = document.getElementById('auth-username').value;
   const err = document.getElementById('auth-error'); err.textContent = '';
-  if (!email || !password) { err.textContent = "Введіть email та пароль"; return; }
+  
+  if (!email || !password || !username) { err.textContent = "Заповніть всі поля"; return; }
   if (password.length < 6) { err.textContent = "Пароль має бути мінімум 6 символів"; return; }
-  try { document.getElementById('btn-register').textContent = 'Створення...'; await createUserWithEmailAndPassword(auth, email, password); }
-  catch (e) { err.textContent = "Помилка: " + (e.code === 'auth/email-already-in-use' ? "Ця пошта вже зареєстрована" : e.message); document.getElementById('btn-register').textContent = 'Створити новий акаунт'; }
+  
+  try { 
+    document.getElementById('btn-register').textContent = 'Створення...'; 
+    const { error } = await supabase.auth.signUp({ 
+      email, 
+      password,
+      options: { data: { username: username } }
+    });
+    if (error) throw error;
+    
+    // Якщо Supabase не вимагає підтвердження пошти, користувач одразу залогінений
+    alert('Акаунт створено! Якщо ви не увійшли автоматично, перевірте пошту для підтвердження.');
+  } catch (e) { 
+    err.textContent = "Помилка: " + e.message; 
+    document.getElementById('btn-register').textContent = 'Створити новий акаунт'; 
+  }
 };
 
-window.logoutUser = async () => { if(confirm('Ви впевнені, що хочете вийти?')) { await signOut(auth); location.reload(); } };
-window.openAuthModal = () => { document.getElementById('auth-modal').style.display = 'flex'; };
+window.switchAuthMode = (mode) => {
+  const title = document.getElementById('auth-title');
+  const btnLogin = document.getElementById('btn-login');
+  const btnRegister = document.getElementById('btn-register');
+  const btnBack = document.getElementById('btn-back-login');
+  const btnForgot = document.getElementById('btn-forgot');
+  const inputUsername = document.getElementById('auth-username');
+  const inputPassword = document.getElementById('auth-password');
+  const err = document.getElementById('auth-error'); err.textContent = '';
+  
+  if (mode === 'login') {
+    title.textContent = 'Вхід до MyCinema';
+    btnLogin.style.display = 'block'; btnLogin.textContent = 'Увійти'; btnLogin.onclick = window.loginUser;
+    btnRegister.style.display = 'block'; btnRegister.textContent = 'Створити новий акаунт'; btnRegister.onclick = () => window.switchAuthMode('register');
+    inputUsername.style.display = 'none';
+    inputPassword.style.display = 'block';
+    btnBack.style.display = 'none';
+    btnForgot.style.display = 'block';
+  } else if (mode === 'register') {
+    title.textContent = 'Реєстрація';
+    btnLogin.style.display = 'none';
+    btnRegister.style.display = 'block'; btnRegister.textContent = 'Зареєструватися'; btnRegister.onclick = registerUser;
+    inputUsername.style.display = 'block';
+    inputPassword.style.display = 'block';
+    btnBack.style.display = 'block'; btnBack.onclick = () => window.switchAuthMode('login');
+    btnForgot.style.display = 'none';
+  } else if (mode === 'forgot') {
+    title.textContent = 'Відновлення пароля';
+    btnLogin.style.display = 'block'; btnLogin.textContent = 'Надіслати посилання'; btnLogin.onclick = window.resetPassword;
+    btnRegister.style.display = 'none';
+    inputUsername.style.display = 'none';
+    inputPassword.style.display = 'none';
+    btnBack.style.display = 'block'; btnBack.onclick = () => window.switchAuthMode('login');
+    btnForgot.style.display = 'none';
+  }
+};
+
+window.resetPassword = async () => {
+  const email = document.getElementById('auth-email').value;
+  const err = document.getElementById('auth-error'); err.textContent = '';
+  if (!email) { err.textContent = "Введіть email"; return; }
+  
+  try {
+    document.getElementById('btn-login').textContent = 'Надсилаємо...';
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/#update-password'
+    });
+    if (error) throw error;
+    err.textContent = "Перевірте пошту!";
+    err.style.color = "var(--mint)";
+  } catch (e) {
+    err.textContent = "Помилка: " + e.message;
+    err.style.color = "var(--danger)";
+    document.getElementById('btn-login').textContent = 'Надіслати посилання';
+  }
+};
+
+window.logoutUser = async () => {
+  if (confirm('Ви впевнені, що хочете вийти?')) {
+    await supabase.auth.signOut();
+    location.reload();
+  }
+};
+
+window.openAuthModal = () => {
+  document.getElementById('auth-modal').style.display = 'flex';
+  if (typeof window.switchAuthMode === 'function') window.switchAuthMode('login');
+};
+
 window.closeAuthModal = () => { document.getElementById('auth-modal').style.display = 'none'; };
 
-onAuthStateChanged(auth, (user) => {
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    const newPassword = prompt("Введіть новий пароль (мінімум 6 символів):");
+    if (newPassword && newPassword.length >= 6) {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) alert("Помилка: " + error.message);
+      else alert("Пароль успішно змінено!");
+    }
+    return;
+  }
+  
+  const user = session?.user;
   if (user) {
-    window.currentUser = user; window.firebaseReady = true;
+    window.currentUser = { uid: user.id, email: user.email };
+    window.firebaseReady = true; // Залишаємо назву для сумісності з іншим кодом
     document.getElementById('auth-modal').style.display = 'none';
     document.getElementById('auth-banner').classList.remove('visible');
-    document.getElementById('sidebar-email').textContent = user.email || user.displayName || 'Користувач';
+    document.getElementById('sidebar-email').textContent = user.email || 'Користувач';
     document.getElementById('sidebar-login-btn').style.display = 'none';
     document.getElementById('sidebar-logout-btn').style.display = 'block';
     window.dispatchEvent(new CustomEvent('firebase-ready'));
