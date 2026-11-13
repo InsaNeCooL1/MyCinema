@@ -21,10 +21,26 @@ async function renderGame() {
       c.append(insight);
     }
 
-    const bm = el('button', 'game-btn primary', '🎬 Грати з фільмами');
-    bm.addEventListener('click', () => startGame('movie'));
-    const bt = el('button', 'game-btn secondary', '📺 Грати з серіалами');
-    bt.addEventListener('click', () => startGame('tv'));
+    if (!state.gameSource) state.gameSource = 'tmdb';
+    const srcSwitch = el('div', 'game-source-switch');
+    const srcTmdb = el('button', 'game-source-pill' + (state.gameSource === 'tmdb' ? ' active' : ''), '🌍 Популярне TMDB');
+    const srcLib = el('button', 'game-source-pill' + (state.gameSource === 'library' ? ' active' : ''), '📚 Моя бібліотека');
+    srcTmdb.type = 'button';
+    srcLib.type = 'button';
+    srcTmdb.addEventListener('click', () => { state.gameSource = 'tmdb'; renderGame(); });
+    srcLib.addEventListener('click', () => { state.gameSource = 'library'; renderGame(); });
+    srcSwitch.append(srcTmdb, srcLib);
+    c.append(srcSwitch);
+
+    const mCount = Object.values(lib).filter(x => x.type === 'movie' && x.poster && hasWatched(x)).length;
+    const tCount = Object.values(lib).filter(x => x.type === 'tv' && x.poster && hasWatched(x)).length;
+    const bmLabel = state.gameSource === 'library' ? `🎬 Мої фільми (${mCount})` : '🎬 Грати з фільмами';
+    const btLabel = state.gameSource === 'library' ? `📺 Мої серіали (${tCount})` : '📺 Грати з серіалами';
+
+    const bm = el('button', 'game-btn primary', bmLabel);
+    bm.addEventListener('click', () => startGame('movie', state.gameSource));
+    const bt = el('button', 'game-btn secondary', btLabel);
+    bt.addEventListener('click', () => startGame('tv', state.gameSource));
     c.append(bm, bt);
 
     const hist = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]');
@@ -55,6 +71,14 @@ async function renderGame() {
   const stats = el('div', 'game-stats');
   stats.append(el('span', '', `${state.game.round + 1} / ${state.game.totalRounds}`));
   c.append(stats);
+  if (state.game.loadError) {
+    c.append(el('div', 'avail-empty', 'Не вдалося завантажити тайтли з TMDB.'));
+    const backBtn = el('button', 'game-btn secondary', '← Назад');
+    backBtn.addEventListener('click', () => { state.game.active = false; state.game.loadError = false; renderGame(); });
+    c.append(backBtn);
+    box.append(c);
+    return;
+  }
   if (!state.game.champion || !state.game.challenger) { c.append(el('div', 'avail-empty', 'Завантаження...')); box.append(c); return; }
   const arena = el('div', 'game-arena');
 
@@ -128,11 +152,41 @@ async function renderGame() {
   box.append(c);
 }
 
-async function startGame(type) {
-  state.game = { active: true, type, round: 0, totalRounds: 20, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() };
+async function startGame(type, source) {
+  source = source || state.gameSource || 'tmdb';
+  if (source === 'library') {
+    const items = Object.values(lib).filter(x => x.type === type && x.poster && hasWatched(x));
+    if (items.length < 2) {
+      showCenterToast('❌ Потрібно мінімум 2 переглянуті тайтли цього типу');
+      return;
+    }
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+    const champion = items.shift();
+    const challenger = items.shift();
+    state.game = {
+      active: true, type, source: 'library',
+      round: 0, totalRounds: Math.min(20, items.length + 1),
+      champion, challenger, history: [], finished: false,
+      pool: items, seen: new Set([champion.key, challenger.key]),
+      usedPages: new Set(), loadingNext: false, loadError: false
+    };
+    renderGame();
+    return;
+  }
+
+  state.game = { active: true, type, source: 'tmdb', round: 0, totalRounds: 20, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set(), loadingNext: false, loadError: false };
   renderGame();
-  await loadGameChampion();
-  await loadGameChallenger();
+  try {
+    await loadGameChampion();
+    await loadGameChallenger();
+    if (!state.game.champion || !state.game.challenger) state.game.loadError = true;
+  } catch (e) {
+    console.error(e);
+    state.game.loadError = true;
+  }
   renderGame();
 }
 
@@ -161,10 +215,18 @@ function takeFromPool() {
 }
 
 async function loadGameChampion() { state.game.pool = []; await refillGamePool(); state.game.champion = takeFromPool(); }
-async function loadGameChallenger() { if (state.game.pool.length < 3) await refillGamePool(); state.game.challenger = takeFromPool(); }
+async function loadGameChallenger() {
+  if (state.game.source === 'library') {
+    state.game.challenger = state.game.pool.shift() || null;
+    if (!state.game.challenger) finishGame();
+    return;
+  }
+  if (state.game.pool.length < 3) await refillGamePool();
+  state.game.challenger = takeFromPool();
+}
 
 function makeGameChoice(choice) {
-  if (!state.game.champion || !state.game.challenger) return;
+  if (!state.game.champion || !state.game.challenger || state.game.loadingNext) return;
   let winner, result, eloDelta = 0;
   if (choice === 'challenger') {
     winner = state.game.challenger;
@@ -184,7 +246,11 @@ function makeGameChoice(choice) {
   state.game.history.push({ round: state.game.round, winner, result, eloDelta, champion: state.game.champion, challenger: state.game.challenger });
   state.game.round++;
   if (state.game.round >= state.game.totalRounds) { finishGame(); return; }
-  loadGameChallenger().then(() => renderGame());
+  state.game.loadingNext = true;
+  loadGameChallenger()
+    .then(() => { if (!state.game.challenger) state.game.loadError = true; })
+    .catch((e) => { console.error(e); state.game.loadError = true; })
+    .finally(() => { state.game.loadingNext = false; renderGame(); });
 }
 
 function finishGame() {

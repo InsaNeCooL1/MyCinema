@@ -6,6 +6,7 @@ function openSettings() {
   renderSettingsSwatches();
   document.getElementById('poster-bg-toggle').checked = settings.posterBg;
   injectSnowToggle();
+  if (typeof injectDismissedReset === 'function') injectDismissedReset();
   document.getElementById('settings-modal').classList.add('open');
 }
 
@@ -206,4 +207,38 @@ function injectSnowToggle() {
   label.appendChild(input);
   label.appendChild(span);
   target.appendChild(label);
+}
+
+// ========== RESET DISMISSED ==========
+function injectDismissedReset() {
+  const modal = document.getElementById('settings-modal');
+  if (!modal) return;
+  const sections = modal.querySelectorAll('.settings-section');
+  let target = null;
+  sections.forEach((sec) => {
+    const title = sec.querySelector('.settings-section-title');
+    if (title && /Дані/i.test(title.textContent)) target = sec;
+  });
+  if (!target) return;
+
+  const getCount = () => (typeof dismissedRecs === 'object' && dismissedRecs) ? Object.keys(dismissedRecs).length : 0;
+  let btn = modal.querySelector('#reset-dismissed-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'reset-dismissed-btn';
+    btn.className = 'settings-btn';
+    btn.addEventListener('click', () => {
+      const cnt = getCount();
+      if (!cnt) { showSyncToast('Немає схованих рекомендацій'); return; }
+      if (!confirm(`Повернути всі сховані рекомендації (${cnt})?`)) return;
+      if (typeof clearDismissed === 'function') clearDismissed();
+      state.home.sig = null;
+      try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
+      btn.textContent = '🙈 Повернути сховані рекомендації (0)';
+      showSyncToast('✅ Сховані рекомендації повернуто');
+      if (state.tab === 'home') refresh();
+    });
+    target.appendChild(btn);
+  }
+  btn.textContent = `🙈 Повернути сховані рекомендації (${getCount()})`;
 }

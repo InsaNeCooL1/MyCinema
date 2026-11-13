@@ -16,24 +16,64 @@
     <div class="sidebar-logo">MyCinema</div>
     <div class="sidebar-email" id="sidebar-email">Гість</div>
   </div>
-  <div class="sidebar-nav">
-    <div class="nav-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> Головна</div>
-    <div class="nav-item" data-tab="filter" onclick="setTab('filter')"><span class="nav-icon">🔎</span> Фільтр</div>
-    <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> Дивлюсь</div>
-    <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> Переглянуто</div>
-    <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> Планую</div>
-    <div class="nav-item" data-tab="dropped" onclick="setTab('dropped')"><span class="nav-icon">🕸️</span> Закинуто</div>
-    <div class="nav-item" data-tab="favorites" onclick="setTab('favorites')"><span class="nav-icon">❤️</span> Улюблене</div>
-    <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> Мій топ</div>
-    <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> Календар</div>
-    <div class="nav-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> Нотатки</div>
-    <div class="nav-item" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> Обсерваторія</div>
-    <div class="nav-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> Цар гори</div>
+  <div class="sidebar-nav" id="sidebar-nav">
+    <div class="nav-item nav-top-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> Головна</div>
+
+    <div class="nav-group nav-top-item" data-group="lists">
+      <button type="button" class="nav-group-btn" onclick="toggleNavGroup('lists', event)">
+        <span class="nav-icon">📚</span> Списки <span class="nav-caret">▾</span>
+      </button>
+      <div class="nav-dropdown">
+        <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> Дивлюсь</div>
+        <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> Переглянуто</div>
+        <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> Планую</div>
+        <div class="nav-item" data-tab="dropped" onclick="setTab('dropped')"><span class="nav-icon">🕸️</span> Закинуто</div>
+        <div class="nav-item" data-tab="favorites" onclick="setTab('favorites')"><span class="nav-icon">❤️</span> Улюблене</div>
+      </div>
+    </div>
+
+    <div class="nav-item nav-top-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> Нотатки</div>
+
+    <div class="nav-group nav-top-item" data-group="overview">
+      <button type="button" class="nav-group-btn" onclick="toggleNavGroup('overview', event)">
+        <span class="nav-icon">📊</span> Огляд <span class="nav-caret">▾</span>
+      </button>
+      <div class="nav-dropdown">
+        <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> Мій топ</div>
+        <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> Календар</div>
+        <div class="nav-item" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> Обсерваторія</div>
+      </div>
+    </div>
+
+    <div class="nav-item nav-top-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> Цар гори</div>
+
+    <div class="nav-group nav-more-group" data-group="more" style="display:none;">
+      <button type="button" class="nav-group-btn" onclick="toggleNavGroup('more', event)">
+        Ще <span class="nav-caret">▾</span>
+      </button>
+      <div class="nav-dropdown nav-more-menu" id="nav-more-menu"></div>
+    </div>
   </div>
   <div class="sidebar-footer">
-    <button class="login-btn-side" id="sidebar-login-btn" onclick="openAuthModal()">Увійти в акаунт</button>
-    <button class="logout-btn-side" id="sidebar-logout-btn" style="display:none;" onclick="logoutUser()">Вийти з акаунту</button>
-    <button class="logout-btn-side" style="border-color:var(--accent);color:var(--accent)" onclick="openSettings()">⚙️ Налаштування</button>
+    <button class="login-btn-side icon-compact-btn" id="sidebar-login-btn" title="Увійти в акаунт" onclick="openAuthModal()">
+      <span class="icon-btn-inner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="btn-label">Увійти в акаунт</span>
+      </span>
+    </button>
+    <button class="logout-btn-side icon-compact-btn logged-in" id="sidebar-logout-btn" style="display:none;" title="Акаунт (вийти)" onclick="logoutUser()">
+      <span class="icon-btn-inner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="account-dot" aria-hidden="true"></span>
+        <span class="btn-label">Вийти з акаунту</span>
+      </span>
+    </button>
+    <button class="logout-btn-side icon-compact-btn settings-compact-btn" id="sidebar-settings-btn" style="border-color:var(--accent);color:var(--accent)" title="Налаштування" onclick="openSettings()">
+      <span class="icon-btn-inner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="btn-label">Налаштування</span>
+      </span>
+    </button>
   </div>
 </div>
 
@@ -41,7 +81,12 @@
   <button class="hamburger" onclick="openSidebar()">☰</button>
   <div class="search-container">
     <input id="q" type="search" placeholder="Від чого кайфонем сьогодні?" autocomplete="off">
+    <button type="button" id="search-filter-btn" class="search-filter-btn" title="Фільтр" aria-label="Фільтр">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      <span class="filter-dot" aria-hidden="true"></span>
+    </button>
     <div id="autocomplete" class="autocomplete hidden"></div>
+    <div id="filter-dropdown" class="filter-dropdown hidden"></div>
   </div>
 </header>
 

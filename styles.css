@@ -1254,7 +1254,7 @@ input#q::placeholder { color: var(--text-dim); }
         display: flex !important;
         align-items: center !important;
     }
-}
+
 
 /* 4. Трохи збільшуємо шрифт назви для балансу */
 .card-top-right .title {
@@ -1296,7 +1296,7 @@ input#q::placeholder { color: var(--text-dim); }
         display: flex !important;
         align-items: center !important;
     }
-}
+
 
 /* 4. Трохи збільшуємо шрифт назви для балансу */
 .card-top-right .title {
@@ -1682,3 +1682,905 @@ html, body {
   .mcm-snow::after { animation: none; }
 }
 /* === /MCM Snow v3 === */
+
+/* ========================================================= */
+/* FIX: Стрілочка поверх постера (мобільна версія)           */
+/* ========================================================= */
+@media (max-width: 899px) {
+  .card-bar {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    z-index: 100 !important;
+    pointer-events: none !important; /* Кліки проходять крізь панель на постер */
+    padding: 12px 16px !important;
+    padding-top: calc(12px + env(safe-area-inset-top)) !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+  }
+
+  .card-x {
+    pointer-events: auto !important; /* Сама кнопка клікабельна */
+    background: rgba(0, 0, 0, 0.6) !important; /* Темний фон, щоб було видно на світлих постерах */
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+    width: 42px !important;
+    height: 42px !important;
+    font-size: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .card-scroll {
+    padding-top: 0 !important; /* Постер піднімається на самий верх */
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ========================================================= */
+/* DESKTOP TOP MENU V2 (Full Width & Glass Search)           */
+/* ========================================================= */
+@media (min-width: 900px) and (min-height: 600px) {
+  
+  /* 1. Меню на всю ширину */
+  #sidebar {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 64px !important;
+    flex-direction: row !important;
+    transform: none !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding: 0 20px !important;
+    box-sizing: border-box !important;
+    z-index: 1000 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    background: var(--bg-0) !important;
+  }
+  #sidebar-backdrop, .hamburger { display: none !important; }
+  
+  /* 2. Логотип і кнопки */
+  .sidebar-header { margin-right: 20px !important; padding: 0 !important; border: none !important; height: 100% !important; display: flex; align-items: center; }
+  .sidebar-logo { margin: 0 !important; font-size: 24px !important; }
+  .sidebar-email { display: none !important; }
+  
+  /* 3. Навігація (без іконок) */
+  .sidebar-nav {
+    flex-direction: row !important;
+    height: 100% !important;
+    padding: 0 !important;
+    gap: 2px !important;
+    align-items: center !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    justify-content: center !important;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none !important; }
+  .nav-item {
+    height: 38px !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+  .nav-item.active::before { display: none !important; }
+  .nav-icon { display: none !important; }
+
+  /* 4. Кнопки справа */
+  .sidebar-footer {
+    flex-direction: row !important;
+    border: none !important;
+    padding: 0 !important;
+    gap: 8px !important;
+    align-items: center !important;
+    margin-left: 20px !important;
+    flex-shrink: 0 !important;
+  }
+  .logout-btn-side, .login-btn-side {
+    padding: 0 14px !important;
+    height: 38px !important;
+    width: auto !important;
+    margin: 0 !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+  }
+
+  /* 5. Відступи для body (під меню + пошук) */
+  body { padding-left: 0 !important; padding-top: 134px !important; }
+  body.no-search { padding-top: 64px !important; }
+  
+  /* Відступ для підпунктів, коли пошук приховано */
+  body.no-search #type-filter {
+    margin-top: 24px !important; 
+    margin-bottom: 10px !important;
+  }
+
+  /* 6. РОЗТЯГУЄМО КОНТЕНТ */
+  #results {
+    max-width: 100vw !important;
+    width: 100vw !important;
+    padding-left: 40px !important;
+    padding-right: 40px !important;
+    padding-top: 16px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+
+  /* Занульовуємо обмеження ширини і падінги у внутрішніх контейнерів */
+  .home-wrap, .mood-section, .taste-summary-container, .game-container, .filter-bar, #type-filter {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    box-sizing: border-box !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* ========================================================= */
+  /* 6.1. ЗБІЛЬШЕННЯ МІНІКАРТОК (РІВНО 7 КОЛОНОК)              */
+  /* ========================================================= */
+  body #results .home-grid {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 20px 16px;
+    width: 100% !important;
+  }
+  body #results .row-title { font-size: 13.7px; }
+  body #results .row-meta { font-size: 12px; }
+  body #results .rec-why { font-size: 11.5px; }
+  body #results .item .poster { width: 88px; height: 132px; }
+  body #results .item .title { font-size: 16.5px; }
+  body #results .item .meta { font-size: 13px; }
+  body #results .item .badge { font-size: 13px; }
+  body #results .top-number { min-width: 28px; height: 28px; font-size: 13px; }
+
+  /* ========================================================= */
+  /* 6.2. НАСТРОЇ ТА ТАБЛЕТКА СМАКУ В ОДИН РЯДОК               */
+  /* ========================================================= */
+  #results:has(> .mood-section) {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    column-gap: 28px !important;
+    row-gap: 20px !important;
+  }
+
+  /* 1. Блок настрою (зліва, до 45% ширини) */
+  body #results > .mood-section {
+    order: 1;
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: 45% !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  body #results .mood-title {
+    display: none !important;
+  }
+
+  body #results .mood-pills {
+    display: flex !important;
+    max-width: 100% !important;
+    height: 44px !important;
+    padding: 4px !important;
+    margin-bottom: 0 !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 24px !important;
+    align-items: center !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  body #results .mood-pill {
+    height: 34px !important;
+    padding: 0 16px !important;
+    font-size: 13px !important;
+    border-radius: 20px !important;
+    border: none !important;
+    background: transparent !important;
+    color: var(--text-secondary) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  body #results .mood-pill.active {
+    background: var(--accent) !important;
+    color: var(--accent-fg) !important;
+  }
+
+  /* 2. Таблетка смаку (справа, займає залишок ширини) */
+  body #results > .taste-summary-container {
+    order: 2;
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  body #results .taste-summary {
+    height: 44px !important;
+    padding: 0 18px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 3. Сітка фільмів і блок "Продовжити" (перенос на новий рядок) */
+  body #results > .home-wrap,
+  body #results > .home-section {
+    order: 3;
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* ========================================================= */
+  /* 7. ПОШУК (ПОВЕРНУТО НА МІСЦЕ)                             */
+  /* ========================================================= */
+  body > header {
+    position: fixed !important;
+    top: 64px !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 70px !important;
+    padding: 10px 40px !important;
+    background: transparent !important;
+    border: none !important;
+    z-index: 990 !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    backdrop-filter: none !important;
+  }
+  body.no-search > header { display: none !important; }
+  body:has(#overlay.open) > header { display: none !important; }
+  
+  .search-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 48px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 20px !important;
+    margin: 0 !important;
+  }
+  input#q {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    height: 100% !important;
+    width: 100% !important;
+    font-size: 15px !important;
+    padding: 0 !important;
+  }
+
+  /* ========================================================= */
+  /* 8. КАРТКА (OVERLAY)                                       */
+  /* ========================================================= */
+  #overlay {
+    top: 64px !important;
+    height: calc(100vh - 64px) !important;
+    z-index: 1100 !important;
+  }
+}
+
+/* ========================================================= */
+/* TOP MENU GROUPS + PRIORITY+ + SEARCH FILTER V3            */
+/* ========================================================= */
+
+/* Кнопка фільтра справа в строці пошуку */
+.search-container { position: relative; }
+input#q { padding-right: 44px !important; }
+
+.search-filter-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  transition: .2s;
+  z-index: 2;
+}
+.search-filter-btn:hover,
+.search-filter-btn.open {
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), .12);
+}
+.search-filter-btn.has-filters {
+  color: var(--accent);
+}
+.search-filter-btn .filter-dot {
+  display: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), .8);
+}
+.search-filter-btn.has-filters .filter-dot { display: block; }
+
+/* Випадаючий список фільтрів під пошуком */
+.filter-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 65;
+  max-height: 75vh;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: rgba(15, 14, 19, .98);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .75);
+  border: 1px solid rgba(255, 255, 255, .08);
+  animation: fadeUp .18s ease-out;
+}
+.filter-dropdown.hidden { display: none; }
+.filter-dropdown-panel {
+  margin-bottom: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 14px 16px !important;
+}
+.filter-dropdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.filter-dropdown-title {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.filter-dropdown-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+.filter-dropdown-close:hover { background: var(--bg-3); color: var(--text); }
+.filter-dropdown .filter-actions { justify-content: flex-end; }
+.filter-dropdown .filter-actions button.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.filter-dropdown .filter-actions button.primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Компактна панель активних фільтрів у #results */
+.filter-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, .05);
+}
+.filter-summary-chips {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  flex: 1;
+  min-width: 160px;
+}
+.filter-summary-actions { display: flex; gap: 8px; }
+.filter-summary-btn {
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  transition: .15s;
+}
+.filter-summary-btn:hover { background: var(--bg-4); color: var(--accent); }
+.filter-summary-btn.reset { color: var(--danger); }
+
+/* Групи меню в мобільній шторці (акордеон) */
+.nav-group { display: flex; flex-direction: column; }
+.nav-group-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  width: 100%;
+  text-align: left;
+  transition: .2s;
+}
+.nav-group-btn:hover { background: var(--bg-1); color: var(--text); }
+.nav-group.has-active > .nav-group-btn {
+  color: var(--accent);
+  font-weight: 600;
+}
+.nav-caret {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: .75;
+  transition: transform .2s;
+}
+.nav-group.open > .nav-group-btn .nav-caret { transform: rotate(180deg); }
+.nav-dropdown {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 16px;
+}
+.nav-group.open > .nav-dropdown { display: flex; }
+
+.icon-btn-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.account-dot {
+  display: none;
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mint);
+  border: 2px solid var(--bg-0);
+}
+.logout-btn-side.logged-in .account-dot { display: block; }
+
+/* ДЕКСТОПНІ ПЕРЕВИЗНАЧЕННЯ ДЛЯ МЕНЮ, ДРОПДАУНІВ І ЗНАЧКІВ */
+@media (min-width: 900px) and (min-height: 600px) {
+  #sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .sidebar-nav {
+    overflow: visible !important;
+    justify-content: center !important;
+    gap: 4px !important;
+  }
+
+  .nav-group {
+    position: relative !important;
+    flex-direction: row !important;
+    flex-shrink: 0 !important;
+  }
+
+  .nav-group-btn {
+    height: 38px !important;
+    padding: 0 12px !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    gap: 6px !important;
+    width: auto !important;
+    white-space: nowrap !important;
+  }
+  .nav-group-btn:hover {
+    background: var(--bg-1) !important;
+  }
+  .nav-group.has-active > .nav-group-btn,
+  .nav-group.open > .nav-group-btn {
+    background: linear-gradient(135deg, rgba(var(--accent-rgb), .15), rgba(var(--accent-rgb), .05)) !important;
+    color: var(--accent) !important;
+    font-weight: 600 !important;
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .2) !important;
+  }
+  .nav-caret { margin-left: 2px !important; }
+
+  .nav-dropdown {
+    position: absolute !important;
+    top: calc(100% + 10px) !important;
+    left: 0 !important;
+    min-width: 195px !important;
+    padding: 6px !important;
+    background: rgba(15, 14, 19, .97) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, .08) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .7) !important;
+    z-index: 1200 !important;
+  }
+  .nav-more-menu {
+    left: auto !important;
+    right: 0 !important;
+    min-width: 210px !important;
+  }
+  .nav-dropdown .nav-item {
+    width: 100% !important;
+    height: 36px !important;
+    justify-content: flex-start !important;
+    padding: 0 12px !important;
+  }
+
+  /* Вкладені групи всередині "Ще ▾" показуємо охайними секціями */
+  .nav-more-menu .nav-group {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  .nav-more-menu .nav-group-btn {
+    pointer-events: none !important;
+    height: auto !important;
+    padding: 8px 12px 4px !important;
+    font-size: 10.5px !important;
+    text-transform: uppercase !important;
+    letter-spacing: .8px !important;
+    color: var(--text-muted) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .nav-more-menu .nav-group-btn .nav-caret { display: none !important; }
+  .nav-more-menu .nav-dropdown {
+    display: flex !important;
+    position: static !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    padding: 0 0 4px 6px !important;
+    min-width: 0 !important;
+  }
+
+  /* Компактні значки Акаунт та Налаштування */
+  .sidebar-footer { gap: 8px !important; }
+  .sidebar-footer .icon-compact-btn {
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+  }
+  .sidebar-footer .icon-compact-btn .btn-label { display: none !important; }
+  .sidebar-footer .login-btn-side.icon-compact-btn {
+    background: rgba(var(--accent-rgb), .14) !important;
+    color: var(--accent) !important;
+    border: 1px solid rgba(var(--accent-rgb), .35) !important;
+  }
+  .sidebar-footer .login-btn-side.icon-compact-btn:hover {
+    background: var(--accent) !important;
+    color: var(--accent-fg) !important;
+  }
+  .sidebar-footer .logout-btn-side.logged-in.icon-compact-btn {
+    border: 1px solid rgba(157, 229, 195, .45) !important;
+    color: var(--mint) !important;
+    background: rgba(157, 229, 195, .1) !important;
+  }
+  .sidebar-footer .logout-btn-side.logged-in.icon-compact-btn:hover {
+    background: var(--danger) !important;
+    border-color: var(--danger) !important;
+    color: #fff !important;
+  }
+  .sidebar-footer .settings-compact-btn {
+    border: 1px solid rgba(255, 255, 255, .12) !important;
+    color: var(--text-secondary) !important;
+    background: rgba(255, 255, 255, .04) !important;
+  }
+  .sidebar-footer .settings-compact-btn:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    background: rgba(var(--accent-rgb), .12) !important;
+  }
+
+  /* Дропдаун фільтра справа під пошуком */
+  .filter-dropdown {
+    left: auto !important;
+    right: 0 !important;
+    width: min(460px, 100%) !important;
+  }
+}
+
+/* ========================================================= */
+/* STAGE 1: RECS V2, MODES, DISMISS, PLANNED STRIP           */
+/* ========================================================= */
+.rec-poster-wrap {
+  position: relative;
+  width: 100%;
+}
+.rec-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(8, 7, 10, .62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, .85);
+  border: 1px solid rgba(255, 255, 255, .14);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: .55;
+  transition: opacity .2s, background .2s, transform .15s;
+  z-index: 3;
+}
+.rec-card:hover .rec-dismiss,
+.rec-dismiss:hover {
+  opacity: 1;
+}
+.rec-dismiss:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  transform: scale(1.08);
+}
+.rec-card.dismissing {
+  opacity: 0;
+  transform: scale(.9);
+  transition: opacity .18s, transform .18s;
+}
+
+.recs-mode-pills {
+  display: flex;
+  gap: 8px;
+  margin: -4px 0 16px;
+  flex-wrap: wrap;
+}
+.recs-mode-pill {
+  padding: 6px 14px;
+  border-radius: 18px;
+  background: var(--bg-1);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, .05);
+  transition: .2s;
+}
+.recs-mode-pill:hover {
+  background: var(--bg-2);
+  color: var(--text);
+}
+.recs-mode-pill.active {
+  background: rgba(var(--accent-rgb), .16);
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), .45);
+}
+
+.planned-mood-sec .section-head {
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.planned-head-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.roulette-btn {
+  padding: 7px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), .18), rgba(197, 163, 255, .14));
+  border: 1px solid rgba(var(--accent-rgb), .35);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: .2s;
+  flex-shrink: 0;
+}
+.roulette-btn:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+  transform: translateY(-1px);
+}
+.planned-strip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+}
+.planned-strip::-webkit-scrollbar { height: 5px; }
+.planned-strip::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+.planned-strip-card {
+  flex: 0 0 112px;
+  width: 112px;
+}
+@media (min-width: 900px) {
+  .planned-strip-card {
+    flex: 0 0 142px;
+    width: 142px;
+  }
+}
+
+/* ========================================================= */
+/* STAGE 2: PROGRESS, STREAMING, HEATMAP, GAME SOURCE        */
+/* ========================================================= */
+.item-progress {
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-3);
+  overflow: hidden;
+  margin-top: 4px;
+}
+.item-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--mint));
+  transition: width .4s ease;
+}
+
+.series-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 22px;
+}
+.series-prog-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, .04);
+  cursor: pointer;
+  transition: .15s;
+}
+.series-prog-row:hover { background: var(--bg-2); }
+.series-prog-body { flex: 1; min-width: 0; }
+.series-prog-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.series-prog-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.platform-rank-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #fff;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.heatmap-grid {
+  display: flex;
+  gap: 4px;
+  width: max-content;
+}
+.heatmap-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.heatmap-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--bg-3);
+}
+.heatmap-cell.future { opacity: .2; }
+.heatmap-cell.lvl-1 { background: rgba(var(--accent-rgb), .28); }
+.heatmap-cell.lvl-2 { background: rgba(var(--accent-rgb), .52); }
+.heatmap-cell.lvl-3 { background: rgba(var(--accent-rgb), .76); }
+.heatmap-cell.lvl-4 { background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb), .45); }
+
+.game-source-switch {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 22px;
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, .06);
+  margin-bottom: 14px;
+}
+.game-source-pill {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: .2s;
+}
+.game-source-pill:hover { color: var(--text); }
+.game-source-pill.active {
+  background: rgba(var(--accent-rgb), .18);
+  color: var(--accent);
+}
+
+/* CALENDAR SUMMARY */
+.cal-summary { margin-bottom: 20px; }
+.cal-best-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(var(--accent-rgb), .12);
+  border: 1px solid rgba(var(--accent-rgb), .28);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  transition: .2s;
+}
+.cal-best-btn:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}

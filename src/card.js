@@ -93,11 +93,20 @@ async function loadMediaCardData(ctx) {
       r.popularity = d.popularity || 0;
     }
     
-    if (r.type === 'tv') r.episode_count = d.number_of_episodes || 0;
-    if (d.genres) { ctx.genres = d.genres.map(g => g.id); if (lib[r.key]) { lib[r.key].genres = ctx.genres; save(); } }
-    if (d.credits?.cast?.length) {
-      ctx.cast = d.credits.cast.slice(0, CAST_LIMIT).map(a => ({ id: a.id, name: a.name, profile_path: a.profile_path }));
-      if (lib[r.key] && !lib[r.key].cast) { lib[r.key].cast = ctx.cast; save(); }
+    const meta = typeof extractItemMeta === 'function' ? extractItemMeta(d, r.type) : {};
+    if (r.type === 'tv') r.episode_count = meta.episode_count || d.number_of_episodes || 0;
+    if (meta.runtime) r.runtime = meta.runtime;
+    if (meta.platforms) r.platforms = meta.platforms;
+    if (meta.genres) { ctx.genres = meta.genres; r.genres = meta.genres; }
+    if (meta.cast) ctx.cast = meta.cast;
+    if (lib[r.key]) {
+      let dirty = false;
+      if (meta.genres && !lib[r.key].genres?.length) { lib[r.key].genres = meta.genres; dirty = true; }
+      if (meta.cast && !lib[r.key].cast?.length) { lib[r.key].cast = meta.cast; dirty = true; }
+      if (meta.runtime && !lib[r.key].runtime) { lib[r.key].runtime = meta.runtime; dirty = true; }
+      if (meta.episode_count && lib[r.key].episode_count !== meta.episode_count) { lib[r.key].episode_count = meta.episode_count; dirty = true; }
+      if (meta.platforms && (!lib[r.key].platforms || !lib[r.key].platforms.length)) { lib[r.key].platforms = meta.platforms; dirty = true; }
+      if (dirty) save();
     }
     if (d.external_ids?.imdb_id) {
       try {
@@ -110,7 +119,14 @@ async function loadMediaCardData(ctx) {
       const sd = await Promise.all(d.seasons.map(s => tmdbFetch(`/tv/${r.id}/season/${s.season_number}?language=uk-UA`).catch(() => null)));
       ctx.details.seasons = d.seasons.map((s, i) => ({ ...s, episode_count: sd[i] ? sd[i].episodes.length : s.episode_count, episodes: sd[i] ? sd[i].episodes : [] }));
       const totalSeasons = d.seasons.filter(s => s.season_number !== 0).length;
-      if (lib[r.key]) lib[r.key].totalSeasons = totalSeasons;
+      if (!r.runtime && typeof extractItemMeta === 'function') {
+        const refined = extractItemMeta(ctx.details, 'tv');
+        if (refined.runtime) r.runtime = refined.runtime;
+      }
+      if (lib[r.key]) {
+        lib[r.key].totalSeasons = totalSeasons;
+        if (r.runtime && !lib[r.key].runtime) lib[r.key].runtime = r.runtime;
+      }
     }
     ctx.watchProviders = d['watch/providers']?.results?.UA || null;
     

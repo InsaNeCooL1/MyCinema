@@ -32,7 +32,13 @@ function renderMyTop() {
   if (state.topTypeFilter !== 'all') {
     rated = rated.filter(x => x.item.type === state.topTypeFilter);
   }
-  rated.sort((a, b) => b.r.avg - a.r.avg || (b.item.updated || 0) - (a.item.updated || 0));
+  rated.sort((a, b) => {
+    const diff = b.r.avg - a.r.avg;
+    if (Math.abs(diff) > 0.001) return diff;
+    const eloDiff = (b.item.elo || ELO_START) - (a.item.elo || ELO_START);
+    if (eloDiff !== 0) return eloDiff;
+    return (b.item.updated || 0) - (a.item.updated || 0);
+  });
 
   if (!rated.length) {
     box.append(el('div', 'avail-empty', 'Ще немає оцінених тайтлів цього типу'));
@@ -169,9 +175,26 @@ function createListItem(r, showNumber, number) {
     if (saved.elo && saved.eloGames > 1) {
       info.append(el("span", "badge elo", `🏆 ${saved.elo}`));
     }
-    if (r.type === 'tv' && saved.watchedEpisodes && saved.watchedEpisodes.length > 0 && saved.totalSeasons) {
-      const total = saved.watchedEpisodes.length;
-      info.append(el('div', 'meta', `${total} ${plural(total, 'серія', 'серії', 'серій')}`));
+    if (r.type === 'tv' && saved.watchedEpisodes && saved.watchedEpisodes.length > 0) {
+      const done = saved.watchedEpisodes.length;
+      const totalEps = saved.episode_count || 0;
+      if (totalEps > 0) {
+        const pct = Math.min(100, Math.round((done / totalEps) * 100));
+        const remEps = Math.max(0, totalEps - done);
+        let txt = `${done} / ${totalEps} ${plural(totalEps, 'серія', 'серії', 'серій')} (${pct}%)`;
+        if (remEps > 0 && saved.runtime > 0) {
+          const remHrs = (remEps * saved.runtime) / 60;
+          txt += ` · ~${remHrs >= 10 ? Math.round(remHrs) : fmtNum(remHrs)} год`;
+        }
+        info.append(el('div', 'meta', txt));
+        const prog = el('div', 'item-progress');
+        const fill = el('div', 'item-progress-fill');
+        fill.style.width = pct + '%';
+        prog.append(fill);
+        info.append(prog);
+      } else if (saved.totalSeasons) {
+        info.append(el('div', 'meta', `${done} ${plural(done, 'серія', 'серії', 'серій')}`));
+      }
     }
   }
   item.append(info);
@@ -240,27 +263,98 @@ function removeFromLibrary(key) {
 }
 
 // ========== FILTER ==========
-function renderFilter() {
-  if (box.querySelector('.filter-panel')) {
-    filterPage = 1;
-    const list = document.getElementById('filter-results-list'); if (list) list.innerHTML = '';
-    doFetchFilter(false); return;
+function syncFilterSelects() {
+  const f = state.filter;
+  const map = {
+    'f-type': f.type,
+    'f-decade': f.decade,
+    'f-genre': String(f.genre),
+    'f-rating': String(f.minRating),
+    'f-streaming': f.streaming ? String(f.streaming) : 'any',
+    'f-sort': f.sortBy
+  };
+  for (const [id, val] of Object.entries(map)) {
+    const sel = document.getElementById(id);
+    if (sel) sel.value = val;
   }
-  box.replaceChildren(); box.style.padding = '0 16px 16px';
+  if (typeof updateFilterBadge === 'function') updateFilterBadge();
+}
+
+function resetAllFilters() {
+  state.filter = { ...state.filter, type: 'all', decade: 'any', genre: 'any', minRating: 0, sortBy: 'popularity.desc', streaming: null };
+  syncFilterSelects();
+  if (state.tab === 'filter') renderFilter();
+  else { setTab('filter'); }
+}
+
+function buildFilterSummaryBar() {
+  const f = state.filter;
+  const chips = [];
+  if (f.type !== 'all') chips.push(f.type === 'movie' ? 'Фільми' : 'Серіали');
+  if (f.decade !== 'any') chips.push(f.decade + '-ті');
+  if (f.genre !== 'any') {
+    const g = GENRES.find(x => x.id === f.genre);
+    if (g) chips.push(g.name);
+  }
+  if (f.minRating > 0) chips.push(f.minRating + '+');
+  if (f.streaming) {
+    const p = STREAMING_PROVIDERS.find(x => x.id === f.streaming);
+    if (p) chips.push(p.name);
+  }
+  if (f.sortBy !== 'popularity.desc') {
+    const sorts = { 'vote_average.desc': 'Рейтинг ↓', 'primary_release_date.desc': 'Новіші', 'primary_release_date.asc': 'Старіші' };
+    if (sorts[f.sortBy]) chips.push(sorts[f.sortBy]);
+  }
+
+  const bar = el('div', 'filter-summary-bar');
+  const text = el('div', 'filter-summary-chips', chips.length ? chips.join(' · ') : 'Популярне · Усі фільтри за замовчуванням');
+  bar.append(text);
+
+  const actions = el('div', 'filter-summary-actions');
+  const editBtn = el('button', 'filter-summary-btn', '🎛️ Фільтри');
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (typeof toggleFilterDropdown === 'function') toggleFilterDropdown(e);
+  });
+  actions.append(editBtn);
+
+  if (chips.length) {
+    const rstBtn = el('button', 'filter-summary-btn reset', 'Скинути');
+    rstBtn.addEventListener('click', resetAllFilters);
+    actions.append(rstBtn);
+  }
+  bar.append(actions);
+  return bar;
+}
+
+function renderFilter() {
+  box.replaceChildren();
+  box.style.padding = '0 16px 16px';
   if (state.filter.query) {
     const qb = el("div", "query-bar");
     qb.append(el("span", "", `Результати пошуку: "${state.filter.query}"`));
     const clr = el("button", "", "✕");
     clr.addEventListener("click", () => { state.filter.query = ''; input.value = ''; renderFilter(); });
-    qb.append(clr); box.append(qb);
+    qb.append(clr);
+    box.append(qb);
   }
-  box.append(buildFilterPanel());
+  box.append(buildFilterSummaryBar());
   const ra = el("div"); ra.id = "filter-results-list"; box.append(ra);
-  filterPage = 1; doFetchFilter(false);
+  if (typeof updateFilterBadge === 'function') updateFilterBadge();
+  filterPage = 1;
+  doFetchFilter(false);
 }
 
 function buildFilterPanel() {
-  const panel = el("div", "filter-panel");
+  const panel = el("div", "filter-panel filter-dropdown-panel");
+  const head = el("div", "filter-dropdown-head");
+  head.append(el("span", "filter-dropdown-title", "Фільтр"));
+  const closeBtn = el("button", "filter-dropdown-close", "✕");
+  closeBtn.type = "button";
+  closeBtn.addEventListener("click", () => { if (typeof hideFilterDropdown === 'function') hideFilterDropdown(); });
+  head.append(closeBtn);
+  panel.append(head);
+
   const decades = [['any', 'Будь-яке'], ['2020', '2020-ті'], ['2010', '2010-ті'], ['2000', '2000-ті'], ['1990', '1990-ті'], ['1980', '1980-ті'], ['1970', '1970-ті']];
   const ratings = [[0, 'Будь-який'], [5, '5+'], [6, '6+'], [7, '7+'], [8, '8+'], [9, '9+']];
   const sorts = [['popularity.desc', 'Популярність ↓'], ['vote_average.desc', 'Рейтинг ↓'], ['primary_release_date.desc', 'Новіші'], ['primary_release_date.asc', 'Старіші']];
@@ -275,14 +369,19 @@ function buildFilterPanel() {
   
   const actions = el("div", "filter-actions");
   const resetBtn = el("button", "", "Скинути");
+  resetBtn.type = "button";
   resetBtn.addEventListener("click", () => {
-    state.filter = { ...state.filter, type: 'all', decade: 'any', genre: 'any', minRating: 0, sortBy: 'popularity.desc', streaming: null };
-    ['f-type','f-decade','f-genre','f-rating','f-sort','f-streaming'].forEach(id => document.getElementById(id).value = id === 'f-type' ? 'all' : id === 'f-decade' ? 'any' : id === 'f-genre' ? 'any' : id === 'f-rating' ? '0' : id === 'f-sort' ? 'popularity.desc' : 'any');
-    filterPage = 1;
-    const list = document.getElementById('filter-results-list'); if (list) list.innerHTML = '';
-    doFetchFilter(false);
+    resetAllFilters();
   });
-  actions.append(resetBtn); panel.append(actions);
+  const applyBtn = el("button", "primary", "Показати");
+  applyBtn.type = "button";
+  applyBtn.addEventListener("click", () => {
+    if (typeof hideFilterDropdown === 'function') hideFilterDropdown();
+    if (state.tab !== "filter") setTab("filter");
+    else renderFilter();
+  });
+  actions.append(resetBtn, applyBtn);
+  panel.append(actions);
   return panel;
 }
 
@@ -302,9 +401,9 @@ function makeSelectRow(label, id, options, currentVal) {
     else if (id === 'f-rating') state.filter.minRating = parseInt(sel.value);
     else if (id === 'f-sort') state.filter.sortBy = sel.value;
     else if (id === 'f-streaming') state.filter.streaming = sel.value === 'any' ? null : parseInt(sel.value);
-    filterPage = 1;
-    const list = document.getElementById('filter-results-list'); if (list) list.innerHTML = '';
-    doFetchFilter(false);
+    if (typeof updateFilterBadge === 'function') updateFilterBadge();
+    if (state.tab !== 'filter') setTab('filter');
+    else renderFilter();
   });
   row.append(sel);
   return row;

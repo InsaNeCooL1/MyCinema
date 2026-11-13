@@ -41,21 +41,65 @@ function showHistory() {
   autocomplete.append(clearBtn);
 }
 
+const filterBtn = document.getElementById("search-filter-btn");
+const filterDropdown = document.getElementById("filter-dropdown");
+
+function hasActiveFilters() {
+  const f = state.filter;
+  return f.type !== 'all' || f.decade !== 'any' || f.genre !== 'any' || f.minRating > 0 || f.streaming !== null || f.sortBy !== 'popularity.desc';
+}
+
+function updateFilterBadge() {
+  if (filterBtn) filterBtn.classList.toggle("has-filters", hasActiveFilters());
+}
+
+function hideFilterDropdown() {
+  if (filterDropdown) filterDropdown.classList.add("hidden");
+  if (filterBtn) filterBtn.classList.remove("open");
+}
+
+function openFilterDropdown() {
+  if (!filterDropdown) return;
+  hideAutocomplete();
+  if (typeof closeNavDropdowns === 'function') closeNavDropdowns();
+  if (!filterDropdown.childElementCount && typeof buildFilterPanel === 'function') {
+    filterDropdown.append(buildFilterPanel());
+  } else if (typeof syncFilterSelects === 'function') {
+    syncFilterSelects();
+  }
+  filterDropdown.classList.remove("hidden");
+  if (filterBtn) filterBtn.classList.add("open");
+}
+
+function toggleFilterDropdown(e) {
+  if (e) e.stopPropagation();
+  if (!filterDropdown) return;
+  if (filterDropdown.classList.contains("hidden")) openFilterDropdown();
+  else hideFilterDropdown();
+}
+
+if (filterBtn) {
+  filterBtn.addEventListener("click", toggleFilterDropdown);
+}
+
 function performFullSearch() {
   const q = input.value.trim();
   if (!q) return;
   addToHistory(q); // <-- Додаємо в історію при пошуку
   hideAutocomplete();
+  hideFilterDropdown();
   state.filter.query = q;
   if (state.tab !== "filter") setTab("filter"); else renderFilter();
 }
 
 let acTimer;
 input.addEventListener("focus", () => {
+  hideFilterDropdown();
   if (!input.value.trim()) showHistory();
 });
 
 input.addEventListener("input", () => {
+  hideFilterDropdown();
   clearTimeout(acTimer);
   const q = input.value.trim();
   if (!q) { showHistory(); return; }
@@ -69,11 +113,11 @@ input.addEventListener("input", () => {
 
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); performFullSearch(); }
-  if (e.key === "Escape") hideAutocomplete();
+  if (e.key === "Escape") { hideAutocomplete(); hideFilterDropdown(); }
 });
 
 document.addEventListener("click", (e) => { 
-  if (!e.target.closest(".search-container")) hideAutocomplete(); 
+  if (!e.target.closest(".search-container")) { hideAutocomplete(); hideFilterDropdown(); }
 });
 
 function showAutocomplete(rawResults, query) {

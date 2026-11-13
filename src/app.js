@@ -1,9 +1,26 @@
 'use strict';
 
+function syncNavActive() {
+  const t = state.tab;
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+  document.querySelectorAll(".nav-group").forEach(g => {
+    const hasActive = !!g.querySelector('.nav-item.active');
+    g.classList.toggle('has-active', hasActive);
+    if (window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches) {
+      g.classList.remove('open');
+    } else if (hasActive) {
+      g.classList.add('open');
+    }
+  });
+}
+
 function setTab(t) {
   state.tab = t;
   closeSidebar();
-  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+  if (typeof hideFilterDropdown === 'function') hideFilterDropdown();
+  if (typeof hideAutocomplete === 'function') hideAutocomplete();
+  document.body.classList.toggle('no-search', !(t === 'home' || t === 'filter'));
+  syncNavActive();
   typeFilterBar.classList.toggle("hidden", !["recent", "watching", "watched", "planned", "dropped", "favorites"].includes(t));
   if (t === 'game') { box.style.padding = '0'; renderGame(); return; }
   if (t === 'top') { box.style.padding = '0 16px 16px'; renderMyTop(); return; }
@@ -53,7 +70,9 @@ routeFromHash();
     // 2. Бокове меню
     if (document.getElementById('sidebar').classList.contains('open')) { closeSidebar(); return; }
     
-    // 3. Автокомпліт
+    // 3. Автокомпліт та дропдаун фільтрів
+    if (typeof filterDropdown !== 'undefined' && filterDropdown && !filterDropdown.classList.contains('hidden')) { hideFilterDropdown(); return; }
+    if (document.querySelector('.nav-group.open')) { closeNavDropdowns(); return; }
     if (!autocomplete.classList.contains('hidden') && autocomplete.childElementCount) { hideAutocomplete(); return; }
     
     // 4. Стек карток (модалка тайтлу/актора)
@@ -66,3 +85,14 @@ routeFromHash();
     CapApp.exitApp();
   });
 })();
+
+// Ініціалізація видимості пошуку
+document.body.classList.toggle('no-search', !(state.tab === 'home' || state.tab === 'filter'));
+
+window.addEventListener('firebase-ready', () => {
+  const lb = document.getElementById('sidebar-logout-btn');
+  if (lb && window.currentUser) {
+    lb.title = (window.currentUser.email || 'Акаунт') + ' · Вийти з акаунту';
+  }
+});
+syncNavActive();

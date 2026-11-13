@@ -12,6 +12,8 @@ function renderStatistics() {
   const tabs = el('div', 'card-tabs');
   const tabDefs = [
     { id: 'taste', label: '🧬 Смак' },
+    { id: 'series', label: '📺 Серіали' },
+    { id: 'streaming', label: '📡 Стрімінги' },
     { id: 'elo', label: '🏆 Elo' },
     { id: 'actors', label: '🎭 Актори' },
     { id: 'genres', label: '🎬 Жанри' },
@@ -23,16 +25,106 @@ function renderStatistics() {
     tabs.append(btn);
   }
   wrap.append(tabs);
-  
+
   const content = el('div'); content.style.marginTop = '16px';
   if (state.stats.tab === 'taste') content.append(...renderTasteTab());
+  else if (state.stats.tab === 'series') content.append(...renderSeriesTab());
+  else if (state.stats.tab === 'streaming') content.append(...renderStreamingTab());
   else if (state.stats.tab === 'elo') content.append(...renderEloTab());
   else if (state.stats.tab === 'actors') content.append(...renderActorsTab());
   else if (state.stats.tab === 'genres') content.append(...renderGenresTab());
   else if (state.stats.tab === 'detail') content.append(...renderDetailTab());
-  
+
   wrap.append(content);
   box.append(wrap);
+}
+
+function getMissingMetaItems() {
+  return Object.values(lib).filter(x =>
+    !x.cast?.length ||
+    !x.platforms?.length ||
+    !x.runtime ||
+    (x.type === 'tv' && !x.episode_count)
+  );
+}
+
+function buildMetaLoaderBanner() {
+  const items = Object.values(lib);
+  const missing = getMissingMetaItems();
+  if (!missing.length) return null;
+
+  const loader = el('div', 'cast-loader');
+  if (state.stats.castLoading) {
+    loader.append(el('div', 'cast-loader-text', `Оновлюю метадані (актори, час, стрімінги): ${state.stats.castProgress.done}/${state.stats.castProgress.total}...`));
+  } else {
+    loader.append(el('div', 'cast-loader-text', `Для ${missing.length} з ${items.length} тайтлів ще немає повних метаданих (час, стрімінги або актори)`));
+    const btn = el('button', 'cast-loader-btn', '📥 Завантажити метадані з TMDB');
+    btn.addEventListener('click', async () => {
+      state.stats.castLoading = true;
+      state.stats.castProgress = { done: 0, total: missing.length };
+      renderStatistics();
+      await fetchAllMissingMeta();
+      state.stats.castLoading = false;
+      renderStatistics();
+    });
+    loader.append(btn);
+  }
+  return loader;
+}
+
+async function fetchAllMissingMeta() {
+  const missing = getMissingMetaItems();
+  const batchSize = 5;
+  for (let i = 0; i < missing.length; i += batchSize) {
+    const batch = missing.slice(i, i + batchSize);
+    await Promise.all(batch.map(async item => {
+      try {
+        const d = await tmdbFetch(`/${item.type}/${item.id}?language=uk-UA&append_to_response=credits,watch/providers`);
+        if (!lib[item.key]) return;
+        const meta = typeof extractItemMeta === 'function' ? extractItemMeta(d, item.type) : {};
+        if (meta.cast && !lib[item.key].cast?.length) lib[item.key].cast = meta.cast;
+        if (meta.genres && !lib[item.key].genres?.length) lib[item.key].genres = meta.genres;
+        if (meta.runtime && !lib[item.key].runtime) lib[item.key].runtime = meta.runtime;
+        if (meta.episode_count && !lib[item.key].episode_count) lib[item.key].episode_count = meta.episode_count;
+        if (meta.totalSeasons && !lib[item.key].totalSeasons) lib[item.key].totalSeasons = meta.totalSeasons;
+        if (meta.platforms && !lib[item.key].platforms?.length) lib[item.key].platforms = meta.platforms;
+      } catch {}
+    }));
+    state.stats.castProgress.done = Math.min(missing.length, i + batchSize);
+    if (['actors', 'series', 'streaming', 'detail'].includes(state.stats.tab)) renderStatistics();
+    await new Promise(r => setTimeout(r, 200));
+  }
+  save();
+}
+
+function fmtDuration(totalMin) {
+  if (!totalMin || totalMin <= 0) return '0 год';
+  const hrs = totalMin / 60;
+  if (hrs >= 48) {
+    const days = hrs / 24;
+    return `${Math.round(hrs)} год (${fmtNum(days)} дн)`;
+  }
+  return hrs >= 10 ? `${Math.round(hrs)} год` : `${fmtNum(hrs)} год`;
+}
+
+function computeWatchTimeStats() {
+  let movieMin = 0, movieKnown = 0, movieTotal = 0;
+  let tvMin = 0, tvEpsWatched = 0, tvKnown = 0, tvTotal = 0;
+
+  Object.values(lib).forEach(x => {
+    if (!hasWatched(x)) return;
+    if (x.type === 'movie') {
+      movieTotal++;
+      if (x.runtime > 0) { movieMin += x.runtime; movieKnown++; }
+    } else if (x.type === 'tv') {
+      tvTotal++;
+      let eps = (x.watchedEpisodes && x.watchedEpisodes.length) || 0;
+      if (x.status === 'watched' && (x.episode_count || 0) > eps) eps = x.episode_count;
+      tvEpsWatched += eps;
+      if (eps > 0 && x.runtime > 0) { tvMin += eps * x.runtime; tvKnown++; }
+    }
+  });
+  return { movieMin, movieKnown, movieTotal, tvMin, tvEpsWatched, tvKnown, tvTotal, totalMin: movieMin + tvMin };
 }
 
 function renderTasteTab() {
@@ -44,7 +136,7 @@ function renderTasteTab() {
 
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const recent = Object.values(lib).filter(x => (x.updated || 0) > cutoff && computeItemRating(x).avg > 0);
-  
+
   if (recent.length >= 3) {
     const recentTaste = { count: recent.length };
     const sums = {}, weights = {};
@@ -107,7 +199,7 @@ function renderTasteTab() {
   }
 
   if (rated.length > 0) {
-    const top = rated.sort((a, b) => b.r.avg - a.r.avg)[0];
+    const top = [...rated].sort((a, b) => b.r.avg - a.r.avg)[0];
     insights.push({ icon: '👑', text: `Твій найвищий бал — <strong>${fmtNum(top.r.avg)}/10</strong> — у «${top.item.title}».` });
   }
 
@@ -122,17 +214,218 @@ function renderTasteTab() {
     }
   }
 
-  if (insights.length) {
-    for (const ins of insights) {
-      const c = el('div', 'insight-card');
-      c.append(el('div', 'insight-label', ins.icon + ' інсайт'));
-      const t = el('div', 'insight-text');
-      t.innerHTML = ins.text;
-      c.append(t);
-      wrap.append(c);
-    }
+  for (const ins of insights) {
+    const c = el('div', 'insight-card');
+    c.append(el('div', 'insight-label', ins.icon + ' інсайт'));
+    const t = el('div', 'insight-text'); t.innerHTML = ins.text;
+    c.append(t);
+    wrap.append(c);
+  }
+  return [wrap];
+}
+
+function renderSeriesTab() {
+  const wrap = el('div');
+  const loader = buildMetaLoaderBanner();
+  if (loader) wrap.append(loader);
+
+  const allTv = Object.values(lib).filter(x => x.type === 'tv');
+  if (!allTv.length) {
+    wrap.append(el('div', 'avail-empty', 'Поки немає серіалів у бібліотеці'));
+    return [wrap];
   }
 
+  const watching = allTv.filter(x => x.status === 'watching');
+  const watched = allTv.filter(x => x.status === 'watched');
+  const dropped = allTv.filter(x => x.status === 'dropped');
+  const wt = computeWatchTimeStats();
+
+  let totalSeasonsWatched = 0;
+  let totalEpsKnown = 0;
+  allTv.forEach(x => {
+    if (x.status === 'watched') totalSeasonsWatched += (x.totalSeasons || Object.keys(x.seasonRatings || {}).length || 1);
+    else if (x.status === 'watching' && x.watchedEpisodes?.length) {
+      const sSet = new Set(x.watchedEpisodes.map(k => k.split('-')[0]));
+      totalSeasonsWatched += sSet.size;
+    }
+    if (x.status === 'watching' && x.episode_count > 0) totalEpsKnown += x.episode_count;
+  });
+
+  const sg = el('div', 'stats-grid');
+  const addStat = (l, v) => {
+    const s = el('div', 'stat-card');
+    s.append(el('div', 'stat-value', String(v)), el('div', 'stat-label', l));
+    sg.append(s);
+  };
+  addStat('Переглянуто серій', wt.tvEpsWatched);
+  addStat('Час на серіали', fmtDuration(wt.tvMin).split(' ')[0] + ' год');
+  addStat('Завершено / В процесі', `${watched.length} / ${watching.length}`);
+  addStat('Сезонів · Закинуто', `${totalSeasonsWatched} · ${dropped.length}`);
+  wrap.append(sg);
+
+  if (wt.tvTotal > 0 && wt.tvKnown < wt.tvTotal) {
+    const note = el('div', 'notes-hint', `⏱ Точний хронометраж відомий для ${wt.tvKnown} з ${wt.tvTotal} переглянутих/активних серіалів.`);
+    note.style.marginBottom = '16px';
+    wrap.append(note);
+  }
+
+  // Прогрес поточних серіалів ("Дивлюсь")
+  if (watching.length) {
+    wrap.append(el('h3', 'label', `▶️ Прогрес по серіалах у процесі (${watching.length})`));
+    const list = el('div', 'series-progress-list');
+    watching
+      .slice()
+      .sort((a, b) => (b.updated || 0) - (a.updated || 0))
+      .forEach(s => {
+        const done = (s.watchedEpisodes || []).length;
+        const tot = s.episode_count || 0;
+        const pct = tot > 0 ? Math.min(100, Math.round((done / tot) * 100)) : 0;
+        const row = el('div', 'series-prog-row');
+        if (s.poster) {
+          const p = el('img', 'elo-poster'); p.src = TMDB_IMG + 'w92' + s.poster; p.loading = 'lazy';
+          row.append(p);
+        }
+        const body = el('div', 'series-prog-body');
+        const top = el('div', 'series-prog-top');
+        top.append(el('span', 'elo-title', s.title));
+        const valTxt = tot > 0 ? `${done}/${tot} (${pct}%)` : `${done} сер.`;
+        top.append(el('span', 'series-prog-val', valTxt));
+        body.append(top);
+
+        const bar = el('div', 'item-progress');
+        const fill = el('div', 'item-progress-fill');
+        fill.style.width = (tot > 0 ? pct : (done > 0 ? 15 : 0)) + '%';
+        bar.append(fill);
+        body.append(bar);
+
+        if (tot > done && s.runtime > 0) {
+          const remHrs = ((tot - done) * s.runtime) / 60;
+          body.append(el('div', 'elo-games', `залишилось ~${remHrs >= 10 ? Math.round(remHrs) : fmtNum(remHrs)} год`));
+        }
+        row.append(body);
+        row.addEventListener('click', () => openCard(s));
+        list.append(row);
+      });
+    wrap.append(list);
+  }
+
+  // Топ за часом / кількістю переглянутих серій
+  const byTime = allTv
+    .map(x => {
+      let eps = (x.watchedEpisodes && x.watchedEpisodes.length) || 0;
+      if (x.status === 'watched' && (x.episode_count || 0) > eps) eps = x.episode_count;
+      const mins = x.runtime > 0 ? eps * x.runtime : 0;
+      return { item: x, eps, mins };
+    })
+    .filter(x => x.eps > 0)
+    .sort((a, b) => b.mins - a.mins || b.eps - a.eps)
+    .slice(0, 10);
+
+  if (byTime.length) {
+    wrap.append(el('h3', 'label', '⏱️ Найбільше часу проведено за серіалами'));
+    const lb = el('div', 'elo-lb');
+    byTime.forEach((x, idx) => {
+      const row = el('div', 'elo-row');
+      row.append(el('div', 'elo-rank', String(idx + 1)));
+      if (x.item.poster) {
+        const p = el('img', 'elo-poster'); p.src = TMDB_IMG + 'w92' + x.item.poster; p.loading = 'lazy';
+        row.append(p);
+      }
+      const info = el('div', 'elo-info');
+      info.append(el('div', 'elo-title', x.item.title));
+      info.append(el('div', 'elo-games', `${x.eps} ${plural(x.eps, 'серія', 'серії', 'серій')}`));
+      row.append(info);
+      row.append(el('div', 'elo-value', x.mins > 0 ? fmtDuration(x.mins) : `${x.eps} с.`));
+      row.addEventListener('click', () => openCard(x.item));
+      lb.append(row);
+    });
+    wrap.append(lb);
+  }
+
+  return [wrap];
+}
+
+function renderStreamingTab() {
+  const wrap = el('div');
+  const loader = buildMetaLoaderBanner();
+  if (loader) wrap.append(loader);
+
+  const items = Object.values(lib).filter(x => (hasWatched(x) || x.status === 'planned') && x.platforms?.length);
+  if (!items.length) {
+    wrap.append(el('div', 'avail-empty', 'Поки немає даних про стрімінги. Натисни «Завантажити метадані з TMDB» вище або відкрий кілька карток.'));
+    return [wrap];
+  }
+
+  const platMap = new Map();
+  items.forEach(item => {
+    const watched = hasWatched(item);
+    const avg = computeItemRating(item).avg;
+    item.platforms.forEach(p => {
+      if (!platMap.has(p.key)) {
+        platMap.set(p.key, { key: p.key, name: p.name, logo: p.logo, total: 0, watched: 0, ratedSum: 0, ratedCnt: 0, movies: 0, tv: 0 });
+      }
+      const st = platMap.get(p.key);
+      if (!st.logo && p.logo) st.logo = p.logo;
+      st.total++;
+      if (watched) {
+        st.watched++;
+        if (item.type === 'movie') st.movies++;
+        else st.tv++;
+      }
+      if (avg > 0) { st.ratedSum += avg; st.ratedCnt++; }
+    });
+  });
+
+  const list = [...platMap.values()]
+    .filter(p => p.watched > 0)
+    .sort((a, b) => b.watched - a.watched || (b.ratedCnt ? b.ratedSum / b.ratedCnt : 0) - (a.ratedCnt ? a.ratedSum / a.ratedCnt : 0));
+
+  if (!list.length) {
+    wrap.append(el('div', 'avail-empty', 'Немає переглянутих тайтлів із визначеним стрімінгом'));
+    return [wrap];
+  }
+
+  const topByCount = list[0];
+  const topByQuality = [...list].filter(p => p.ratedCnt >= 3).sort((a, b) => (b.ratedSum / b.ratedCnt) - (a.ratedSum / a.ratedCnt))[0];
+  if (topByCount) {
+    const ins = el('div', 'insight-card');
+    ins.append(el('div', 'insight-label', '📡 Стрімінг-профіль'));
+    let txt = `Найчастіше ти дивишся проєкти з <strong>${topByCount.name}</strong> (${topByCount.watched} тайтлів).`;
+    if (topByQuality) {
+      txt += ` Найвищу середню оцінку від тебе отримує <strong>${topByQuality.name}</strong> — <strong>${fmtNum(topByQuality.ratedSum / topByQuality.ratedCnt)}/10</strong>.`;
+    }
+    const t = el('div', 'insight-text'); t.innerHTML = txt;
+    ins.append(t);
+    wrap.append(ins);
+  }
+
+  const maxWatched = list[0].watched;
+  wrap.append(el('h3', 'label', `Топ платформ і мереж (${list.length})`));
+  const rowsWrap = el('div', 'actor-rank-list');
+  list.forEach((p, idx) => {
+    const row = el('div', 'actor-rank-item');
+    row.style.cursor = 'default';
+    row.append(el('div', 'actor-rank-num', String(idx + 1)));
+    if (p.logo) {
+      const img = el('img', 'platform-rank-logo'); img.src = TMDB_IMG + 'w92' + p.logo; img.loading = 'lazy';
+      row.append(img);
+    } else {
+      row.append(el('div', 'actor-rank-photo-empty', p.name.charAt(0).toUpperCase()));
+    }
+    const info = el('div', 'actor-rank-info');
+    info.append(el('div', 'actor-rank-name', p.name));
+    const avgTxt = p.ratedCnt ? ` · ⭐ ${fmtNum(p.ratedSum / p.ratedCnt)}` : '';
+    info.append(el('div', 'actor-rank-meta', `${p.movies} ф. · ${p.tv} с.${avgTxt}`));
+    const bar = el('div', 'item-progress');
+    const fill = el('div', 'item-progress-fill');
+    fill.style.width = Math.round((p.watched / maxWatched) * 100) + '%';
+    bar.append(fill);
+    info.append(bar);
+    row.append(info);
+    row.append(el('div', 'actor-rank-value', String(p.watched)));
+    rowsWrap.append(row);
+  });
+  wrap.append(rowsWrap);
   return [wrap];
 }
 
@@ -180,29 +473,11 @@ function renderActorsTab() {
   subTabs.append(rTab, cTab);
   wrap.append(subTabs);
   const content = el('div'); content.style.marginTop = '16px';
+
+  const loader = buildMetaLoaderBanner();
+  if (loader) wrap.append(loader);
+
   const items = Object.values(lib);
-  const missing = items.filter(x => !x.cast || !x.cast.length);
-  
-  if (missing.length > 0) {
-    const loader = el('div', 'cast-loader');
-    if (state.stats.castLoading) {
-      loader.append(el('div', 'cast-loader-text', `Завантажую акторів: ${state.stats.castProgress.done}/${state.stats.castProgress.total}...`));
-    } else {
-      loader.append(el('div', 'cast-loader-text', `Даних про акторів немає для ${missing.length} з ${items.length} тайтлів`));
-      const btn = el('button', 'cast-loader-btn', '📥 Завантажити дані акторів');
-      btn.addEventListener('click', async () => {
-        state.stats.castLoading = true;
-        state.stats.castProgress = { done: 0, total: missing.length };
-        renderStatistics();
-        await fetchAllMissingCasts();
-        state.stats.castLoading = false;
-        renderStatistics();
-      });
-      loader.append(btn);
-    }
-    wrap.append(loader);
-  }
-  
   const actorMap = new Map();
   items.forEach(item => {
     (item.cast || []).forEach(a => {
@@ -219,8 +494,10 @@ function renderActorsTab() {
     const rated = watched.filter(p => computeItemRating(p).avg > 0);
     const avgRating = rated.length ? rated.reduce((s, p) => s + computeItemRating(p).avg, 0) / rated.length : 0;
     const v = rated.length;
-    const weightedRating = v > 0 ? (v * avgRating + ACTOR_MIN_VOTES * globalAvg) / (v + ACTOR_MIN_VOTES) : 0;
-    return { ...a, watchedCount: watched.length, ratedCount: v, avgRating, weightedRating };
+    const baseWeighted = v > 0 ? (v * avgRating + ACTOR_MIN_VOTES * globalAvg) / (v + ACTOR_MIN_VOTES) : 0;
+    const adj = typeof getActorAdj === 'function' ? getActorAdj(a.id) : 0;
+    const weightedRating = baseWeighted > 0 ? Math.max(1, Math.min(10, baseWeighted + adj * ACTOR_ADJUST_STEP)) : 0;
+    return { ...a, watchedCount: watched.length, ratedCount: v, avgRating, weightedRating, adj };
   });
 
   let display, valueFn;
@@ -241,7 +518,7 @@ function renderActorsTab() {
   if (state.stats.actorTab === 'rating' && display.length > 0) {
     const hint = el('div');
     hint.style.cssText = 'padding:10px 14px;background:rgba(255,184,108,.06);border-left:3px solid var(--accent);border-radius:8px;font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:12px';
-    hint.innerHTML = `Оцінка зважена за кількістю проєктів (мін. вага: <strong style="color:var(--accent)">${ACTOR_MIN_VOTES}</strong>). Актори з малою кількістю оцінок тягнуться до середнього (<strong style="color:var(--accent)">${fmtNum(globalAvg)}</strong>), тому не "висять" у топі випадково.`;
+    hint.innerHTML = `Оцінка зважена за кількістю проєктів (мін. вага: <strong style="color:var(--accent)">${ACTOR_MIN_VOTES}</strong>). Кнопки 🔥/😞 дозволяють вручну підкрутити вплив актора на рекомендації.`;
     content.append(hint);
   }
 
@@ -263,7 +540,32 @@ function renderActorsTab() {
     } else {
       meta = `${a.watchedCount} ${plural(a.watchedCount, 'перегляд', 'перегляди', 'переглядів')}`;
     }
-    info.append(el('div', 'actor-rank-meta', meta));
+    const metaRow = el('div', 'actor-rank-meta-row');
+    metaRow.append(el('div', 'actor-rank-meta', meta));
+    if (typeof setActorAdj === 'function') {
+      const adjBtns = el('div', 'actor-adjust-btns');
+      const fireBtn = el('button', 'actor-adjust-btn fire' + (a.adj > 0 ? ' active' : ''), '🔥');
+      fireBtn.type = 'button';
+      fireBtn.title = 'Підняти у рекомендаціях';
+      fireBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setActorAdj(a.id, a.adj > 0 ? 0 : 1);
+        state.home.sig = null;
+        renderStatistics();
+      });
+      const sadBtn = el('button', 'actor-adjust-btn sad' + (a.adj < 0 ? ' active' : ''), '😞');
+      sadBtn.type = 'button';
+      sadBtn.title = 'Знизити у рекомендаціях';
+      sadBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setActorAdj(a.id, a.adj < 0 ? 0 : -1);
+        state.home.sig = null;
+        renderStatistics();
+      });
+      adjBtns.append(fireBtn, sadBtn);
+      metaRow.append(adjBtns);
+    }
+    info.append(metaRow);
     it.append(info);
     const v = valueFn(a);
     it.append(el('div', 'actor-rank-value ' + v.cls, v.text));
@@ -273,24 +575,6 @@ function renderActorsTab() {
   content.append(list);
   wrap.append(content);
   return [wrap];
-}
-
-async function fetchAllMissingCasts() {
-  const missing = Object.values(lib).filter(x => !x.cast || !x.cast.length);
-  const batchSize = 5;
-  for (let i = 0; i < missing.length; i += batchSize) {
-    const batch = missing.slice(i, i + batchSize);
-    await Promise.all(batch.map(async item => {
-      try {
-        const d = await tmdbFetch(`/${item.type}/${item.id}/credits?language=uk-UA`);
-        if (lib[item.key] && d.cast) lib[item.key].cast = d.cast.slice(0, CAST_LIMIT).map(a => ({ id: a.id, name: a.name, profile_path: a.profile_path }));
-      } catch {}
-    }));
-    state.stats.castProgress.done = Math.min(missing.length, i + batchSize);
-    if (state.stats.tab === 'actors') renderStatistics();
-    await new Promise(r => setTimeout(r, 200));
-  }
-  save();
 }
 
 function renderGenresTab() {
@@ -317,10 +601,73 @@ function renderGenresTab() {
   return [wrap];
 }
 
+function buildActivityHeatmap() {
+  const counts = {};
+  Object.values(lib).forEach(item => {
+    const ts = item.statusDate || item.updated || item.createdAt;
+    if (!ts) return;
+    const d = new Date(ts);
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    counts[k] = (counts[k] || 0) + 1;
+  });
+
+  const sec = el('div', 'pie-section');
+  sec.append(el('div', 'pie-title', '🗓️ Ритм активності · останні 26 тижнів'));
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayOfWeek = (today.getDay() + 6) % 7; // 0=Пн .. 6=Нд
+  const start = new Date(today);
+  start.setDate(today.getDate() - (25 * 7 + dayOfWeek));
+
+  const grid = el('div', 'heatmap-grid');
+  let activeDays = 0;
+  for (let w = 0; w < 26; w++) {
+    const col = el('div', 'heatmap-col');
+    for (let d = 0; d < 7; d++) {
+      const cur = new Date(start);
+      cur.setDate(start.getDate() + w * 7 + d);
+      const cell = el('div', 'heatmap-cell');
+      if (cur > today) {
+        cell.classList.add('future');
+      } else {
+        const k = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+        const n = counts[k] || 0;
+        if (n > 0) activeDays++;
+        const lvl = n === 0 ? 0 : n === 1 ? 1 : n <= 3 ? 2 : n <= 5 ? 3 : 4;
+        cell.classList.add('lvl-' + lvl);
+        cell.title = `${cur.toLocaleDateString('uk-UA')}: ${n} ${plural(n, 'дія', 'дії', 'дій')}`;
+      }
+      col.append(cell);
+    }
+    grid.append(col);
+  }
+  const scrollWrap = el('div', 'heatmap-scroll');
+  scrollWrap.append(grid);
+  sec.append(scrollWrap);
+  sec.append(el('div', 'notes-hint', `Активних днів за півроку: ${activeDays}`));
+  return sec;
+}
+
 function renderDetailTab() {
   const all = Object.values(lib);
   if (!all.length) return [el('div', 'avail-empty', 'Бібліотека порожня')];
   const wrap = el('div');
+
+  const loader = buildMetaLoaderBanner();
+  if (loader) wrap.append(loader);
+
+  // Час у кіно
+  const wt = computeWatchTimeStats();
+  const timeGrid = el('div', 'stats-grid');
+  const addT = (l, v) => { const s = el('div', 'stat-card'); s.append(el('div', 'stat-value', v), el('div', 'stat-label', l)); timeGrid.append(s); };
+  addT('Усього в кіно', fmtDuration(wt.totalMin));
+  addT(`Фільми (${wt.movieKnown}/${wt.movieTotal})`, fmtDuration(wt.movieMin));
+  addT(`Серіали (${wt.tvKnown}/${wt.tvTotal})`, fmtDuration(wt.tvMin));
+  addT('Серій переглянуто', String(wt.tvEpsWatched));
+  wrap.append(timeGrid);
+
+  wrap.append(buildActivityHeatmap());
 
   const movies = all.filter(x => x.type === 'movie').length;
   const tvShows = all.filter(x => x.type === 'tv').length;

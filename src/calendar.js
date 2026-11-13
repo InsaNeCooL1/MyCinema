@@ -111,6 +111,43 @@ function renderCalendar() {
     return `${date.getFullYear()}-${date.getMonth()}` === state.calendarMonth;
   });
 
+  // 5.1 Підсумок місяця
+  const monthNames = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень", "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"];
+  const [cy, cm] = (state.calendarMonth || '').split('-').map(Number);
+  let monthMins = 0;
+  const monthRated = [];
+  filteredItems.forEach(item => {
+    if (item.type === 'movie' && item.runtime > 0) monthMins += item.runtime;
+    else if (item.type === 'tv' && item.runtime > 0) {
+      let eps = (item.watchedEpisodes && item.watchedEpisodes.length) || 0;
+      if (item.status === 'watched' && (item.episode_count || 0) > eps) eps = item.episode_count;
+      monthMins += eps * item.runtime;
+    }
+    const r = computeItemRating(item).avg;
+    if (r > 0) monthRated.push({ item, avg: r });
+  });
+  const monthAvg = monthRated.length ? (monthRated.reduce((s, x) => s + x.avg, 0) / monthRated.length) : 0;
+  const bestOfMonth = monthRated.length ? [...monthRated].sort((a, b) => b.avg - a.avg)[0] : null;
+
+  const sumCard = el('div', 'insight-card cal-summary');
+  sumCard.append(el('div', 'insight-label', `📊 Підсумок · ${monthNames[cm] || ''} ${cy || ''}`));
+  const parts = [`<strong>${filteredItems.length}</strong> ${plural(filteredItems.length, 'тайтл', 'тайтли', 'тайтлів')}`];
+  if (monthMins > 0) {
+    const hrs = monthMins / 60;
+    parts.push(`<strong>~${hrs >= 10 ? Math.round(hrs) : fmtNum(hrs)} год</strong>`);
+  }
+  if (monthAvg > 0) parts.push(`сер. оцінка <strong>${fmtNum(monthAvg)}</strong>`);
+  const line = el('div', 'insight-text');
+  line.innerHTML = parts.join(' · ');
+  sumCard.append(line);
+  if (bestOfMonth) {
+    const bestBtn = el('button', 'cal-best-btn', `👑 Найкраще за місяць: ${bestOfMonth.item.title} (${fmtNum(bestOfMonth.avg)})`);
+    bestBtn.type = 'button';
+    bestBtn.addEventListener('click', () => openCard(bestOfMonth.item));
+    sumCard.append(bestBtn);
+  }
+  wrap.append(sumCard);
+
   // 6. Групуємо за днями
   const groups = {};
   filteredItems.forEach(item => {
