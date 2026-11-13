@@ -810,6 +810,38 @@ function renderHomeContent(taste) {
   box.append(wrap);
 }
 
+function buildFactOfDayCard() {
+  if (typeof getFactOfDay !== 'function' || typeof isFactDismissedToday !== 'function') return null;
+  if (isFactDismissedToday()) return null;
+  const fact = getFactOfDay();
+  if (!fact) return null;
+
+  const card = el('div', 'fact-card');
+  const head = el('div', 'fact-card-head');
+  head.append(el('span', 'fact-card-badge', '🎞️ Факт дня'));
+
+  const closeBtn = el('button', 'fact-card-close', '✕');
+  closeBtn.type = 'button';
+  closeBtn.title = 'Сховати до завтра';
+  closeBtn.addEventListener('click', () => {
+    dismissFactToday();
+    card.classList.add('dismissing');
+    setTimeout(() => card.remove(), 180);
+  });
+  head.append(closeBtn);
+  card.append(head);
+
+  card.append(el('div', 'fact-card-text', fact.text));
+
+  if (fact.title && typeof openFactMedia === 'function') {
+    const linkBtn = el('button', 'fact-card-link', `🎬 ${fact.title}${fact.year ? ' (' + fact.year + ')' : ''} →`);
+    linkBtn.type = 'button';
+    linkBtn.addEventListener('click', () => openFactMedia(fact));
+    card.append(linkBtn);
+  }
+  return card;
+}
+
 function buildContinueWatchingSection() {
   const watching = Object.values(lib).filter(x => x.type === 'tv' && x.status === 'watching' && x.watchedEpisodes && x.watchedEpisodes.length > 0).sort((a, b) => b.updated - a.updated).slice(0, 6);
   if (!watching.length) return null;

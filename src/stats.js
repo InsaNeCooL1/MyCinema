@@ -182,39 +182,163 @@ function renderTasteTab() {
   wrap.append(el('h3', 'label', '💡 Інсайти'));
   const insights = [];
 
-  const rated = Object.values(lib).map(x => ({ item: x, r: computeItemRating(x) })).filter(x => x.r.avg > 0 && x.item.ratings);
-  if (rated.length >= 5) {
-    const plotHigh = rated.filter(x => (x.item.ratings?.plot || 0) >= 8);
-    const castHigh = rated.filter(x => (x.item.ratings?.cast || 0) >= 8);
+  // Беремо УСІ оцінені тайтли: і фільми (ratings), і серіали (seasonRatings)
+  const rated = Object.values(lib)
+    .map(x => ({ item: x, r: computeItemRating(x) }))
+    .filter(x => x.r.avg > 0);
+
+  const critsOf = (item) => item.type === 'tv' ? averagedSeasonRatings(item) : (item.ratings || {});
+  const withCrits = rated.filter(x => {
+    const c = critsOf(x.item);
+    return c && Object.values(c).some(v => v > 0);
+  });
+
+  // 1. Кореляція сюжету та касту (тепер і для серіалів!)
+  if (withCrits.length >= 5) {
+    const plotHigh = withCrits.filter(x => (critsOf(x.item).plot || 0) >= 8);
+    const castHigh = withCrits.filter(x => (critsOf(x.item).cast || 0) >= 8);
     if (plotHigh.length >= 3 && castHigh.length >= 3) {
-      const overlap = plotHigh.filter(x => (x.item.ratings?.cast || 0) >= 8).length;
+      const overlap = plotHigh.filter(x => (critsOf(x.item).cast || 0) >= 8).length;
       if (overlap / plotHigh.length > 0.6) {
-        insights.push({ icon: '🎯', text: `Коли тобі подобається сюжет (<strong>8+</strong>), ти майже завжди високо оцінюєш і каст. У <strong>${Math.round(overlap / plotHigh.length * 100)}%</strong> випадків.` });
+        insights.push({ icon: '🎯', text: `Коли тобі заходить сюжет (<strong>8+</strong>), ти майже завжди високо оцінюєш і каст — у <strong>${Math.round(overlap / plotHigh.length * 100)}%</strong> випадків.` });
       }
     }
   }
 
-  const allRated = rated.map(x => x.r.avg);
-  if (allRated.length >= 5) {
-    const avg = allRated.reduce((a, b) => a + b, 0) / allRated.length;
+  // 2. Середня власна оцінка (без дивного "ніж інші")
+  if (rated.length >= 5) {
+    const avg = rated.reduce((s, x) => s + x.r.avg, 0) / rated.length;
     const strict = avg < 6.5, generous = avg > 7.5;
-    insights.push({ icon: generous ? '🌟' : (strict ? '🔍' : '⚖️'), text: `Твоя середня оцінка — <strong>${fmtNum(avg)}/10</strong>. ${generous ? 'Ти щедрий на оцінки — ставиш високі бали частіше, ніж інші.' : strict ? 'Ти вимогливий — не роздаєш високі оцінки просто так.' : 'Ти ставишся до оцінювання виважено.'}` });
+    insights.push({
+      icon: generous ? '🌟' : (strict ? '🔍' : '⚖️'),
+      text: `Твоя середня оцінка по всій бібліотеці — <strong>${fmtNum(avg)}/10</strong> (${rated.length} тайтлів). ${generous ? 'Оцінюєш досить щедро — напевно вправно підбираєш кіно під свій смак.' : strict ? 'Тримаєш високу планку — ставиш високі бали лише справді сильному кіно.' : 'Оцінюєш збалансовано й виважено.'}`
+    });
   }
 
+  // 3. Найвищий бал (з Elo tie-breaker і всіма типами)
   if (rated.length > 0) {
-    const top = [...rated].sort((a, b) => b.r.avg - a.r.avg)[0];
-    insights.push({ icon: '👑', text: `Твій найвищий бал — <strong>${fmtNum(top.r.avg)}/10</strong> — у «${top.item.title}».` });
+    const sortedTop = [...rated].sort((a, b) =>
+      (b.r.avg - a.r.avg) || ((b.item.elo || ELO_START) - (a.item.elo || ELO_START))
+    );
+    const bestScore = sortedTop[0].r.avg;
+    const tiedCount = sortedTop.filter(x => Math.abs(x.r.avg - bestScore) < 0.05).length;
+    const tieNote = tiedCount > 1 ? ` (разом із ще ${tiedCount - 1})` : '';
+    insights.push({ icon: '👑', text: `Твій найвищий бал — <strong>${fmtNum(bestScore)}/10</strong> — у «${sortedTop[0].item.title}»${tieNote}.` });
   }
 
+  // 4. Фільми vs Серіали (тепер реально працює!)
   const movieRated = rated.filter(x => x.item.type === 'movie');
   const tvRated = rated.filter(x => x.item.type === 'tv');
   if (movieRated.length >= 3 && tvRated.length >= 3) {
     const mAvg = movieRated.reduce((a, b) => a + b.r.avg, 0) / movieRated.length;
     const tAvg = tvRated.reduce((a, b) => a + b.r.avg, 0) / tvRated.length;
     const diff = tAvg - mAvg;
-    if (Math.abs(diff) > 0.5) {
-      insights.push({ icon: diff > 0 ? '📺' : '🎬', text: `Ти оцінюєш ${diff > 0 ? 'серіали' : 'фільми'} у середньому на <strong>${fmtNum(Math.abs(diff))}</strong> вище, ніж ${diff > 0 ? 'фільми' : 'серіали'}.` });
+    if (Math.abs(diff) >= 0.4) {
+      insights.push({ icon: diff > 0 ? '📺' : '🎬', text: `Ти оцінюєш ${diff > 0 ? 'серіали' : 'фільми'} в середньому на <strong>${fmtNum(Math.abs(diff))}</strong> вище, ніж ${diff > 0 ? 'фільми' : 'серіали'} (${fmtNum(diff > 0 ? tAvg : mAvg)} проти ${fmtNum(diff > 0 ? mAvg : tAvg)}).` });
     }
+  }
+
+  // 5. Ти vs TMDB (суворість і найбільший контраст)
+  const withTmdb = rated.filter(x => x.item.tmdbRating > 0);
+  if (withTmdb.length >= 5) {
+    const diffs = withTmdb.map(x => ({ ...x, delta: x.r.avg - x.item.tmdbRating }));
+    const avgDelta = diffs.reduce((s, x) => s + x.delta, 0) / diffs.length;
+    if (Math.abs(avgDelta) >= 0.3) {
+      insights.push({
+        icon: '🧪',
+        text: `У середньому ти ставиш оцінки на <strong>${fmtNum(Math.abs(avgDelta))}</strong> ${avgDelta > 0 ? 'вище' : 'нижче'}, ніж середній рейтинг TMDB.`
+      });
+    }
+    const over = [...diffs].sort((a, b) => b.delta - a.delta)[0];
+    const under = [...diffs].sort((a, b) => a.delta - b.delta)[0];
+    if (over && over.delta >= 1.5) {
+      insights.push({
+        icon: '💎',
+        text: `Твій особистий скарб проти натовпу: «${over.item.title}» — твоя оцінка <strong>${fmtNum(over.r.avg)}</strong> при TMDB ${over.item.tmdbRating.toFixed(1)}.`
+      });
+    } else if (under && under.delta <= -1.5) {
+      insights.push({
+        icon: '🤨',
+        text: `Не зайшло попри хайп: «${under.item.title}» — ти поставив <strong>${fmtNum(under.r.avg)}</strong> при TMDB ${under.item.tmdbRating.toFixed(1)}.`
+      });
+    }
+  }
+
+  // 6. Золота епоха (десятиліття з найвищою оцінкою)
+  const decMap = {};
+  rated.forEach(x => {
+    const y = parseInt(x.item.year);
+    if (!y || y < 1920) return;
+    const dec = Math.floor(y / 10) * 10;
+    if (!decMap[dec]) decMap[dec] = { sum: 0, cnt: 0 };
+    decMap[dec].sum += x.r.avg;
+    decMap[dec].cnt++;
+  });
+  const decList = Object.entries(decMap)
+    .filter(([, v]) => v.cnt >= 3)
+    .map(([dec, v]) => ({ dec, avg: v.sum / v.cnt, cnt: v.cnt }))
+    .sort((a, b) => b.avg - a.avg);
+  if (decList.length >= 2) {
+    const bestD = decList[0];
+    insights.push({
+      icon: '🕰️',
+      text: `Твоя «золота епоха» — <strong>${bestD.dec}-ті</strong>: середня оцінка <strong>${fmtNum(bestD.avg)}/10</strong> (${bestD.cnt} тайтлів).`
+    });
+  }
+
+  // 7. Дивишся найчастіше vs Цінуєш найбільше (жанри)
+  const gCount = {};
+  const gRating = {};
+  Object.values(lib).filter(hasWatched).forEach(x => {
+    (x.genres || []).forEach(gid => { gCount[gid] = (gCount[gid] || 0) + 1; });
+  });
+  rated.forEach(x => {
+    (x.item.genres || []).forEach(gid => {
+      if (!gRating[gid]) gRating[gid] = { sum: 0, cnt: 0 };
+      gRating[gid].sum += x.r.avg;
+      gRating[gid].cnt++;
+    });
+  });
+  const topWatchG = Object.entries(gCount).sort((a, b) => b[1] - a[1])[0];
+  const topRateG = Object.entries(gRating)
+    .filter(([, v]) => v.cnt >= 3)
+    .map(([gid, v]) => ({ gid: parseInt(gid), avg: v.sum / v.cnt, cnt: v.cnt }))
+    .sort((a, b) => b.avg - a.avg)[0];
+  if (topWatchG && topRateG) {
+    const wGObj = GENRES.find(g => g.id === parseInt(topWatchG[0]));
+    const rGObj = GENRES.find(g => g.id === topRateG.gid);
+    if (wGObj && rGObj) {
+      if (wGObj.id !== rGObj.id) {
+        insights.push({
+          icon: '🎭',
+          text: `Найчастіше ти дивишся <strong>${wGObj.name}</strong> (${topWatchG[1]}), але найвищу середню оцінку отримує <strong>${rGObj.name}</strong> — <strong>${fmtNum(topRateG.avg)}/10</strong>.`
+        });
+      } else {
+        insights.push({
+          icon: '❤️',
+          text: `Твій беззаперечний фаворит — <strong>${rGObj.name}</strong>: і лідер за кількістю (${topWatchG[1]}), і найвищий середній бал (<strong>${fmtNum(topRateG.avg)}/10</strong>).`
+        });
+      }
+    }
+  }
+
+  // 8. Кіно-ритм (день тижня + додивлюваність)
+  const finished = Object.values(lib).filter(x => x.status === 'watched' && (x.statusDate || x.updated));
+  const droppedCnt = Object.values(lib).filter(x => x.status === 'dropped').length;
+  if (finished.length >= 8) {
+    const days = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', 'Пʼятниця', 'Субота'];
+    const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+    finished.forEach(x => {
+      const d = new Date(x.statusDate || x.updated).getDay();
+      dayCounts[d]++;
+    });
+    const bestDayIdx = dayCounts.indexOf(Math.max(...dayCounts));
+    let rhythmTxt = `Найчастіше ти завершуєш тайтли у день: <strong>${days[bestDayIdx]}</strong>.`;
+    if (droppedCnt > 0) {
+      const compRate = Math.round((finished.length / (finished.length + droppedCnt)) * 100);
+      rhythmTxt += ` Доводиш до фіналу <strong>${compRate}%</strong> розпочатого (проти ${droppedCnt} закинутих).`;
+    }
+    insights.push({ icon: '🗓️', text: rhythmTxt });
   }
 
   for (const ins of insights) {

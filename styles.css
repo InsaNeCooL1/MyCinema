@@ -2617,3 +2617,69 @@ body:has(#overlay.open) .mcm-snow::before,
 body:has(#overlay.open) .mcm-snow::after {
   animation-play-state: paused !important;
 }
+
+/* ========================================================= */
+/* FACT OF THE DAY                                           */
+/* ========================================================= */
+.fact-card {
+  background: linear-gradient(135deg, rgba(197, 163, 255, .09), rgba(var(--accent-rgb), .06));
+  border: 1px solid rgba(197, 163, 255, .22);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  animation: fadeUp .35s ease-out;
+  transition: opacity .18s, transform .18s;
+}
+.fact-card.dismissing {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.fact-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.fact-card-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--violet);
+}
+.fact-card-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: .15s;
+}
+.fact-card-close:hover {
+  background: rgba(255, 255, 255, .08);
+  color: var(--text);
+}
+.fact-card-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.fact-card-link {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(var(--accent-rgb), .12);
+  border: 1px solid rgba(var(--accent-rgb), .26);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  transition: .2s;
+}
+.fact-card-link:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
