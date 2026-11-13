@@ -18,8 +18,6 @@ let state = {
     recs: null, 
     sig: null, 
     shown: { movie: 20, tv: 20 }, // <--- ДОДАНО ОСЬ ЦЕ
-    calendarMonth: null,
-    calendarStatus: 'all',
     tab: 'movie', 
     general: null, 
     mood: null, 
@@ -28,7 +26,8 @@ let state = {
   },
   game: { active: false, type: 'movie', round: 0, totalRounds: 20, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() },
   stats: { tab: 'taste', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } },
-  librarySearch: '', librarySort: 'updated'
+  librarySearch: '', librarySort: 'updated',
+  calendarMonth: null, calendarStatus: 'all'
 };
 let cardStack = [];
 let filterPage = 1;

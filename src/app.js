@@ -21,7 +21,7 @@ function setTab(t) {
   if (typeof hideAutocomplete === 'function') hideAutocomplete();
   document.body.classList.toggle('no-search', !(t === 'home' || t === 'filter'));
   syncNavActive();
-  typeFilterBar.classList.toggle("hidden", !["recent", "watching", "watched", "planned", "dropped", "favorites"].includes(t));
+  typeFilterBar.classList.toggle("hidden", !["watching", "watched", "planned", "dropped", "favorites"].includes(t));
   if (t === 'game') { box.style.padding = '0'; renderGame(); return; }
   if (t === 'top') { box.style.padding = '0 16px 16px'; renderMyTop(); return; }
   refresh();
@@ -89,10 +89,15 @@ routeFromHash();
 // Ініціалізація видимості пошуку
 document.body.classList.toggle('no-search', !(state.tab === 'home' || state.tab === 'filter'));
 
-window.addEventListener('firebase-ready', () => {
+function onFirebaseReadyUI() {
   const lb = document.getElementById('sidebar-logout-btn');
   if (lb && window.currentUser) {
     lb.title = (window.currentUser.email || 'Акаунт') + ' · Вийти з акаунту';
   }
-});
+}
+window.addEventListener('firebase-ready', onFirebaseReadyUI);
+if (window.firebaseReady) {
+  onFirebaseReadyUI();
+  syncFromCloud();
+}
 syncNavActive();

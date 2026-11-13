@@ -875,6 +875,30 @@ function setCriterion(r, criterionKey, value) {
   if (!scroll) return;
   refreshRatingBlockDOM(scroll, criterionKey, value);
   refreshAverageBlockDOM(scroll, r);
+  refreshStatusAndBadgeDOM(scroll, r, newStatus);
+}
+
+function refreshStatusAndBadgeDOM(scroll, r, newStatus) {
+  const watchedBtn = scroll.querySelector('.status-btn-watched');
+  if (watchedBtn) watchedBtn.classList.toggle('active', newStatus === 'watched');
+  if (newStatus === 'watched' || !newStatus) {
+    scroll.querySelectorAll('.status-section-row .status-btn-text').forEach(b => b.classList.remove('active'));
+  }
+  const ctx = cardStack[cardStack.length - 1];
+  const hero = scroll.querySelector('.card-hero');
+  if (hero && (!ctx || !ctx.playingTrailer)) {
+    const avg = computeItemRating(lib[r.key] || {}).avg;
+    let badge = hero.querySelector('.hero-rating-badge');
+    if (avg > 0) {
+      if (!badge) {
+        badge = el('div', 'hero-rating-badge');
+        hero.append(badge);
+      }
+      badge.textContent = fmtNum(avg);
+    } else if (badge) {
+      badge.remove();
+    }
+  }
 }
 
 function refreshRatingBlockDOM(scroll, critKey, value) {

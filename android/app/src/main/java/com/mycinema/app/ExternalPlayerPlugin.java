@@ -3,7 +3,9 @@ package com.mycinema.app;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import org.json.JSONObject;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -73,5 +75,61 @@ public class ExternalPlayerPlugin extends Plugin {
         } catch (ActivityNotFoundException e) {
             call.reject("No video player found", e);
         }
+    }
+
+    @PluginMethod
+    public void openLampa(PluginCall call) {
+        final String lampaPkg = "top.rootu.lampa";
+        final String lampaActivity = "top.rootu.lampa.MainActivity";
+
+        PackageManager pm = getContext().getPackageManager();
+        try {
+            pm.getPackageInfo(lampaPkg, 0);
+        } catch (PackageManager.NameNotFoundException e) {
+            call.reject("NOT_INSTALLED");
+            return;
+        }
+
+        Object rawId = call.getData().opt("id");
+        String id = (rawId != null && rawId != JSONObject.NULL) ? String.valueOf(rawId).trim() : "";
+        String rawType = call.getString("type", "movie");
+        String media = "tv".equals(rawType) ? "tv" : "movie";
+
+        if (!id.isEmpty()) {
+            Uri tmdbUri = Uri.parse("https://www.themoviedb.org/" + media + "/" + id);
+
+            // 1. Явний компонент Lampa (ChromeOS / ARCVM)
+            try {
+                Intent i = new Intent(Intent.ACTION_VIEW, tmdbUri);
+                i.setComponent(new ComponentName(lampaPkg, lampaActivity));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getActivity().startActivity(i);
+                done(call, "component:tmdb");
+                return;
+            } catch (ActivityNotFoundException | SecurityException ignored) {}
+
+            // 2. Пакет Lampa
+            try {
+                Intent i = new Intent(Intent.ACTION_VIEW, tmdbUri);
+                i.setPackage(lampaPkg);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getActivity().startActivity(i);
+                done(call, "package:tmdb");
+                return;
+            } catch (ActivityNotFoundException | SecurityException ignored) {}
+        }
+
+        // 3. Fallback: просто відкрити Lampa
+        Intent launch = pm.getLaunchIntentForPackage(lampaPkg);
+        if (launch != null) {
+            try {
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getActivity().startActivity(launch);
+                done(call, "launch-only");
+                return;
+            } catch (ActivityNotFoundException | SecurityException ignored) {}
+        }
+
+        call.reject("OPEN_FAILED");
     }
 }

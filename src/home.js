@@ -749,7 +749,15 @@ function renderHomeContent(taste) {
     sec.append(refreshBtn);
     wrap.append(sec);
 
-    // Плаваючі таби
+  } else if (recs && recs.seeds === 0) {
+    const sec = el('section', 'home-section');
+    sec.append(el('h2', 'section-title', '✨ Для тебе'));
+    sec.append(el('div', 'home-note', 'Постав оцінку 7+ або ❤️ улюбленому фільму чи серіалу — і тут з\'являться персональні рекомендації.'));
+    wrap.append(sec);
+  }
+
+  // Плаваючі таби (доступні і для персональних, і для загальних добірок)
+  if ((recs && recs.items && recs.items.length) || state.home.general) {
     const tabsWrap = el('div', 'home-tabs-wrap');
     const tabs = el('div', 'home-tabs');
     const mTab = el('button', 'home-tab' + (state.home.tab === 'movie' ? ' active' : ''), '🎬 Фільми');
@@ -773,11 +781,6 @@ function renderHomeContent(taste) {
     tabs.append(mTab, tTab);
     tabsWrap.append(tabs);
     wrap.append(tabsWrap);
-  } else if (recs && recs.seeds === 0) {
-    const sec = el('section', 'home-section');
-    sec.append(el('h2', 'section-title', '✨ Для тебе'));
-    sec.append(el('div', 'home-note', 'Постав оцінку 7+ або ❤️ улюбленому фільму чи серіалу — і тут з\'являться персональні рекомендації.'));
-    wrap.append(sec);
   }
 
   // === БЛОК ЗАГАЛЬНИХ ПІДБІРОК ===
