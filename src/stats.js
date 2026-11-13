@@ -13,6 +13,7 @@ function renderStatistics() {
   const tabDefs = [
     { id: 'taste', label: '🧬 Смак' },
     { id: 'series', label: '📺 Серіали' },
+    { id: 'franchises', label: '🎞️ Франшизи' },
     { id: 'streaming', label: '📡 Стрімінги' },
     { id: 'elo', label: '🏆 Elo' },
     { id: 'actors', label: '🎭 Актори' },
@@ -29,6 +30,7 @@ function renderStatistics() {
   const content = el('div'); content.style.marginTop = '16px';
   if (state.stats.tab === 'taste') content.append(...renderTasteTab());
   else if (state.stats.tab === 'series') content.append(...renderSeriesTab());
+  else if (state.stats.tab === 'franchises') content.append(...renderFranchisesTab());
   else if (state.stats.tab === 'streaming') content.append(...renderStreamingTab());
   else if (state.stats.tab === 'elo') content.append(...renderEloTab());
   else if (state.stats.tab === 'actors') content.append(...renderActorsTab());
@@ -44,7 +46,9 @@ function getMissingMetaItems() {
     !x.cast?.length ||
     !x.platforms?.length ||
     !x.runtime ||
-    (x.type === 'tv' && !x.episode_count)
+    x.franchiseKey === undefined ||
+    (x.type === 'tv' && !x.episode_count) ||
+    (x.type === 'movie' && x.collection === undefined)
   );
 }
 
@@ -90,6 +94,8 @@ async function fetchAllMissingMeta() {
         if (meta.episode_count && !lib[item.key].episode_count) lib[item.key].episode_count = meta.episode_count;
         if (meta.totalSeasons && !lib[item.key].totalSeasons) lib[item.key].totalSeasons = meta.totalSeasons;
         if (meta.platforms && !lib[item.key].platforms?.length) lib[item.key].platforms = meta.platforms;
+        if (lib[item.key].franchiseKey === undefined && 'franchiseKey' in meta) lib[item.key].franchiseKey = meta.franchiseKey;
+        if (item.type === 'movie' && lib[item.key].collection === undefined && 'collection' in meta) lib[item.key].collection = meta.collection;
       } catch {}
     }));
     state.stats.castProgress.done = Math.min(missing.length, i + batchSize);
@@ -472,6 +478,244 @@ function renderSeriesTab() {
   return [wrap];
 }
 
+
+const COL_CACHE_KEY = 'mycinema.colCache.v1';
+const COL_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+
+function readColCache() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COL_CACHE_KEY)) || {};
+    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  } catch { return {}; }
+}
+
+function writeColCache(cache) {
+  try { localStorage.setItem(COL_CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
+
+async function fetchMissingCollections(colIds) {
+  if (state.stats.colLoading) return;
+  state.stats.colLoading = true;
+  const cache = readColCache();
+  const now = Date.now();
+  const todo = colIds.filter(id => !cache[id] || (now - (cache[id].ts || 0)) > COL_CACHE_TTL).slice(0, 15);
+  try {
+    for (let i = 0; i < todo.length; i += 4) {
+      const batch = todo.slice(i, i + 4);
+      await Promise.all(batch.map(async id => {
+        try {
+          const d = await tmdbFetch(`/collection/${id}?language=uk-UA`);
+          const parts = (d.parts || [])
+            .map(p => ({
+              id: p.id,
+              title: p.title || '',
+              poster: p.poster_path || null,
+              backdrop: p.backdrop_path || null,
+              release_date: p.release_date || '',
+              year: (p.release_date || '').slice(0, 4),
+              vote_average: p.vote_average || 0,
+              overview: p.overview || ''
+            }))
+            .sort((a, b) => (a.release_date || '9999').localeCompare(b.release_date || '9999'));
+          cache[id] = { ts: Date.now(), name: d.name || '', poster: d.poster_path || null, parts };
+        } catch {}
+      }));
+    }
+    writeColCache(cache);
+  } finally {
+    state.stats.colLoading = false;
+    if (state.tab === 'statistics' && state.stats.tab === 'franchises') renderStatistics();
+  }
+}
+
+function renderFranchisesTab() {
+  const wrap = el('div');
+  const loader = buildMetaLoaderBanner();
+  if (loader) wrap.append(loader);
+
+  const moviesWithCol = Object.values(lib).filter(x => x.type === 'movie' && x.collection && x.collection.id);
+  if (!moviesWithCol.length) {
+    wrap.append(el('div', 'avail-empty', 'Поки немає даних про франшизи. Натисни «Завантажити метадані з TMDB» вище або відкрий картки фільмів.'));
+    return [wrap];
+  }
+
+  const colMap = new Map();
+  moviesWithCol.forEach(m => {
+    const cid = m.collection.id;
+    if (!colMap.has(cid)) {
+      colMap.set(cid, {
+        id: cid,
+        name: m.collection.name || 'Франшиза',
+        poster: m.collection.poster || m.poster || null,
+        inLib: []
+      });
+    }
+    const entry = colMap.get(cid);
+    if (!entry.poster && m.poster) entry.poster = m.poster;
+    entry.inLib.push(m);
+  });
+
+  const colCache = readColCache();
+  const now = Date.now();
+  const colIds = [...colMap.keys()];
+  const needFetchIds = colIds.filter(id => !colCache[id] || (now - (colCache[id].ts || 0)) > COL_CACHE_TTL);
+  if (needFetchIds.length && !state.stats.colLoading) {
+    setTimeout(() => fetchMissingCollections(needFetchIds), 50);
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const franchises = [...colMap.values()].map(c => {
+    const cached = colCache[c.id];
+    const parts = cached?.parts?.length ? cached.parts : null;
+    const releasedParts = parts
+      ? parts.filter(p => p.release_date && p.release_date <= todayIso)
+      : c.inLib;
+    const totalParts = releasedParts.length || (parts ? parts.length : c.inLib.length);
+    const watchedInLib = c.inLib.filter(hasWatched);
+    const watchedSet = new Set(watchedInLib.map(x => x.id));
+    const watchedCount = parts
+      ? releasedParts.filter(p => watchedSet.has(p.id)).length
+      : watchedInLib.length;
+    const rated = c.inLib.map(x => ({ item: x, avg: computeItemRating(x).avg })).filter(x => x.avg > 0);
+    const avgRating = rated.length ? rated.reduce((s, x) => s + x.avg, 0) / rated.length : 0;
+    const mins = watchedInLib.reduce((s, x) => s + (x.runtime || 0), 0);
+    const pct = totalParts > 0 ? Math.min(100, Math.round((watchedCount / totalParts) * 100)) : 0;
+    const completed = totalParts >= 2 && watchedCount >= totalParts;
+    return {
+      ...c,
+      name: (cached?.name || c.name).replace(/\s*\(Колекція\)\s*$/i, '').replace(/\s*Collection\s*$/i, ''),
+      poster: cached?.poster || c.poster,
+      parts,
+      totalParts,
+      watchedCount,
+      ratedCount: rated.length,
+      avgRating,
+      mins,
+      pct,
+      completed
+    };
+  }).sort((a, b) => b.watchedCount - a.watchedCount || b.avgRating - a.avgRating || b.inLib.length - a.inLib.length);
+
+  const totalWatchedInFr = franchises.reduce((s, f) => s + f.watchedCount, 0);
+  const totalPartsKnown = franchises.reduce((s, f) => s + f.totalParts, 0);
+  const completedCount = franchises.filter(f => f.completed).length;
+  const totalMins = franchises.reduce((s, f) => s + f.mins, 0);
+
+  const sg = el('div', 'stats-grid');
+  const addS = (l, v) => { const s = el('div', 'stat-card'); s.append(el('div', 'stat-value', String(v)), el('div', 'stat-label', l)); sg.append(s); };
+  addS('Франшиз', franchises.length);
+  addS('Завершено повністю', completedCount);
+  addS('Переглянуто частин', `${totalWatchedInFr}/${totalPartsKnown}`);
+  addS('Час у франшизах', totalMins > 0 ? fmtDuration(totalMins).split(' ')[0] + ' год' : '—');
+  wrap.append(sg);
+
+  const favFr = [...franchises].filter(f => f.ratedCount >= 2).sort((a, b) => b.avgRating - a.avgRating || b.watchedCount - a.watchedCount)[0];
+  if (favFr) {
+    const ins = el('div', 'insight-card');
+    ins.append(el('div', 'insight-label', '🏆 Улюблена франшиза'));
+    const txt = el('div', 'insight-text');
+    txt.innerHTML = `Найвище ти оцінив серію <strong>«${favFr.name}»</strong> — середня оцінка <strong>${fmtNum(favFr.avgRating)}/10</strong> (${favFr.watchedCount}/${favFr.totalParts} переглянуто).`;
+    ins.append(txt);
+    wrap.append(ins);
+  }
+
+  if (!state.stats.openFranchises) state.stats.openFranchises = {};
+
+  wrap.append(el('h3', 'label', `Усі франшизи (${franchises.length})${state.stats.colLoading ? ' · оновлюю частини...' : ''}`));
+
+  const list = el('div', 'franchise-list');
+  franchises.forEach(fr => {
+    const isOpen = !!state.stats.openFranchises[fr.id];
+    const cardWrap = el('div', 'franchise-card' + (isOpen ? ' open' : ''));
+
+    const row = el('div', 'franchise-head');
+    if (fr.poster) {
+      const p = el('img', 'elo-poster'); p.src = TMDB_IMG + 'w92' + fr.poster; p.loading = 'lazy';
+      row.append(p);
+    } else {
+      row.append(el('div', 'actor-rank-photo-empty', '🎞️'));
+    }
+
+    const body = el('div', 'franchise-body');
+    const top = el('div', 'series-prog-top');
+    top.append(el('span', 'elo-title', fr.name));
+    const rightVal = fr.avgRating > 0
+      ? `⭐ ${fmtNum(fr.avgRating)}`
+      : (fr.completed ? '✓ 100%' : `${fr.pct}%`);
+    const valEl = el('span', 'series-prog-val' + (fr.avgRating > 0 ? ' ' + ratingClass(fr.avgRating) : ''), rightVal);
+    top.append(valEl);
+    body.append(top);
+
+    let subTxt = `${fr.watchedCount} з ${fr.totalParts} ${plural(fr.totalParts, 'фільм', 'фільми', 'фільмів')}`;
+    if (fr.completed) subTxt += ' · Завершено';
+    if (fr.mins > 0) subTxt += ` · ~${fmtDuration(fr.mins)}`;
+    body.append(el('div', 'elo-games', subTxt));
+
+    const bar = el('div', 'item-progress');
+    const fill = el('div', 'item-progress-fill');
+    fill.style.width = fr.pct + '%';
+    bar.append(fill);
+    body.append(bar);
+
+    row.append(body);
+    row.append(el('span', 'franchise-chev', isOpen ? '▴' : '▾'));
+
+    const partsBox = el('div', 'franchise-parts');
+    partsBox.style.display = isOpen ? 'flex' : 'none';
+
+    const renderParts = () => {
+      partsBox.replaceChildren();
+      const rawParts = fr.parts || fr.inLib.slice().sort((a, b) => (a.year || '9999').localeCompare(b.year || '9999'));
+      rawParts.forEach(p => {
+        const saved = lib['movie-' + p.id];
+        const partItem = saved || normalizeItem({ ...p, media_type: 'movie', poster_path: p.poster });
+        const pr = el('div', 'franchise-part-row');
+        if (partItem.poster) {
+          const pp = el('img', 'franchise-part-poster'); pp.src = TMDB_IMG + 'w92' + partItem.poster; pp.loading = 'lazy';
+          pr.append(pp);
+        } else {
+          pr.append(el('div', 'franchise-part-poster poster-empty'));
+        }
+        const pi = el('div', 'elo-info');
+        pi.append(el('div', 'elo-title', partItem.title || p.title));
+        const isFuture = p.release_date && p.release_date > todayIso;
+        let meta = partItem.year || (isFuture ? 'Анонс' : '—');
+        if (saved?.status === 'watched') meta += ' · ✅ Переглянуто';
+        else if (saved?.status === 'planned') meta += ' · 📅 Планую';
+        else if (saved?.status === 'dropped') meta += ' · 🕸️ Закинуто';
+        else if (isFuture) meta += ' · 🗓️ Незабаром';
+        else meta += ' · Ще не в бібліотеці';
+        pi.append(el('div', 'elo-games', meta));
+        pr.append(pi);
+
+        const sAvg = saved ? computeItemRating(saved).avg : 0;
+        if (sAvg > 0) {
+          pr.append(el('span', 'badge rated ' + ratingClass(sAvg), fmtNum(sAvg)));
+        }
+        pr.addEventListener('click', (e) => { e.stopPropagation(); openCard(partItem); });
+        partsBox.append(pr);
+      });
+    };
+
+    if (isOpen) renderParts();
+
+    row.addEventListener('click', () => {
+      const next = !state.stats.openFranchises[fr.id];
+      state.stats.openFranchises[fr.id] = next;
+      cardWrap.classList.toggle('open', next);
+      row.querySelector('.franchise-chev').textContent = next ? '▴' : '▾';
+      if (next && !partsBox.childElementCount) renderParts();
+      partsBox.style.display = next ? 'flex' : 'none';
+    });
+
+    cardWrap.append(row, partsBox);
+    list.append(cardWrap);
+  });
+
+  wrap.append(list);
+  return [wrap];
+}
+
 function renderStreamingTab() {
   const wrap = el('div');
   const loader = buildMetaLoaderBanner();
@@ -604,48 +848,32 @@ function renderActorsTab() {
   const loader = buildMetaLoaderBanner();
   if (loader) wrap.append(loader);
 
-  const items = Object.values(lib);
-  const actorMap = new Map();
-  items.forEach(item => {
-    (item.cast || []).forEach(a => {
-      if (!actorMap.has(a.id)) actorMap.set(a.id, { id: a.id, name: a.name, profile_path: a.profile_path, projects: [] });
-      actorMap.get(a.id).projects.push(item);
-    });
-  });
-
-  const allRatedAvgs = Object.values(lib).map(x => computeItemRating(x).avg).filter(v => v > 0);
-  const globalAvg = allRatedAvgs.length ? allRatedAvgs.reduce((a, b) => a + b, 0) / allRatedAvgs.length : 7;
-
-  const actors = [...actorMap.values()].map(a => {
-    const watched = a.projects.filter(hasWatched);
-    const rated = watched.filter(p => computeItemRating(p).avg > 0);
-    const avgRating = rated.length ? rated.reduce((s, p) => s + computeItemRating(p).avg, 0) / rated.length : 0;
-    const v = rated.length;
-    const baseWeighted = v > 0 ? (v * avgRating + ACTOR_MIN_VOTES * globalAvg) / (v + ACTOR_MIN_VOTES) : 0;
-    const adj = typeof getActorAdj === 'function' ? getActorAdj(a.id) : 0;
-    const weightedRating = baseWeighted > 0 ? Math.max(1, Math.min(10, baseWeighted + adj * ACTOR_ADJUST_STEP)) : 0;
-    return { ...a, watchedCount: watched.length, ratedCount: v, avgRating, weightedRating, adj };
-  });
+  const { globalCastAvg, actors: actorMap } = computeActorProfiles();
+  const actors = [...actorMap.values()];
 
   let display, valueFn;
   if (state.stats.actorTab === 'rating') {
-    display = actors.filter(a => a.ratedCount >= 1).sort((x, y) => y.weightedRating - x.weightedRating || y.ratedCount - x.ratedCount || x.name.localeCompare(y.name));
-    valueFn = a => ({ text: fmtNum(a.weightedRating), cls: ratingClass(a.weightedRating) });
+    display = actors
+      .filter(a => a.ratedCount >= 1)
+      .sort((x, y) => y.score - x.score || y.effCount - x.effCount || x.name.localeCompare(y.name));
+    valueFn = a => ({ text: fmtNum(a.score), cls: ratingClass(a.score) });
   } else {
-    display = actors.filter(a => a.watchedCount >= 1).sort((x, y) => y.watchedCount - x.watchedCount || y.weightedRating - x.weightedRating || x.name.localeCompare(y.name));
+    display = actors
+      .filter(a => a.watchedCount >= 1)
+      .sort((x, y) => y.watchedCount - x.watchedCount || y.score - x.score || x.name.localeCompare(y.name));
     valueFn = a => ({ text: String(a.watchedCount), cls: '' });
   }
 
   if (!display.length) {
-    content.append(el('div', 'avail-empty', state.stats.actorTab === 'rating' ? 'Немає оцінених проєктів з акторами' : 'Немає переглянутих проєктів з акторами'));
+    content.append(el('div', 'avail-empty', state.stats.actorTab === 'rating' ? 'Немає проєктів з оцінкою «Персонажі і каст»' : 'Немає переглянутих проєктів з акторами'));
     wrap.append(content);
     return [wrap];
   }
 
   if (state.stats.actorTab === 'rating' && display.length > 0) {
     const hint = el('div');
-    hint.style.cssText = 'padding:10px 14px;background:rgba(255,184,108,.06);border-left:3px solid var(--accent);border-radius:8px;font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:12px';
-    hint.innerHTML = `Оцінка зважена за кількістю проєктів (мін. вага: <strong style="color:var(--accent)">${ACTOR_MIN_VOTES}</strong>). Кнопки 🔥/😞 дозволяють вручну підкрутити вплив актора на рекомендації.`;
+    hint.style.cssText = 'padding:10px 14px;background:rgba(var(--accent-rgb),.06);border-left:3px solid var(--accent);border-radius:8px;font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:12px';
+    hint.innerHTML = `Критерій <strong style="color:var(--accent)">«Персонажі і каст»</strong> відносно твоєї середньої (<strong style="color:var(--accent)">${fmtNum(globalCastAvg)}</strong>): головні ролі (0–3), бонус за хіти, % штраф нижче (-10% на -0,85; -20% на -1,5), база ${ACTOR_REF_PROJECTS} проєктів і згортання повторів франшиз (вкл. MCU).`;
     content.append(hint);
   }
 
@@ -663,7 +891,11 @@ function renderActorsTab() {
     info.append(el('div', 'actor-rank-name', a.name));
     let meta;
     if (state.stats.actorTab === 'rating') {
-      meta = `${a.ratedCount} ${plural(a.ratedCount, 'проєкт', 'проєкти', 'проєктів')} · сира ${fmtNum(a.avgRating)}`;
+      const parts = [`${a.ratedCount} ${plural(a.ratedCount, 'проєкт', 'проєкти', 'проєктів')}`, `каст ${fmtNum(a.rawAvg)}`];
+      if (a.leadCount > 0) parts.push(`${a.leadCount} гол.`);
+      if (a.hitCount > 0) parts.push(`${a.hitCount} хіт.`);
+      if (a.missCount > 0) parts.push(`${a.missCount} низьк.`);
+      meta = parts.join(' · ');
     } else {
       meta = `${a.watchedCount} ${plural(a.watchedCount, 'перегляд', 'перегляди', 'переглядів')}`;
     }
@@ -677,6 +909,7 @@ function renderActorsTab() {
       fireBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         setActorAdj(a.id, a.adj > 0 ? 0 : 1);
+        try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
         state.home.sig = null;
         renderStatistics();
       });
@@ -686,6 +919,7 @@ function renderActorsTab() {
       sadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         setActorAdj(a.id, a.adj < 0 ? 0 : -1);
+        try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
         state.home.sig = null;
         renderStatistics();
       });

@@ -17,6 +17,7 @@ function closeSettings() {
 function onPosterBgToggle(on) {
   settings.posterBg = on;
   localStorage.setItem('mycinema.posterBg', on ? 'true' : 'false');
+  if (typeof touchAppearance === 'function') touchAppearance();
   if (cardStack.length) renderCard();
 }
 
@@ -38,7 +39,7 @@ function renderSettingsSwatches() {
     const s = el('div', 'theme-swatch' + (settings.themeBg === key ? ' active' : ''));
     s.style.cssText = `width:48px;height:48px;border-radius:12px;cursor:pointer;border:3px solid ${settings.themeBg === key ? 'var(--accent)' : 'transparent'};background:linear-gradient(135deg,${t.bg1} 0%,${t.bg3} 100%);position:relative;transition:transform .15s`;
     s.innerHTML = `<span style="position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:9px;font-weight:600;color:${t.text}">${t.name}</span>`;
-    s.addEventListener('click', () => { applyTheme(key, settings.themeAccent); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
+    s.addEventListener('click', () => { applyTheme(key, settings.themeAccent); if (typeof touchAppearance === 'function') touchAppearance(); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
     bgWrap.append(s);
   });
   
@@ -46,7 +47,7 @@ function renderSettingsSwatches() {
     const s = el('div', 'theme-swatch' + (settings.themeAccent === key ? ' active' : ''));
     s.style.cssText = `width:48px;height:48px;border-radius:12px;cursor:pointer;border:3px solid ${settings.themeAccent === key ? 'var(--accent)' : 'transparent'};background:${a.accent};position:relative;transition:transform .15s`;
     s.innerHTML = `<span style="position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:9px;font-weight:600;color:${a.fg}">${a.name}</span>`;
-    s.addEventListener('click', () => { applyTheme(settings.themeBg, key); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
+    s.addEventListener('click', () => { applyTheme(settings.themeBg, key); if (typeof touchAppearance === 'function') touchAppearance(); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
     acWrap.append(s);
   });
 }

@@ -17,6 +17,13 @@ const TASTE_HALFLIFE_DAYS = 180;
 const ACTOR_MIN_VOTES = 5;
 const ACTOR_ADJUST_STEP = 0.35;
 const ACTOR_ADJUST_KEY = 'mycinema.actorAdjustments';
+const ACTOR_REF_PROJECTS = 6;
+const ACTOR_LEAD_MAX_INDEX = 3;
+const ACTOR_PENALTY_START = -0.35;
+const ACTOR_PENALTY_10_DELTA = -0.85;
+const ACTOR_PENALTY_CAP = 0.25;
+const ACTOR_FRANCHISE_CAP = 0.09;
+const MCU_COMPANY_IDS = [420, 38679]; // Marvel Studios (420), Marvel Television (38679) // Marvel Studios (420), Marvel Television (38679)
 
 // ============ MOODS ============
 const MOODS = {

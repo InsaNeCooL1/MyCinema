@@ -28,6 +28,7 @@
   function setEnabled(on) {
     localStorage.setItem(KEY, on ? 'true' : 'false');
     apply();
+    if (typeof touchAppearance === 'function') touchAppearance();
   }
 
   window.SnowFeature = { isEnabled: isEnabled, setEnabled: setEnabled, apply: apply };

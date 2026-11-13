@@ -315,15 +315,36 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     signals.cast[id] *= clampNum(1 + smooth / 2, 0.5, 1.6);
   }
 
+  // Профіль акторів (Б+В відносно G, без countMod і без подвійного обліку)
+  const actorProfiles = typeof computeActorProfiles === 'function'
+    ? computeActorProfiles()
+    : { globalCastAvg: 7.2, actors: new Map() };
+  const anti = { directors: {}, genres: {}, keywords: {}, cast: {} };
+
+  for (const [aid, prof] of actorProfiles.actors.entries()) {
+    if (prof.name && !names.cast[aid]) names.cast[aid] = prof.name;
+    if (prof.isAnti) {
+      if (signals.cast[aid]) signals.cast[aid] = 0;
+      anti.cast[aid] = Math.min(1.4, Math.max(0.25, Math.abs(prof.recSignal) * 0.6));
+    } else if (prof.ratedCount >= 1 && prof.recSignal > 0.25 && prof.shrunk >= actorProfiles.globalCastAvg) {
+      const profBoost = Math.min(2.2, prof.recSignal * 0.95);
+      signals.cast[aid] = Math.max(signals.cast[aid] || 0, profBoost);
+    }
+  }
+
   // Ручні оцінки акторів (🔥/😞)
   for (const [aidStr, adj] of Object.entries(actorAdjust || {})) {
     const aid = parseInt(aidStr);
-    if (adj > 0) signals.cast[aid] = (signals.cast[aid] || 0) + adj * 2.0;
-    else if (adj < 0 && signals.cast[aid]) signals.cast[aid] = Math.max(0, signals.cast[aid] + adj * 1.5);
+    if (adj > 0) {
+      signals.cast[aid] = (signals.cast[aid] || 0) + adj * 1.5;
+      delete anti.cast[aid];
+    } else if (adj < 0) {
+      if (signals.cast[aid]) signals.cast[aid] = 0;
+      anti.cast[aid] = Math.max(anti.cast[aid] || 0, Math.abs(adj) * 0.9);
+    }
   }
 
-  // Анти-сигнали (тільки dropped + ручне «не схоже» + сховані)
-  const anti = { directors: {}, genres: {}, keywords: {} };
+  // Анти-сигнали (тільки dropped + ручне «не схоже» + сховані + анти-актори)
   for (const { seed, meta } of antiDetails) {
     const aw = seed.antiSeed ? 1.4 : 1.0;
     (meta.dirs || []).forEach(c => { anti.directors[c.id] = (anti.directors[c.id] || 0) + aw; });
@@ -342,7 +363,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   const topGenres = Object.entries(signals.genres)
     .sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id]) => parseInt(id));
   const topCast = Object.entries(signals.cast)
-    .filter(([, sc]) => sc > 0)
+    .filter(([id, sc]) => sc > 0 && !anti.cast[id])
     .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => parseInt(id));
   const topDirectors = Object.entries(signals.directors)
     .filter(([id]) => !anti.directors[id])
@@ -478,8 +499,10 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         addReason(entry, 'dir-' + batch.dirId, dName ? `Режисер: ${dName}` : 'Твій режисер', 9);
       } else if (batch.source === 'cast') {
         const adj = typeof getActorAdj === 'function' ? getActorAdj(batch.actorId) : 0;
-        if (adj < 0) continue;
-        entry._sourceRaw += 0.8 + adj * 0.25;
+        if (adj < 0 || anti.cast[batch.actorId]) continue;
+        const prof = actorProfiles.actors.get(batch.actorId);
+        const profBoost = prof && prof.recSignal > 0 ? Math.min(0.4, prof.recSignal * 0.16) : 0;
+        entry._sourceRaw += 0.75 + adj * 0.25 + profBoost;
         const aName = names.cast[batch.actorId];
         addReason(entry, 'cast-' + batch.actorId, aName ? `З ${aName}` : 'Актор з улюблених', 7);
       } else if (batch.source === 'personalized') {
@@ -592,16 +615,23 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         let antiKw = 0;
 
         let bestActor = null, bestActorScore = 0;
+        let antiCast = 0;
         (entry._meta.cast || []).forEach(c => {
+          if (anti.cast[c.id]) {
+            antiCast += anti.cast[c.id] * (c.w || 1) * 0.25;
+            return;
+          }
           const sig = signals.cast[c.id] || 0;
           if (sig > 0) {
-            const sc = sig * (c.w || 1) * 0.35;
+            const prof = actorProfiles.actors.get(c.id);
+            const leadBoost = prof && prof.shrunk >= actorProfiles.globalCastAvg + 0.5 && (c.w || 0) >= 0.5 ? 1.12 : 1.0;
+            const sc = sig * (c.w || 1) * 0.25 * leadBoost;
             actorMatch += sc;
             if (sc > bestActorScore) { bestActorScore = sc; bestActor = c; }
           }
         });
-        actorMatch = Math.min(0.8, actorMatch);
-        if (bestActor && bestActorScore >= 0.25) {
+        actorMatch = Math.min(0.80, actorMatch);
+        if (bestActor && bestActorScore >= 0.20) {
           addReason(entry, 'cast-' + bestActor.id, `З ${bestActor.name}`, 7);
         }
 
@@ -627,7 +657,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         kwMatch = Math.min(0.6, kwMatch);
 
         entry._profileRaw = entry._genreMatch + actorMatch + directorMatch + kwMatch;
-        entry._antiPenalty = entry._antiGenre + Math.min(0.4, antiDir) + Math.min(0.35, antiKw);
+        entry._antiPenalty = entry._antiGenre + Math.min(0.4, antiDir) + Math.min(0.35, antiKw) + Math.min(0.35, antiCast);
         finalizeReasons(entry);
       }
 
@@ -838,8 +868,10 @@ function computeRecsSignature(seeds) {
   const antiSig = getAntiSeeds().map(a => a.key).join(',');
   const exSig = Object.values(lib).filter(x => x.excludeFromProfile !== undefined).map(x => `${x.key}:${x.excludeFromProfile ? 1 : 0}`).join(',');
   const adjSig = Object.entries(actorAdjust || {}).filter(([, v]) => v !== 0).map(([k, v]) => `${k}:${v}`).join(',');
+  const castVals = Object.values(lib).map(x => typeof getItemCastRating === 'function' ? getItemCastRating(x) : 0).filter(v => v > 0);
+  const castSig = `${castVals.length}:${castVals.reduce((a, b) => a + b, 0).toFixed(1)}`;
   const day = new Date().toISOString().slice(0, 10);
-  return `v6|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|mood:${state.home.mood || 'any'}|mode:${state.home.mode || 'balance'}`;
+  return `v9|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}|mode:${state.home.mode || 'balance'}`;
 }
 
 async function loadHome() {
@@ -1055,6 +1087,9 @@ function renderHomeContent(taste) {
   if (cwSection) box.append(cwSection);
 
   const wrap = el('div', 'home-wrap');
+
+  const factCard = buildFactOfDayCard();
+  if (factCard) wrap.append(factCard);
 
   const plannedSec = buildPlannedByMoodSection();
   if (plannedSec) wrap.append(plannedSec);

@@ -2720,3 +2720,206 @@ body:has(#overlay.open) .mcm-snow::after {
   0%, 100% { opacity: 1; }
   50% { opacity: .15; }
 }
+
+/* ========================================================= */
+/* PERSON CARD BAR FIX + BIO + FRANCHISES OBSERVATORY       */
+/* ========================================================= */
+@media (max-width: 899px) {
+  #card.is-person .card-bar {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    pointer-events: auto !important;
+    padding: 10px 16px 4px !important;
+    padding-top: calc(10px + env(safe-area-inset-top)) !important;
+  }
+  #card.is-person .card-scroll {
+    padding-top: 4px !important;
+  }
+}
+
+@media (min-width: 900px) {
+  #overlay #card.is-person .card-bar {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    pointer-events: auto !important;
+    padding: 18px 24px 6px !important;
+  }
+  #overlay #card.is-person .card-scroll {
+    padding: 4px 40px 40px !important;
+  }
+}
+
+.person-lib-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(var(--accent-rgb), .12);
+  border: 1px solid rgba(var(--accent-rgb), .3);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+
+.person-bio-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.person-bio-source {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.person-wiki-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+.person-wiki-link:hover {
+  text-decoration: underline;
+}
+
+.franchise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.franchise-card {
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, .04);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.franchise-card.open {
+  border-color: rgba(var(--accent-rgb), .28);
+}
+.franchise-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.franchise-head:hover {
+  background: var(--bg-2);
+}
+.franchise-body {
+  flex: 1;
+  min-width: 0;
+}
+.franchise-chev {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.franchise-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+  border-top: 1px solid rgba(255, 255, 255, .04);
+  padding-top: 10px;
+}
+.franchise-part-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--bg-2);
+  cursor: pointer;
+  transition: background .15s;
+}
+.franchise-part-row:hover {
+  background: var(--bg-3);
+}
+.franchise-part-poster {
+  width: 30px;
+  height: 45px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-3);
+}
+.series-prog-val.green { color: var(--mint); }
+.series-prog-val.yellow { color: var(--accent); }
+.series-prog-val.red { color: var(--danger); }
+
+/* ========================================================= */
+/* WIKI OVERVIEW + WIDER LAMPA/UAKINO FONTS + NOTES LABEL    */
+/* ========================================================= */
+.action-row-top .action-btn-main.watch {
+  font-family: Verdana, 'DejaVu Sans', 'Segoe UI', sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.7px !important;
+  gap: 8px !important;
+}
+
+.action-row-top .action-btn-main.uakino {
+  font-family: Verdana, 'DejaVu Sans', 'Arial Black', sans-serif !important;
+  font-size: 19px !important;
+  font-weight: 900 !important;
+  font-style: normal !important;
+  letter-spacing: 1px !important;
+  gap: 1px !important;
+}
+.uakino-ua { color: #2b8cff; }
+.uakino-kino { color: #ffd700; }
+
+.status-section-row .status-btn-text {
+  white-space: nowrap;
+}
+
+.overview-source-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.overview-src-btn {
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid rgba(255, 255, 255, .06);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: .15s;
+}
+.overview-src-btn:hover {
+  color: var(--text);
+  background: var(--bg-3);
+}
+.overview-src-btn.active {
+  background: rgba(var(--accent-rgb), .14);
+  border-color: rgba(var(--accent-rgb), .4);
+  color: var(--accent);
+}
+.overview-wiki-link {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  text-decoration: none;
+  transition: .15s;
+}
+.overview-wiki-link:hover {
+  color: var(--accent);
+  background: var(--bg-3);
+}

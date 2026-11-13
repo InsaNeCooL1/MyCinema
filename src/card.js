@@ -72,16 +72,13 @@ function cardBar() {
   const bar = el('div', 'card-bar');
   const back = el('button', 'card-x', '←'); back.title = 'Назад';
   back.addEventListener('click', () => history.back());
-  bar.append(back);
-  if (cardStack.length > 1) {
-    const x = el('button', 'card-x', '✕'); x.title = 'Закрити все';
-    x.addEventListener('click', closeCard);
-    bar.append(x);
-  } else bar.append(el('div', 'card-spacer'));
+  bar.append(back, el('div', 'card-spacer'));
   return bar;
 }
 
 function renderLoading() {
+  const top = cardStack[cardStack.length - 1];
+  card.classList.toggle('is-person', top?.type === 'person');
   card.innerHTML = '';
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
@@ -94,6 +91,9 @@ async function loadMediaCardData(ctx) {
   try {
     const d = await tmdbFetch(`/${r.type}/${r.id}?language=uk-UA&include_video_language=uk,en,null&append_to_response=credits,videos,external_ids,watch/providers,recommendations,similar,images`);
     ctx.details = d;
+    const wikiPromise = (d.external_ids?.wikidata_id && typeof fetchWikiMediaDescription === 'function')
+      ? fetchWikiMediaDescription(d.external_ids.wikidata_id)
+      : Promise.resolve(null);
     
     if (!r.title) {
       r.title = d.title || d.name || '';
@@ -112,6 +112,14 @@ async function loadMediaCardData(ctx) {
     if (meta.platforms) r.platforms = meta.platforms;
     if (meta.genres) { ctx.genres = meta.genres; r.genres = meta.genres; }
     if (meta.cast) ctx.cast = meta.cast;
+    if ('franchiseKey' in meta) {
+      ctx.franchiseKey = meta.franchiseKey;
+      r.franchiseKey = meta.franchiseKey;
+    }
+    if (r.type === 'movie' && 'collection' in meta) {
+      ctx.collection = meta.collection;
+      r.collection = meta.collection;
+    }
     if (lib[r.key]) {
       let dirty = false;
       if (meta.genres && !lib[r.key].genres?.length) { lib[r.key].genres = meta.genres; dirty = true; }
@@ -119,6 +127,8 @@ async function loadMediaCardData(ctx) {
       if (meta.runtime && !lib[r.key].runtime) { lib[r.key].runtime = meta.runtime; dirty = true; }
       if (meta.episode_count && lib[r.key].episode_count !== meta.episode_count) { lib[r.key].episode_count = meta.episode_count; dirty = true; }
       if (meta.platforms && (!lib[r.key].platforms || !lib[r.key].platforms.length)) { lib[r.key].platforms = meta.platforms; dirty = true; }
+      if (r.type === 'movie' && 'collection' in meta && lib[r.key].collection === undefined) { lib[r.key].collection = meta.collection; dirty = true; }
+      if ('franchiseKey' in meta && lib[r.key].franchiseKey === undefined) { lib[r.key].franchiseKey = meta.franchiseKey; dirty = true; }
       if (dirty) save();
     }
     if (d.external_ids?.imdb_id) {
@@ -149,6 +159,12 @@ async function loadMediaCardData(ctx) {
     const sims = d.similar?.results || [];
     const pool = recs.length > 0 ? recs : sims;
     ctx.similar = pool.map(item => normalizeItem({ ...item, media_type: r.type })).filter(item => item.poster && item.id !== r.id);
+    const wiki = await wikiPromise;
+    if (wiki?.text) {
+      ctx.wikiOverview = wiki.text;
+      ctx.wikiUrl = wiki.url || null;
+      if (!ctx.overviewSource) ctx.overviewSource = 'wiki';
+    }
   } catch (e) { ctx.error = e.message; }
 }
 
@@ -213,6 +229,7 @@ function renderCard(restore) {
 
   const prevScroll = card.querySelector('.card-scroll');
   const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
+  card.classList.toggle('is-person', ctx.type === 'person');
   card.innerHTML = '';
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
@@ -287,10 +304,10 @@ function renderMediaCard(ctx, scroll) {
   
   const watchBtn = el('button', 'action-btn-main watch');
   watchBtn.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
       <path d="M8 5v14l11-7z"/>
     </svg>
-    Лампа
+    <span>Лампа</span>
   `;
   watchBtn.title = 'Відкрити в Lampa';
   watchBtn.addEventListener('click', () => openInLampa(r));
@@ -301,10 +318,7 @@ function renderMediaCard(ctx, scroll) {
   const cleanSearchTitle = searchTitle.replace(/[^a-zA-Zа-яА-ЯіІїЇєЄґҐ0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(cleanSearchTitle)}`;
   const uakinoBtn = el('button', 'action-btn-main uakino');
-  uakinoBtn.innerHTML = '<span style="color: #0057b8; font-weight: 900; font-size: 16px; font-style: italic; letter-spacing: -0.5px;">UA</span><span style="color: #ffd700; font-weight: 900; font-size: 16px; font-style: italic; letter-spacing: -0.5px;">KINO</span>';
-  uakinoBtn.style.display = 'flex';
-  uakinoBtn.style.alignItems = 'center';
-  uakinoBtn.style.justifyContent = 'center';
+  uakinoBtn.innerHTML = '<span class="uakino-ua">UA</span><span class="uakino-kino">KINO</span>';
   uakinoBtn.addEventListener('click', () => window.open(searchUrl, '_blank'));
   actionRowTop.append(uakinoBtn);
   
@@ -437,19 +451,60 @@ function renderMediaCard(ctx, scroll) {
   
   topRight.append(statusRow);
 
-  // 6. Опис
-  if (d.overview) {
+  // 6. Опис (Вікіпедія + TMDB перемикач)
+  const hasWikiOv = !!(ctx.wikiOverview && ctx.wikiOverview.trim());
+  const hasTmdbOv = !!(d.overview && d.overview.trim());
+  if (hasWikiOv || hasTmdbOv) {
+    const useWikiOv = hasWikiOv && ctx.overviewSource !== 'tmdb';
+    const activeOv = useWikiOv ? ctx.wikiOverview : d.overview;
+
     const overviewWrap = el('div');
     overviewWrap.style.marginTop = '8px';
+
+    if (hasWikiOv) {
+      const srcBar = el('div', 'overview-source-bar');
+      const wikiBtn = el('button', 'overview-src-btn' + (useWikiOv ? ' active' : ''), '📖 Вікіпедія');
+      wikiBtn.type = 'button';
+      wikiBtn.addEventListener('click', () => {
+        if (ctx.overviewSource === 'wiki') return;
+        ctx.overviewSource = 'wiki';
+        ctx.overviewExpanded = false;
+        renderCard();
+      });
+      srcBar.append(wikiBtn);
+
+      if (hasTmdbOv) {
+        const tmdbBtn = el('button', 'overview-src-btn' + (!useWikiOv ? ' active' : ''), '🎬 TMDB');
+        tmdbBtn.type = 'button';
+        tmdbBtn.addEventListener('click', () => {
+          if (ctx.overviewSource === 'tmdb') return;
+          ctx.overviewSource = 'tmdb';
+          ctx.overviewExpanded = false;
+          renderCard();
+        });
+        srcBar.append(tmdbBtn);
+      }
+
+      if (ctx.wikiUrl) {
+        const wLink = el('a', 'overview-wiki-link', '↗');
+        wLink.href = ctx.wikiUrl;
+        wLink.target = '_blank';
+        wLink.rel = 'noopener noreferrer';
+        wLink.title = 'Відкрити статтю у Вікіпедії';
+        srcBar.append(wLink);
+      }
+      overviewWrap.append(srcBar);
+    }
+
     const isExpanded = !!ctx.overviewExpanded;
-    
-    const textEl = el('div', 'overview', d.overview);
+    const textEl = el('div', 'overview', activeOv);
     textEl.style.margin = '0';
+    textEl.style.whiteSpace = 'pre-line';
     if (isExpanded) textEl.classList.add('overview-expanded');
     else textEl.classList.add('overview-clamped');
     overviewWrap.append(textEl);
 
-    if (d.overview.length > 180) {
+    if (activeOv.length > 180 || (activeOv.includes('\n') && activeOv.length > 120)) {
       const readMoreBtn = el('button', 'btn-read-more', isExpanded ? 'Згорнути' : 'Читати далі...');
       readMoreBtn.addEventListener('click', () => {
         ctx.overviewExpanded = !ctx.overviewExpanded;
@@ -569,6 +624,7 @@ function renderDetailsTab(ctx) {
   const producers = (d.credits?.crew || []).filter(c => c.job === 'Producer').slice(0, 5).map(c => c.name).join(', ');
   const countries = (d.production_countries || []).map(c => c.name).join(', ');
 
+  addItem('Франшиза', d.belongs_to_collection?.name || null);
   addItem('Бюджет', d.budget ? '$' + d.budget.toLocaleString('en-US') : null);
   addItem('Збори', d.revenue ? '$' + d.revenue.toLocaleString('en-US') : null);
   addItem('Дата виходу', d.release_date || d.first_air_date);

@@ -113,6 +113,231 @@ function computeTasteVector() {
   return result;
 }
 
+function getItemCastRating(item) {
+  if (!item) return 0;
+  if (item.type === 'tv') {
+    const sr = item.seasonRatings || {};
+    const vals = Object.values(sr).map(s => (s && s.cast) || 0).filter(v => v > 0);
+    if (vals.length) return vals.reduce((a, b) => a + b, 0) / vals.length;
+    return (item.ratings && item.ratings.cast) || 0;
+  }
+  return (item.ratings && item.ratings.cast) || 0;
+}
+
+function getItemFranchiseKey(item) {
+  if (!item) return null;
+  if (item.franchiseKey) return item.franchiseKey;
+  if (item.type === 'movie' && item.collection?.id) return 'col-' + item.collection.id;
+  return null;
+}
+
+function computeActorProfiles() {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const items = Object.values(lib);
+
+  const ratedCastItems = items
+    .map(item => ({ item, castRating: getItemCastRating(item) }))
+    .filter(x => x.castRating > 0);
+
+  // Історичне середнє критерію «Персонажі і каст»
+  const globalCastAvg = ratedCastItems.length
+    ? ratedCastItems.reduce((s, x) => s + x.castRating, 0) / ratedCastItems.length
+    : 7.2;
+
+  const tmdbPairs = ratedCastItems.filter(x => x.item.tmdbRating > 0);
+  const globalTmdbAvg = tmdbPairs.length
+    ? tmdbPairs.reduce((s, x) => s + x.item.tmdbRating, 0) / tmdbPairs.length
+    : 6.9;
+
+  const G = globalCastAvg;
+  const hitTagDelta = Math.max(0.4, Math.min(0.8, (10 - G) * 0.55));
+  const hiScale = Math.max(0.8, Math.min(1.3, 10 - G));
+
+  const actorMap = new Map();
+  items.forEach(item => {
+    const castRating = getItemCastRating(item);
+    const watched = hasWatched(item);
+    if (castRating <= 0 && !watched) return;
+
+    const fKey = getItemFranchiseKey(item);
+    (item.cast || []).forEach((a, idx) => {
+      if (!a || !a.id) return;
+      if (!actorMap.has(a.id)) {
+        actorMap.set(a.id, {
+          id: a.id,
+          name: a.name,
+          profile_path: a.profile_path || null,
+          watchedCount: 0,
+          ratedEntries: []
+        });
+      }
+      const entry = actorMap.get(a.id);
+      if (!entry.profile_path && a.profile_path) entry.profile_path = a.profile_path;
+      if (watched) entry.watchedCount++;
+      if (castRating > 0) {
+        entry.ratedEntries.push({ item, castRating, idx, fKey });
+      }
+    });
+  });
+
+  const actors = new Map();
+  for (const a of actorMap.values()) {
+    const rated = a.ratedEntries;
+    const adj = typeof getActorAdj === 'function' ? getActorAdj(a.id) : 0;
+
+    if (!rated.length) {
+      actors.set(a.id, {
+        id: a.id,
+        name: a.name,
+        profile_path: a.profile_path,
+        watchedCount: a.watchedCount,
+        ratedCount: 0,
+        effCount: 0,
+        rawAvg: 0,
+        shrunk: 0,
+        score: 0,
+        leadCount: 0,
+        hitCount: 0,
+        missCount: 0,
+        isAnti: adj < 0,
+        adj,
+        recSignal: adj > 0 ? adj * 0.8 : (adj < 0 ? adj * 0.9 : 0)
+      });
+      continue;
+    }
+
+    // Сильніша/головніша частина кожної франшизи = 1.0, далі 0.45 -> 0.25 -> 0.15
+    const sorted = [...rated].sort((x, y) => {
+      const lx = x.idx <= ACTOR_LEAD_MAX_INDEX ? 1 : 0;
+      const ly = y.idx <= ACTOR_LEAD_MAX_INDEX ? 1 : 0;
+      return (ly - lx) || (y.castRating - x.castRating) || (parseInt(x.item.year || '9999') - parseInt(y.item.year || '9999'));
+    });
+
+    const frSeen = {};
+    const frEff = {};
+    const frRaw = {};
+
+    let sumW = 0;
+    let sumWC = 0;
+    let effCount = 0;
+    let leadCount = 0;
+    let leadGoodW = 0;
+    let hitCount = 0;
+    let hitW = 0;
+    let missCount = 0;
+    let penWeightedSum = 0;
+    let sumRecW = 0;
+    let sumRecRes = 0;
+
+    for (const r of sorted) {
+      const roleW = r.idx <= ACTOR_LEAD_MAX_INDEX ? 1.35 : (r.idx <= 6 ? 0.90 : 0.55);
+      let fw = 1.0;
+      if (r.fKey) {
+        const k = frSeen[r.fKey] || 0;
+        frSeen[r.fKey] = k + 1;
+        fw = k === 0 ? 1.0 : (k === 1 ? 0.45 : (k === 2 ? 0.25 : 0.15));
+        frEff[r.fKey] = (frEff[r.fKey] || 0) + fw;
+        frRaw[r.fKey] = (frRaw[r.fKey] || 0) + 1;
+      }
+
+      const w = roleW * fw;
+      const delta = r.castRating - G;
+
+      sumW += w;
+      sumWC += w * r.castRating;
+      effCount += fw;
+
+      if (r.idx <= ACTOR_LEAD_MAX_INDEX) {
+        leadCount++;
+        if (delta >= ACTOR_PENALTY_START) leadGoodW += w;
+      }
+
+      if (delta > 0.30) {
+        const hitStr = clamp((delta - 0.30) / hiScale, 0, 1);
+        hitW += w * hitStr;
+        if (delta >= hitTagDelta) hitCount++;
+      }
+
+      if (delta < ACTOR_PENALTY_START) {
+        // Плавний % штраф: -0.85 -> 10%, -1.50 -> ~20%, кап 25%
+        const projPen = Math.min(ACTOR_PENALTY_CAP, 0.10 * Math.pow((ACTOR_PENALTY_START - delta) / 0.50, 0.85));
+        penWeightedSum += w * projPen;
+        if (delta <= ACTOR_PENALTY_10_DELTA) missCount++;
+      }
+
+      const dec = tasteDecay(r.item.updated);
+      const res = r.item.tmdbRating > 0
+        ? (r.castRating - G) - (r.item.tmdbRating - globalTmdbAvg)
+        : (r.castRating - G);
+      sumRecW += w * dec;
+      sumRecRes += w * dec * res;
+    }
+
+    const rawAvg = sumW > 0 ? sumWC / sumW : 0;
+    const stabAvg = (effCount * rawAvg + 2.0 * G) / (effCount + 2.0);
+
+    // Прогресія відносно бази 6 (тільки для Топу в Обсерваторії)
+    let countMod = 0;
+    if (effCount < ACTOR_REF_PROJECTS) {
+      countMod = -0.95 * Math.pow((ACTOR_REF_PROJECTS - effCount) / (ACTOR_REF_PROJECTS - 1), 1.15);
+    } else if (effCount > ACTOR_REF_PROJECTS) {
+      const qualFactor = clamp((rawAvg - (G - 0.6)) / 1.4, 0, 1);
+      countMod = Math.min(0.40, 0.25 * Math.log(1 + (effCount - ACTOR_REF_PROJECTS) / ACTOR_REF_PROJECTS)) * qualFactor;
+    }
+
+    const leadBonusPct = 0.032 * (leadGoodW / (sumW + 2.0));
+    const hitBonusPct = 0.055 * (hitW / (sumW + 2.0));
+    const avgPenPct = penWeightedSum / (sumW + 0.5);
+
+    // Посилений штраф за концентрацію в одній франшизі (> 35%, до -9%)
+    let maxFrEff = 0;
+    let maxFrRaw = 0;
+    for (const fk of Object.keys(frEff)) {
+      if (frEff[fk] > maxFrEff) {
+        maxFrEff = frEff[fk];
+        maxFrRaw = frRaw[fk];
+      }
+    }
+    const frShare = effCount > 0 ? maxFrEff / effCount : 0;
+    const franchisePenaltyPct = (maxFrRaw >= 2 && frShare > 0.35)
+      ? Math.min(ACTOR_FRANCHISE_CAP, ((frShare - 0.35) / 0.65) * ACTOR_FRANCHISE_CAP)
+      : 0;
+
+    // Спосіб 1: відсоткові модифікатори до стабілізованої бази
+    const shrunk = stabAvg * (1 + leadBonusPct + hitBonusPct) * (1 - avgPenPct) * (1 - franchisePenaltyPct) + adj * ACTOR_ADJUST_STEP;
+
+    const avgRes = sumRecW > 0 ? sumRecRes / sumRecW : 0;
+    const recSignal = (shrunk - G) * 0.75 + clamp(avgRes, -2.5, 2.5) * 0.35 + adj * 0.8;
+
+    // Для Топу акторів: з countMod та стелею rawAvg + 0.5 (+ ручний 🔥)
+    const rawScore = shrunk + countMod;
+    const scoreCap = rawAvg + 0.5 + (adj > 0 ? adj * ACTOR_ADJUST_STEP : 0);
+    const score = clamp(Math.min(scoreCap, rawScore), 1, 10);
+
+    const isAnti = adj < 0 || (rated.length >= 2 && (rawAvg <= G + ACTOR_PENALTY_10_DELTA || (missCount >= 2 && hitCount === 0)));
+
+    actors.set(a.id, {
+      id: a.id,
+      name: a.name,
+      profile_path: a.profile_path,
+      watchedCount: a.watchedCount,
+      ratedCount: rated.length,
+      effCount,
+      rawAvg,
+      shrunk,
+      score,
+      leadCount,
+      hitCount,
+      missCount,
+      isAnti,
+      adj,
+      recSignal
+    });
+  }
+
+  return { globalCastAvg, globalTmdbAvg, actors };
+}
+
 // ============ THEMES ============
 function hexToRgb(hex) {
   let h = hex.replace('#', '');
@@ -247,7 +472,75 @@ function mergeCloudExtras(cloud) {
     actorAdjustTs = mergedAdjTs;
   }
 
+  if (cloud.appearance) applyCloudAppearance(cloud.appearance);
+
   return changed;
+}
+
+// ---- синхронізація налаштувань вигляду ----
+const LS_APP_TS = 'mycinema.appearance.ts';
+
+function getAppearanceTs() {
+  const raw = parseInt(localStorage.getItem(LS_APP_TS), 10);
+  if (!isNaN(raw) && raw > 0) return raw;
+  const hasLocalPref =
+    localStorage.getItem('mycinema.theme.bg') !== null ||
+    localStorage.getItem('mycinema.theme.accent') !== null ||
+    localStorage.getItem('mycinema.posterBg') !== null ||
+    localStorage.getItem('mycinema.snowEnabled') !== null;
+  return hasLocalPref ? 1 : 0;
+}
+
+function getAppearancePayload() {
+  const snowRaw = localStorage.getItem('mycinema.snowEnabled');
+  return {
+    themeBg: settings.themeBg,
+    themeAccent: settings.themeAccent,
+    posterBg: !!settings.posterBg,
+    snowEnabled: snowRaw === null ? true : snowRaw === 'true',
+    ts: getAppearanceTs()
+  };
+}
+
+function touchAppearance() {
+  try { localStorage.setItem(LS_APP_TS, String(Date.now())); } catch {}
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveToCloud, 800);
+}
+
+function applyCloudAppearance(app) {
+  if (!app || typeof app !== 'object') return false;
+  const cTs = Number(app.ts) || 0;
+  const lTs = getAppearanceTs();
+  if (cTs <= lTs) return false;
+
+  const bg = THEMES[app.themeBg] ? app.themeBg : settings.themeBg;
+  const ac = ACCENTS[app.themeAccent] ? app.themeAccent : settings.themeAccent;
+  const posterBg = typeof app.posterBg === 'boolean' ? app.posterBg : settings.posterBg;
+  const snowOn = typeof app.snowEnabled === 'boolean' ? app.snowEnabled : true;
+
+  applyTheme(bg, ac);
+  settings.posterBg = posterBg;
+  try {
+    localStorage.setItem('mycinema.posterBg', posterBg ? 'true' : 'false');
+    localStorage.setItem('mycinema.snowEnabled', snowOn ? 'true' : 'false');
+    localStorage.setItem(LS_APP_TS, String(cTs));
+  } catch {}
+
+  if (typeof SnowFeature !== 'undefined') SnowFeature.apply();
+
+  const settingsModal = document.getElementById('settings-modal');
+  if (settingsModal && settingsModal.classList.contains('open')) {
+    if (typeof renderSettingsSwatches === 'function') renderSettingsSwatches();
+    const pbgEl = document.getElementById('poster-bg-toggle');
+    if (pbgEl) pbgEl.checked = settings.posterBg;
+    const snowEl = document.getElementById('snow-toggle');
+    if (snowEl) snowEl.checked = snowOn;
+  }
+  if (typeof cardStack !== 'undefined' && cardStack.length && typeof renderCard === 'function') {
+    renderCard(true);
+  }
+  return true;
 }
 
 async function reconcileWithCloud() {
@@ -270,6 +563,7 @@ async function reconcileWithCloud() {
     dismissedClearedAt,
     actorAdjust,
     actorAdjustTs,
+    appearance: getAppearancePayload(),
     updatedAt: new Date(),
     email: window.currentUser.email
   });
@@ -369,6 +663,13 @@ function extractItemMeta(d, type) {
 
   if (type === 'movie') {
     if (d.runtime > 0) meta.runtime = d.runtime;
+    meta.collection = d.belongs_to_collection
+      ? {
+          id: d.belongs_to_collection.id,
+          name: d.belongs_to_collection.name,
+          poster: d.belongs_to_collection.poster_path || null
+        }
+      : null;
   } else if (type === 'tv') {
     if (d.number_of_episodes > 0) meta.episode_count = d.number_of_episodes;
     if (d.seasons) meta.totalSeasons = d.seasons.filter(s => s.season_number !== 0).length;
@@ -412,6 +713,17 @@ function extractItemMeta(d, type) {
   }
 
   if (platMap.size > 0) meta.platforms = [...platMap.values()].slice(0, 5);
+
+  const mcuIds = typeof MCU_COMPANY_IDS !== 'undefined' ? MCU_COMPANY_IDS : [420, 38679];
+  const prodIds = Array.isArray(d.production_companies) ? d.production_companies.map(c => c.id) : [];
+  if (prodIds.some(id => mcuIds.includes(id))) {
+    meta.franchiseKey = 'mcu';
+  } else if (type === 'movie' && d.belongs_to_collection?.id) {
+    meta.franchiseKey = 'col-' + d.belongs_to_collection.id;
+  } else {
+    meta.franchiseKey = null;
+  }
+
   return meta;
 }
 
