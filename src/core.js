@@ -44,6 +44,7 @@ const syncIndicator = document.getElementById('sync-indicator');
 
 // ============ UTILS ============
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+function clampNum(v, min, max) { return Math.max(min, Math.min(max, v)); }
 function fmtNum(n) { return n.toFixed(1).replace('.', ','); }
 function plural(n, one, few, many) {
   const m10 = n % 10, m100 = n % 100;
@@ -132,7 +133,6 @@ function getItemFranchiseKey(item) {
 }
 
 function computeActorProfiles() {
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const items = Object.values(lib);
 
   const ratedCastItems = items
@@ -201,7 +201,7 @@ function computeActorProfiles() {
         missCount: 0,
         isAnti: adj < 0,
         adj,
-        recSignal: adj > 0 ? adj * 0.8 : (adj < 0 ? adj * 0.9 : 0)
+        recSignal: adj > 0 ? adj * 0.45 : (adj < 0 ? adj * 0.85 : 0)
       });
       continue;
     }
@@ -253,7 +253,7 @@ function computeActorProfiles() {
       }
 
       if (delta > 0.30) {
-        const hitStr = clamp((delta - 0.30) / hiScale, 0, 1);
+        const hitStr = clampNum((delta - 0.30) / hiScale, 0, 1);
         hitW += w * hitStr;
         if (delta >= hitTagDelta) hitCount++;
       }
@@ -281,7 +281,7 @@ function computeActorProfiles() {
     if (effCount < ACTOR_REF_PROJECTS) {
       countMod = -0.95 * Math.pow((ACTOR_REF_PROJECTS - effCount) / (ACTOR_REF_PROJECTS - 1), 1.15);
     } else if (effCount > ACTOR_REF_PROJECTS) {
-      const qualFactor = clamp((rawAvg - (G - 0.6)) / 1.4, 0, 1);
+      const qualFactor = clampNum((rawAvg - (G - 0.6)) / 1.4, 0, 1);
       countMod = Math.min(0.40, 0.25 * Math.log(1 + (effCount - ACTOR_REF_PROJECTS) / ACTOR_REF_PROJECTS)) * qualFactor;
     }
 
@@ -304,17 +304,19 @@ function computeActorProfiles() {
       : 0;
 
     // Спосіб 1: відсоткові модифікатори до стабілізованої бази
-    const shrunk = stabAvg * (1 + leadBonusPct + hitBonusPct) * (1 - avgPenPct) * (1 - franchisePenaltyPct) + adj * ACTOR_ADJUST_STEP;
+    const shrunkBase = stabAvg * (1 + leadBonusPct + hitBonusPct) * (1 - avgPenPct) * (1 - franchisePenaltyPct);
+    const shrunk = shrunkBase + adj * ACTOR_ADJUST_STEP;
 
     const avgRes = sumRecW > 0 ? sumRecRes / sumRecW : 0;
-    const recSignal = (shrunk - G) * 0.75 + clamp(avgRes, -2.5, 2.5) * 0.35 + adj * 0.8;
+    const adjRec = adj > 0 ? adj * 0.45 : (adj < 0 ? adj * 0.85 : 0);
+    const recSignal = (shrunkBase - G) * 0.75 + clampNum(avgRes, -2.5, 2.5) * 0.35 + adjRec;
 
     // Для Топу акторів: з countMod та стелею rawAvg + 0.5 (+ ручний 🔥)
     const rawScore = shrunk + countMod;
     const scoreCap = rawAvg + 0.5 + (adj > 0 ? adj * ACTOR_ADJUST_STEP : 0);
-    const score = clamp(Math.min(scoreCap, rawScore), 1, 10);
+    const score = clampNum(Math.min(scoreCap, rawScore), 1, 10);
 
-    const isAnti = adj < 0 || (rated.length >= 2 && (rawAvg <= G + ACTOR_PENALTY_10_DELTA || (missCount >= 2 && hitCount === 0)));
+    const isAnti = adj < 0 || (rated.length >= 2 && (rawAvg <= G - 1.35 || (missCount >= 3 && hitCount === 0)));
 
     actors.set(a.id, {
       id: a.id,
@@ -360,7 +362,6 @@ function applyTheme(bgName, accentName) {
   localStorage.setItem('mycinema.theme.bg', bgName);
   localStorage.setItem('mycinema.theme.accent', accentName);
 }
-function isLightTheme(name) { const t = THEMES[name]; return t ? t.light : false; }
 applyTheme(settings.themeBg, settings.themeAccent);
 
 // ============ ACTOR ADJUST ============

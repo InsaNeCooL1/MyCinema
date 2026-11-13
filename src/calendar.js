@@ -10,8 +10,9 @@ function renderCalendar() {
   head.append(el('h1', 'section-title', '📅 Календар'));
   wrap.append(head);
 
-  // 1. Беремо всі тайтли з потрібними статусами
-  let allItems = Object.values(lib).filter(x => x.status === 'watching' || x.status === 'watched');
+  const itemTs = (x) => x.statusDate || x.updated || x.createdAt || 0;
+  // 1. Беремо всі тайтли з потрібними статусами й датою
+  let allItems = Object.values(lib).filter(x => (x.status === 'watching' || x.status === 'watched') && itemTs(x) > 0);
   
   if (!allItems.length) {
     wrap.append(el('div', 'avail-empty', 'Тут поки порожньо. Додай фільми зі статусом "Дивлюсь" або "Переглянуто".'));
@@ -27,7 +28,7 @@ function renderCalendar() {
   // 3. Збираємо унікальні місяці вже з відфільтрованих елементів
   const monthsSet = new Set();
   items.forEach(item => {
-    const date = new Date(item.statusDate || item.updated || Date.now());
+    const date = new Date(itemTs(item));
     const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
     monthsSet.add(monthKey);
   });
@@ -107,7 +108,7 @@ function renderCalendar() {
 
   // 5. Фільтруємо по вибраному місяцю
   const filteredItems = items.filter(item => {
-    const date = new Date(item.statusDate || item.updated || Date.now());
+    const date = new Date(itemTs(item));
     return `${date.getFullYear()}-${date.getMonth()}` === state.calendarMonth;
   });
 
@@ -148,31 +149,27 @@ function renderCalendar() {
   }
   wrap.append(sumCard);
 
-  // 6. Групуємо за днями
+  // 6. Групуємо за днями (YYYY-MM-DD для детермінованого сортування)
+  const toDayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const groups = {};
   filteredItems.forEach(item => {
-    const date = new Date(item.statusDate || item.updated || Date.now());
-    const dayKey = date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
-    if (!groups[dayKey]) groups[dayKey] = [];
-    groups[dayKey].push(item);
+    const date = new Date(itemTs(item));
+    const dk = toDayKey(date);
+    if (!groups[dk]) groups[dk] = { label: date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' }), items: [] };
+    groups[dk].items.push(item);
   });
 
-  // Сортуємо дні за спаданням
-  const sortedDays = Object.keys(groups).sort((a, b) => {
-    return new Date(groups[b][0].statusDate || groups[b][0].updated) - new Date(groups[a][0].statusDate || groups[a][0].updated);
-  });
-
+  const sortedDays = Object.keys(groups).sort((a, b) => b.localeCompare(a));
   const timeline = el('div', 'timeline');
-  
-  sortedDays.forEach(day => {
+
+  sortedDays.forEach(dk => {
+    const grp = groups[dk];
     const dayGroup = el('div', 'timeline-day-group');
-    dayGroup.append(el('div', 'timeline-date', day));
-    
+    dayGroup.append(el('div', 'timeline-date', grp.label));
+
     const dayItems = el('div', 'timeline-items');
-    
-    groups[day].sort((a, b) => (b.statusDate || b.updated) - (a.statusDate || a.updated)).forEach(item => {
+    grp.items.sort((a, b) => itemTs(b) - itemTs(a)).forEach(item => {
       const listItem = createListItem(item);
-      
       const statusBadge = item.status === 'watching' ? '▶️ Дивлюсь' : '✅ Переглянуто';
       const info = listItem.querySelector('.info');
       if (info) {
@@ -181,10 +178,9 @@ function renderCalendar() {
         badge.style.color = item.status === 'watching' ? 'var(--accent)' : 'var(--mint)';
         info.insertBefore(badge, info.firstChild);
       }
-      
       dayItems.append(listItem);
     });
-    
+
     dayGroup.append(dayItems);
     timeline.append(dayGroup);
   });

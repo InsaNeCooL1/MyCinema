@@ -67,7 +67,7 @@ function sortLibraryItems(items) {
   });
 }
 
-function renderLibrary() {
+function getFilteredLibraryItems() {
   let items = [];
   if (state.tab === 'favorites') {
     items = Object.values(lib).filter(x => x.favorite);
@@ -79,11 +79,25 @@ function renderLibrary() {
     const sq = state.librarySearch.toLowerCase().trim();
     items = items.filter(x => x.title && x.title.toLowerCase().includes(sq));
   }
-  items = sortLibraryItems(items);
+  return sortLibraryItems(items);
+}
 
+function renderLibraryItems() {
+  const listWrap = document.getElementById('lib-items');
+  if (!listWrap) return;
+  listWrap.replaceChildren();
+  const items = getFilteredLibraryItems();
+  if (!items.length) {
+    listWrap.append(el('div', 'avail-empty', 'Тут поки порожньо'));
+    return;
+  }
+  items.forEach(r => listWrap.append(createListItem(r)));
+}
+
+function renderLibrary() {
   box.style.padding = '0 16px 16px';
   box.replaceChildren();
-  
+
   const searchInp = document.createElement('input');
   searchInp.type = 'search';
   searchInp.className = 'lib-search';
@@ -92,13 +106,8 @@ function renderLibrary() {
   let libSearchTimer;
   searchInp.addEventListener('input', (e) => {
     state.librarySearch = e.target.value;
-    const val = e.target.value;
     clearTimeout(libSearchTimer);
-    libSearchTimer = setTimeout(() => {
-      renderLibrary();
-      const newInp = box.querySelector('.lib-search');
-      if (newInp) { newInp.focus(); newInp.value = val; newInp.setSelectionRange(val.length, val.length); }
-    }, 150);
+    libSearchTimer = setTimeout(renderLibraryItems, 120);
   });
   box.append(searchInp);
 
@@ -121,13 +130,15 @@ function renderLibrary() {
   });
   sortSel.addEventListener('change', () => {
     state.librarySort = sortSel.value;
-    renderLibrary();
+    renderLibraryItems();
   });
   sortRow.append(sortSel);
   box.append(sortRow);
 
-  if (!items.length) { box.append(el('div', 'avail-empty', 'Тут поки порожньо')); return; }
-  items.forEach(r => box.append(createListItem(r)));
+  const listWrap = el('div');
+  listWrap.id = 'lib-items';
+  box.append(listWrap);
+  renderLibraryItems();
 }
 
 function renderNotesList() {
@@ -207,7 +218,13 @@ function createListItem(r, showNumber, number) {
     const acts = el('div', 'item-actions');
     const favBtn = el('button', 'item-fav' + (saved.favorite ? ' on' : ''), '❤');
     favBtn.title = 'В улюблене';
-    favBtn.addEventListener('click', (e) => { e.stopPropagation(); update(r, { favorite: !saved.favorite }); });
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const nextFav = !(lib[r.key] && lib[r.key].favorite);
+      updateNoRender(r, { favorite: nextFav });
+      favBtn.classList.toggle('on', nextFav);
+      if (state.tab === 'favorites' && !nextFav) renderLibraryItems();
+    });
     acts.append(favBtn);
     const del = el("button", "item-delete", "×");
     del.title = "Прибрати зі списку";
@@ -252,7 +269,10 @@ function removeFromLibrary(key) {
   const hasSR = saved.seasonRatings && Object.keys(saved.seasonRatings).length > 0;
   const hasNotes = saved.notes && saved.notes.trim();
   const hasElo = saved.eloGames && saved.eloGames > 0;
-  if (hasR || hasSR || hasNotes || hasElo) {
+  const hasFav = saved.favorite === true;
+  const hasEps = saved.watchedEpisodes && saved.watchedEpisodes.length > 0;
+  const hasTasteFlags = saved.excludeFromProfile !== undefined || saved.antiSeed === true;
+  if (hasR || hasSR || hasNotes || hasElo || hasFav || hasEps || hasTasteFlags) {
     lib[key].status = null;
     lib[key].updated = Date.now();
     saveNow();
@@ -406,74 +426,117 @@ function makeSelectRow(label, id, options, currentVal) {
     else if (id === 'f-sort') state.filter.sortBy = sel.value;
     else if (id === 'f-streaming') state.filter.streaming = sel.value === 'any' ? null : parseInt(sel.value);
     if (typeof updateFilterBadge === 'function') updateFilterBadge();
-    if (state.tab !== 'filter') setTab('filter');
+    if (state.tab !== 'filter') setTab('filter', { keepFilter: true });
     else renderFilter();
   });
   row.append(sel);
   return row;
 }
 
+let filterReqId = 0;
+
 async function doFetchFilter(append) {
-  if (filterLoading) return;
+  if (append && filterLoading) return;
+  const reqId = ++filterReqId;
   filterLoading = true;
   const resultsList = document.getElementById('filter-results-list');
   if (!resultsList) { filterLoading = false; return; }
   if (!append) resultsList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Пошук...</div>';
   const f = state.filter;
-  
+
+  const sortMediaList = (arr) => {
+    const dStr = (x) => x.releaseDate || (x.year ? x.year + '-01-01' : '');
+    if (f.sortBy === 'vote_average.desc') arr.sort((a, b) => b.tmdbRating - a.tmdbRating || b.popularity - a.popularity);
+    else if (f.sortBy === 'primary_release_date.desc') arr.sort((a, b) => dStr(b).localeCompare(dStr(a)));
+    else if (f.sortBy === 'primary_release_date.asc') arr.sort((a, b) => (dStr(a) || '9999').localeCompare(dStr(b) || '9999'));
+    else arr.sort((a, b) => b.popularity - a.popularity);
+  };
+
   try {
     let hasMore = false;
     const people = [], media = [];
     if (f.query) {
-      const data = await tmdbFetch(`/search/multi?language=uk-UA&query=${encodeURIComponent(f.query)}&include_adult=false&page=${filterPage}`);
-      if (!append) data.results.filter(r => r.media_type === 'person').forEach(p => people.push(p));
-      data.results.filter(r => r.media_type === 'movie' || r.media_type === 'tv').map(normalizeItem).forEach(x => media.push(x));
+      const endpoint = f.type === 'movie'
+        ? '/search/movie'
+        : (f.type === 'tv' ? '/search/tv' : '/search/multi');
+      const data = await tmdbFetch(`${endpoint}?language=uk-UA&query=${encodeURIComponent(f.query)}&include_adult=false&page=${filterPage}`);
+      if (reqId !== filterReqId) return;
+
+      if (!append && f.type === 'all') {
+        (data.results || []).filter(r => r.media_type === 'person').forEach(p => people.push(p));
+      }
+      const rawMedia = f.type === 'all'
+        ? (data.results || []).filter(r => r.media_type === 'movie' || r.media_type === 'tv')
+        : (data.results || []).map(r => ({ ...r, media_type: f.type }));
+      rawMedia.map(normalizeItem).forEach(x => media.push(x));
       hasMore = filterPage < (data.total_pages || 1);
     } else {
-      const bp = { language: 'uk-UA', sort_by: (f.sortBy.includes('release_date') && f.type === 'all') ? 'popularity.desc' : f.sortBy, page: String(filterPage) };
+      const tvSort = f.sortBy === 'primary_release_date.desc'
+        ? 'first_air_date.desc'
+        : (f.sortBy === 'primary_release_date.asc' ? 'first_air_date.asc' : f.sortBy);
+      const bp = { language: 'uk-UA', page: String(filterPage) };
       if (f.minRating > 0) bp['vote_average.gte'] = String(f.minRating);
       if (f.genre !== "any") bp['with_genres'] = String(f.genre);
       if (f.streaming) { bp['with_watch_providers'] = String(f.streaming); bp['watch_region'] = 'UA'; }
-      
+
       const fetches = [];
       let mP = 0, tP = 0;
       if (f.type === "movie" || f.type === "all") {
-        const p = { ...bp };
+        const p = { ...bp, sort_by: f.sortBy };
         if (f.decade !== "any") { p['primary_release_date.gte'] = `${f.decade}-01-01`; p['primary_release_date.lte'] = `${parseInt(f.decade) + 9}-12-31`; }
-        fetches.push(tmdbFetch(`/discover/movie?${new URLSearchParams(p)}`).then(d => { mP = d.total_pages || 1; return d.results.map(r => normalizeItem({ ...r, media_type: 'movie' })); }).catch(() => []));
+        fetches.push(tmdbFetch(`/discover/movie?${new URLSearchParams(p)}`).then(d => { mP = d.total_pages || 1; return (d.results || []).map(r => normalizeItem({ ...r, media_type: 'movie' })); }).catch(() => []));
       }
       if (f.type === "tv" || f.type === "all") {
-        const p = { ...bp };
+        const p = { ...bp, sort_by: tvSort };
         if (f.decade !== "any") { p['first_air_date.gte'] = `${f.decade}-01-01`; p['first_air_date.lte'] = `${parseInt(f.decade) + 9}-12-31`; }
-        fetches.push(tmdbFetch(`/discover/tv?${new URLSearchParams(p)}`).then(d => { tP = d.total_pages || 1; return d.results.map(r => normalizeItem({ ...r, media_type: 'tv' })); }).catch(() => []));
+        fetches.push(tmdbFetch(`/discover/tv?${new URLSearchParams(p)}`).then(d => { tP = d.total_pages || 1; return (d.results || []).map(r => normalizeItem({ ...r, media_type: 'tv' })); }).catch(() => []));
       }
       const all = await Promise.all(fetches);
+      if (reqId !== filterReqId) return;
       all.flat().forEach(x => media.push(x));
       hasMore = filterPage < Math.max(mP, tP);
-      if (f.type === "all") {
-        if (f.sortBy === 'popularity.desc') media.sort((a, b) => b.popularity - a.popularity);
-        else if (f.sortBy === 'vote_average.desc') media.sort((a, b) => b.tmdbRating - a.tmdbRating);
+      if (f.type === "all") sortMediaList(media);
+    }
+
+    if (!append) resultsList.innerHTML = '';
+    if (f.query && f.streaming && !append) {
+      resultsList.append(el('div', 'notes-hint', 'ℹ️ Фільтр за стрімінгом застосовується лише без текстового запиту'));
+    }
+    if (f.query) {
+      if (f.genre !== 'any') {
+        for (let i = media.length - 1; i >= 0; i--) if (!(media[i].genres || []).includes(f.genre)) media.splice(i, 1);
+      }
+      if (f.minRating > 0) {
+        for (let i = media.length - 1; i >= 0; i--) if (media[i].tmdbRating < f.minRating) media.splice(i, 1);
+      }
+      if (f.decade !== 'any') {
+        const yS = parseInt(f.decade), yE = yS + 9;
+        for (let i = media.length - 1; i >= 0; i--) { const y = parseInt(media[i].year); if (!(y >= yS && y <= yE)) media.splice(i, 1); }
+      }
+      sortMediaList(media);
+    } else {
+      if (f.minRating > 0) for (let i = media.length - 1; i >= 0; i--) if (media[i].tmdbRating < f.minRating) media.splice(i, 1);
+      if (f.decade !== "any") {
+        const yS = parseInt(f.decade), yE = yS + 9;
+        for (let i = media.length - 1; i >= 0; i--) { const y = parseInt(media[i].year); if (!(y >= yS && y <= yE)) media.splice(i, 1); }
       }
     }
-    
-    if (!append) resultsList.innerHTML = '';
-    if (f.minRating > 0) for (let i = media.length - 1; i >= 0; i--) if (media[i].tmdbRating < f.minRating) media.splice(i, 1);
-    if (f.decade !== "any") {
-      const yS = parseInt(f.decade), yE = yS + 9;
-      for (let i = media.length - 1; i >= 0; i--) { const y = parseInt(media[i].year); if (!(y >= yS && y <= yE)) media.splice(i, 1); }
-    }
-    
+
     for (const p of people) resultsList.append(createPersonResult(p));
     for (const r of media) resultsList.append(createListItem(r, false));
-    
+
     const old = document.getElementById('filter-more-btn'); if (old) old.remove();
     if (hasMore) {
       const more = el('button', 'home-more', 'Показати ще'); more.id = 'filter-more-btn';
       more.addEventListener('click', () => { filterPage++; doFetchFilter(true); });
       resultsList.append(more);
     }
-    if (!resultsList.children.length) resultsList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Нічого не знайдено</div>';
+    if (!resultsList.querySelector('.item')) {
+      resultsList.append(el('div', 'avail-empty', hasMore ? 'На цій сторінці немає збігів під фільтри. Натисни «Показати ще».' : 'Нічого не знайдено'));
+    }
   } catch (e) {
-    resultsList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger);">Помилка: ${e.message}</div>`;
-  } finally { filterLoading = false; }
+    if (reqId === filterReqId) resultsList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger);">Помилка: ${e.message}</div>`;
+  } finally {
+    if (reqId === filterReqId) filterLoading = false;
+  }
 }

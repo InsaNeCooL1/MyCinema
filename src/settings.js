@@ -80,7 +80,12 @@ function importLibrary() {
       if (typeof data !== 'object' || Array.isArray(data)) throw new Error('Невірний формат');
       const count = Object.keys(data).length;
       if (!confirm('Імпортувати ' + count + ' тайтлів? Поточні буде замінено.')) return;
-      for (const k of Object.keys(lib)) if (!(k in data)) libTombstones[k] = Date.now();
+      const nowTs = Date.now();
+      for (const k of Object.keys(lib)) if (!(k in data)) libTombstones[k] = nowTs;
+      for (const k of Object.keys(data)) {
+        delete libTombstones[k];
+        if (data[k] && typeof data[k] === 'object') data[k].updated = nowTs;
+      }
       lib = data;
       await saveNow();
       refresh();
@@ -234,7 +239,7 @@ function injectDismissedReset() {
       if (!confirm(`Повернути всі сховані рекомендації (${cnt})?`)) return;
       if (typeof clearDismissed === 'function') clearDismissed();
       state.home.sig = null;
-      try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
+      try { localStorage.removeItem(RECS_CACHE); } catch {}
       btn.textContent = '🙈 Повернути сховані рекомендації (0)';
       showSyncToast('✅ Сховані рекомендації повернуто');
       if (state.tab === 'home') refresh();

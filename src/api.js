@@ -10,6 +10,7 @@ function normalizeItem(r) {
   return {
     key: type + '-' + r.id, id: r.id, type,
     title: r.title || r.name, year: (r.release_date || r.first_air_date || '').slice(0, 4),
+    releaseDate: r.release_date || r.first_air_date || '',
     poster: r.poster_path, 
     backdrop: r.backdrop_path, // <--- ДОДАЙ ЦЕ
     overview: r.overview || '', tmdbRating: r.vote_average || 0,

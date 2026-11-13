@@ -24,7 +24,8 @@ function showHistory() {
   
   hist.forEach(q => {
     const row = el("div", "ac-item ac-history");
-    row.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> <span>${q}</span>`;
+    row.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+    row.append(el('span', '', q));
     row.addEventListener("click", () => {
       input.value = q;
       performFullSearch();

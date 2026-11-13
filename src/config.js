@@ -8,13 +8,13 @@ const TMDB_IMG = "https://image.tmdb.org/t/p/";
 // ============ CONSTANTS ============
 const LS = "mycinema.library";
 const LS_VER = "mycinema.library.v";
+const RECS_CACHE = "mycinema.recs.v4";
 const EXCLUDED_TV_GENRES = [10763, 10764, 10767];
 const ANIMATION_GENRE_ID = 16;
 const CAST_LIMIT = 10;
 const ELO_START = 1500;
 const ELO_K = 32;
 const TASTE_HALFLIFE_DAYS = 180;
-const ACTOR_MIN_VOTES = 5;
 const ACTOR_ADJUST_STEP = 0.35;
 const ACTOR_ADJUST_KEY = 'mycinema.actorAdjustments';
 const ACTOR_REF_PROJECTS = 6;
@@ -68,11 +68,11 @@ const PLACEHOLDERS = [
 
 // ============ THEMES ============
 const THEMES = {
-  navy:  { name: 'Navy',  light: false, bg0:'#08070a', bg1:'#0f0e13', bg2:'#16141b', bg3:'#201d28', bg4:'#2a2635', sidebar:'#06050a', query:'#040308', text:'#f2eee9', textSecondary:'#cfc8c0', textMuted:'#8d877f', textDim:'#575349' },
-  black: { name: 'Black', light: false, bg0:'#000000', bg1:'#0a0a0a', bg2:'#141414', bg3:'#1e1e1e', bg4:'#2a2a2a', sidebar:'#050505', query:'#000000', text:'#f0f0f0', textSecondary:'#c0c0c0', textMuted:'#888', textDim:'#444' },
-  plum:  { name: 'Plum',  light: false, bg0:'#0c0512', bg1:'#150a20', bg2:'#1f0e2f', bg3:'#301848', bg4:'#422458', sidebar:'#0a0410', query:'#070310', text:'#f0e8f5', textSecondary:'#d8cfe6', textMuted:'#9a8fb5', textDim:'#5a4f7a' },
+  navy:  { name: 'Navy',  bg0:'#08070a', bg1:'#0f0e13', bg2:'#16141b', bg3:'#201d28', bg4:'#2a2635', sidebar:'#06050a', query:'#040308', text:'#f2eee9', textSecondary:'#cfc8c0', textMuted:'#8d877f', textDim:'#575349' },
+  black: { name: 'Black', bg0:'#000000', bg1:'#0a0a0a', bg2:'#141414', bg3:'#1e1e1e', bg4:'#2a2a2a', sidebar:'#050505', query:'#000000', text:'#f0f0f0', textSecondary:'#c0c0c0', textMuted:'#888', textDim:'#444' },
+  plum:  { name: 'Plum',  bg0:'#0c0512', bg1:'#150a20', bg2:'#1f0e2f', bg3:'#301848', bg4:'#422458', sidebar:'#0a0410', query:'#070310', text:'#f0e8f5', textSecondary:'#d8cfe6', textMuted:'#9a8fb5', textDim:'#5a4f7a' },
   forest:{ name: 'Forest',light: false, bg0:'#030b06', bg1:'#0a1510', bg2:'#0f2018', bg3:'#183020', bg4:'#22432f', sidebar:'#050d08', query:'#020705', text:'#e8f2ec', textSecondary:'#cfe6d8', textMuted:'#8fb5a0', textDim:'#4f7a5a' },
-  mocha: { name: 'Mocha', light: false, bg0:'#0b0805', bg1:'#150f0a', bg2:'#1f1710', bg3:'#2f2618', bg4:'#403522', sidebar:'#0a0705', query:'#060403', text:'#f2ebe0', textSecondary:'#e6d8c7', textMuted:'#b5a08f', textDim:'#7a5f4a' }
+  mocha: { name: 'Mocha', bg0:'#0b0805', bg1:'#150f0a', bg2:'#1f1710', bg3:'#2f2618', bg4:'#403522', sidebar:'#0a0705', query:'#060403', text:'#f2ebe0', textSecondary:'#e6d8c7', textMuted:'#b5a08f', textDim:'#7a5f4a' }
 };
 
 // ============ ACCENTS ============

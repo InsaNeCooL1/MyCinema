@@ -107,12 +107,12 @@ function formatPersonDate(iso) {
   return `${parts[2]}.${parts[1]}.${parts[0]}`;
 }
 
-async function openPerson(personId, fromItem) {
+async function openPerson(personId) {
   overlay.classList.add("open");
   const top = cardStack[cardStack.length - 1];
   if (top && top.type === 'person' && top.id === personId) return;
   saveCardScroll();
-  const ctx = { type: 'person', id: personId, item: fromItem, personTab: 'bio' };
+  const ctx = { type: 'person', id: personId, personTab: 'bio' };
   cardStack.push(ctx);
   pushCardState();
   renderLoading();
@@ -135,7 +135,7 @@ async function loadPersonCardData(ctx) {
 
 async function loadPersonForForward(id) {
   overlay.classList.add("open");
-  const ctx = { type: 'person', id, item: {}, personTab: 'bio' };
+  const ctx = { type: 'person', id, personTab: 'bio' };
   cardStack.push(ctx);
   renderLoading();
   await loadPersonCardData(ctx);

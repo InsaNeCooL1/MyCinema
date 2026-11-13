@@ -247,6 +247,10 @@ function makeGameChoice(choice) {
   state.game.round++;
   if (state.game.round >= state.game.totalRounds) { finishGame(); return; }
   state.game.loadingNext = true;
+  const arenaEl = box.querySelector('.game-arena');
+  if (arenaEl) { arenaEl.style.opacity = '0.5'; arenaEl.style.pointerEvents = 'none'; }
+  const statsSpan = box.querySelector('.game-stats span');
+  if (statsSpan) statsSpan.textContent = 'Завантаження наступного...';
   loadGameChallenger()
     .then(() => { if (!state.game.challenger) state.game.loadError = true; })
     .catch((e) => { console.error(e); state.game.loadError = true; })

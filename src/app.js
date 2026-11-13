@@ -12,12 +12,14 @@ function syncNavActive() {
       g.classList.add('open');
     }
   });
+  const moreGroup = document.querySelector('.nav-more-group');
+  if (moreGroup) moreGroup.classList.toggle('has-active', !!moreGroup.querySelector('.nav-item.active'));
 }
 
-function setTab(t) {
+function setTab(t, opts) {
   state.tab = t;
   closeSidebar();
-  if (typeof hideFilterDropdown === 'function') hideFilterDropdown();
+  if (!(opts && opts.keepFilter) && typeof hideFilterDropdown === 'function') hideFilterDropdown();
   if (typeof hideAutocomplete === 'function') hideAutocomplete();
   document.body.classList.toggle('no-search', !(t === 'home' || t === 'filter'));
   syncNavActive();
@@ -48,7 +50,7 @@ function refresh() {
 
 window.addEventListener('firebase-ready', syncFromCloud);
 
-// ========== COLD START SPLASH (TEST 6s) ==========
+// ========== COLD START SPLASH (APK only, 3s) ==========
 const SPLASH_POOL_KEY = 'mycinema.splashPool.v1';
 const SPLASH_POOL_TTL = 12 * 60 * 60 * 1000;
 const SPLASH_DURATION_MS = 3000;
@@ -215,3 +217,11 @@ if (window.firebaseReady) {
   syncFromCloud();
 }
 syncNavActive();
+
+// Закриття модалок по кліку на темний фон
+document.getElementById('settings-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'settings-modal') closeSettings();
+});
+document.getElementById('auth-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'auth-modal') closeAuthModal();
+});

@@ -9,7 +9,17 @@ function pushCardState() {
   else st.ctx = { type: 'media', id: ctx.item.id, media_type: ctx.item.type, key: ctx.item.key };
   history.pushState(st, '', hashFor(ctx));
 }
+let _pendingNoteFlush = null;
+function flushPendingNotes() {
+  if (typeof _pendingNoteFlush === 'function') {
+    const fn = _pendingNoteFlush;
+    _pendingNoteFlush = null;
+    fn();
+  }
+}
+
 function saveCardScroll() {
+  flushPendingNotes();
   const s = card.querySelector('.card-scroll');
   const top = cardStack[cardStack.length - 1];
   if (s && top) top.scroll = s.scrollTop;
@@ -146,9 +156,12 @@ async function loadMediaCardData(ctx) {
         const refined = extractItemMeta(ctx.details, 'tv');
         if (refined.runtime) r.runtime = refined.runtime;
       }
+      r.totalSeasons = totalSeasons;
       if (lib[r.key]) {
-        lib[r.key].totalSeasons = totalSeasons;
-        if (r.runtime && !lib[r.key].runtime) lib[r.key].runtime = r.runtime;
+        let tvDirty = false;
+        if (lib[r.key].totalSeasons !== totalSeasons) { lib[r.key].totalSeasons = totalSeasons; tvDirty = true; }
+        if (r.runtime && !lib[r.key].runtime) { lib[r.key].runtime = r.runtime; tvDirty = true; }
+        if (tvDirty) save();
       }
     }
     ctx.watchProviders = d['watch/providers']?.results?.UA || null;
@@ -169,6 +182,7 @@ async function loadMediaCardData(ctx) {
 }
 
 function closeCard() {
+  flushPendingNotes();
   const iframe = card.querySelector('.card-hero-video');
   if (iframe) iframe.src = 'about:blank';
 
@@ -221,6 +235,7 @@ function routeFromHash() {
 }
 
 function renderCard(restore) {
+  flushPendingNotes();
   const ctx = cardStack[cardStack.length - 1];
   if (!ctx) { overlay.classList.remove('open'); refresh(); return; }
 
@@ -246,7 +261,7 @@ function renderMediaCard(ctx, scroll) {
   const d = ctx.details;
   const s = lib[r.key] || {};
 
-  if (settings.posterBg && r.poster && !isLightTheme(settings.themeBg)) {
+  if (settings.posterBg && r.poster) {
     const bg = el('div', 'card-poster-bg');
     bg.style.backgroundImage = `url(${TMDB_IMG}w500${r.poster})`;
     card.insertBefore(bg, card.firstChild);
@@ -395,9 +410,6 @@ function renderMediaCard(ctx, scroll) {
       }
     }
     const patch = { status: newStatus, watchedEpisodes: newEps };
-    if (!lib[r.key] && ctx.genres) patch.genres = ctx.genres;
-    if (!lib[r.key] && ctx.cast) patch.cast = ctx.cast;
-    if (r.type === "tv" && d.seasons && !lib[r.key]?.totalSeasons) patch.totalSeasons = d.seasons.filter(x => x.season_number !== 0).length;
     update(r, patch);
   });
   rr.append(watchedBtn);
@@ -420,10 +432,7 @@ function renderMediaCard(ctx, scroll) {
         if (newStatus === "planned" || newStatus === "dropped" || newStatus === null) newEps = [];
       }
       const patch = { status: newStatus, watchedEpisodes: newEps };
-      if (!lib[r.key] && ctx.genres) patch.genres = ctx.genres;
-      if (!lib[r.key] && ctx.cast) patch.cast = ctx.cast;
-      if (r.type === "tv" && d.seasons && !lib[r.key]?.totalSeasons) patch.totalSeasons = d.seasons.filter(x => x.season_number !== 0).length;
-      update(r, patch);
+            update(r, patch);
     });
     statusRow.append(b);
   }
@@ -525,23 +534,8 @@ function renderMediaCard(ctx, scroll) {
   ratingWrap.style.marginBottom = '16px';
 
   if (r.type === 'tv') {
-    const ir = computeItemRating(s);
-    ratingWrap.append(el("div", "label", "Моя оцінка"));
-    if (ir.avg > 0) {
-      const block = el("div", "ratings-block");
-      const infoEl = el("div");
-      infoEl.style.padding = "8px 0"; infoEl.style.fontSize = "15px"; infoEl.style.color = "var(--text-secondary)";
-      const suffix = ir.complete ? '' : ` <span style="color:var(--warning)">(${ir.rated}/${ir.total} сезонів)</span>`;
-      infoEl.innerHTML = `${fmtNum(ir.avg)}/10${suffix}`;
-      block.append(infoEl);
-      block.append(renderAverageBlock(ir.avg, 5));
-      ratingWrap.append(block);
-    }
-    const row = el("div", "row"); row.style.marginTop = "8px";
-    const btn = el("button", "btn", ir.avg > 0 ? "⭐ Змінити оцінки" : "⭐ Оцінити сезони");
-    btn.addEventListener('click', () => { ctx.activeTab = 'seasons'; renderCard(); });
-    row.append(btn);
-    ratingWrap.append(row);
+    ratingWrap.classList.add('tv-rating-wrap');
+    renderTvRatingSummaryDOM(ratingWrap, s, ctx);
   } else {
     ratingWrap.append(el("div", "label", "Моя оцінка"));
     const rb = el("div", "ratings-block");
@@ -561,7 +555,7 @@ function renderMediaCard(ctx, scroll) {
   exBtn.type = 'button';
   exBtn.title = 'Виключити з побудови рекомендацій';
   exBtn.addEventListener('click', () => {
-    try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
+    try { localStorage.removeItem(RECS_CACHE); } catch {}
     state.home.sig = null;
     update(r, { excludeFromProfile: !isEx });
   });
@@ -570,7 +564,7 @@ function renderMediaCard(ctx, scroll) {
   antiBtn.type = 'button';
   antiBtn.title = 'Знизити схожі за режисером, ключовими словами і жанром';
   antiBtn.addEventListener('click', () => {
-    try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
+    try { localStorage.removeItem(RECS_CACHE); } catch {}
     state.home.sig = null;
     update(r, { antiSeed: !s.antiSeed });
   });
@@ -645,24 +639,47 @@ function renderNotesTab(ctx) {
   textarea.className = 'notes-textarea';
   textarea.placeholder = 'Свої думки, враження, цитати...';
   textarea.value = s.notes || '';
-  let notesTimer;
+  let notesTimer = null;
+
+  const commitNote = () => {
+    clearTimeout(notesTimer);
+    notesTimer = null;
+    if (_pendingNoteFlush === commitNote) _pendingNoteFlush = null;
+    const val = textarea.value;
+    const cur = lib[r.key] || { ...r, status: null, watchedEpisodes: [] };
+    if (val.trim()) {
+      if (cur.notes === val) return;
+      const next = { ...cur, notes: val, updated: Date.now() };
+      if (!next.createdAt) next.createdAt = Date.now();
+      attachCtxMeta(next, ctx);
+      lib[r.key] = next;
+    } else if (lib[r.key]) {
+      if (!lib[r.key].notes) return;
+      delete lib[r.key].notes;
+      const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
+      const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
+      const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
+      const hasFav = lib[r.key].favorite === true;
+      const hasElo = lib[r.key].eloGames && lib[r.key].eloGames > 0;
+      const hasTasteFlags = lib[r.key].excludeFromProfile !== undefined || lib[r.key].antiSeed === true;
+      if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasFav && !hasElo && !hasTasteFlags) removeLibItem(r.key);
+    } else {
+      return;
+    }
+    save();
+    const st = document.getElementById('notes-status');
+    if (st) st.textContent = val.trim() ? ('Оновлено: ' + new Date().toLocaleString('uk-UA')) : '';
+    const notesBtn = card.querySelector('.status-section-row .status-btn-text[title="Нотатки"]');
+    if (notesBtn) notesBtn.classList.toggle('active', !!val.trim());
+  };
+
   textarea.addEventListener('input', () => {
     clearTimeout(notesTimer);
-    notesTimer = setTimeout(() => {
-      const cur = lib[r.key] || { ...r, status: null, watchedEpisodes: [] };
-      if (textarea.value.trim()) {
-        lib[r.key] = { ...cur, notes: textarea.value, updated: Date.now() };
-        if (!lib[r.key].createdAt) lib[r.key].createdAt = Date.now();
-      } else if (lib[r.key]) {
-        delete lib[r.key].notes;
-        const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
-        const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
-        const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
-        if (!lib[r.key].status && !hasR && !hasSR && !hasEps) removeLibItem(r.key);
-      }
-      save();
-    }, 800);
+    _pendingNoteFlush = commitNote;
+    notesTimer = setTimeout(commitNote, 800);
   });
+  textarea.addEventListener('blur', commitNote);
+
   wrap.append(textarea);
   const status = el('div', 'notes-hint'); status.id = 'notes-status';
   if (s.notes) status.textContent = 'Оновлено: ' + new Date(s.updated || Date.now()).toLocaleString('uk-UA');
@@ -826,9 +843,6 @@ function toggleEpisodeWatched(r, seasonNum, epNum, ctx) {
   else newStatus = 'watching';
   
   const patch = { watchedEpisodes: wEps, status: newStatus };
-  if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
-  if (!lib[r.key] && ctx?.cast) patch.cast = ctx.cast;
-  if (ctx?.details?.seasons && !s.totalSeasons) patch.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
   update(r, patch);
 }
 
@@ -891,10 +905,31 @@ function renderSeasonRatingBlock(r, seasonNum, crit, value) {
   return block;
 }
 
+function renderTvRatingSummaryDOM(ratingWrap, s, ctx) {
+  ratingWrap.replaceChildren();
+  const ir = computeItemRating(s);
+  ratingWrap.append(el("div", "label", "Моя оцінка"));
+  if (ir.avg > 0) {
+    const block = el("div", "ratings-block");
+    const infoEl = el("div");
+    infoEl.style.padding = "8px 0"; infoEl.style.fontSize = "15px"; infoEl.style.color = "var(--text-secondary)";
+    const suffix = ir.complete ? '' : ` <span style="color:var(--warning)">(${ir.rated}/${ir.total} сезонів)</span>`;
+    infoEl.innerHTML = `${fmtNum(ir.avg)}/10${suffix}`;
+    block.append(infoEl);
+    block.append(renderAverageBlock(ir.avg, 5));
+    ratingWrap.append(block);
+  }
+  const row = el("div", "row"); row.style.marginTop = "8px";
+  const btn = el("button", "btn", ir.avg > 0 ? "⭐ Змінити оцінки" : "⭐ Оцінити сезони");
+  btn.addEventListener('click', () => { ctx.activeTab = 'seasons'; renderCard(); });
+  row.append(btn);
+  ratingWrap.append(row);
+}
+
 function renderSeasonAverageBlock(sr) {
   const avg = computeAverage(sr);
   const filled = RATING_CRITERIA.filter(c => sr[c.key] > 0).length;
-  const block = el("div", "rating-block average");
+  const block = el("div", "rating-block average season-average");
   const header = el("div", "rating-block-header");
   header.append(el("span", "rating-block-label", "Середня оцінка сезону"));
   let vt = avg > 0 ? fmtNum(avg) : "—";
@@ -917,14 +952,29 @@ function renderSeasonAverageBlock(sr) {
   return block;
 }
 
+function attachCtxMeta(entry, ctx) {
+  if (!entry || !ctx || ctx.type !== 'media' || ctx.item?.key !== entry.key) return;
+  if (ctx.genres?.length && !entry.genres?.length) entry.genres = ctx.genres;
+  if (ctx.cast?.length && !entry.cast?.length) entry.cast = ctx.cast;
+  if (entry.type === 'tv' && !entry.totalSeasons && ctx.details?.seasons) {
+    entry.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
+  }
+  if (entry.type === 'movie' && entry.collection === undefined && ctx.collection !== undefined) {
+    entry.collection = ctx.collection;
+  }
+  if (entry.franchiseKey === undefined && ctx.franchiseKey !== undefined) {
+    entry.franchiseKey = ctx.franchiseKey;
+  }
+}
+
 function updateCore(r, patch) {
   const cur = lib[r.key] || { ...r, status: null, ratings: null, watchedEpisodes: [] };
   if (!cur.createdAt) cur.createdAt = Date.now();
   const merged = { ...cur, ...patch, updated: Date.now() };
   if (patch.status !== undefined && patch.status !== cur.status) merged.statusDate = Date.now();
-  lib[r.key] = merged;
   const ctx = cardStack[cardStack.length - 1];
-  if (ctx?.cast && !lib[r.key].cast) lib[r.key].cast = ctx.cast;
+  attachCtxMeta(merged, ctx);
+  lib[r.key] = merged;
   const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
   const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
   const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
@@ -949,11 +999,7 @@ function setCriterion(r, criterionKey, value) {
     if (r.type === "tv") { if (s.status !== "watched") newStatus = "watching"; }
     else newStatus = "watched";
   } else if (avg === 0 && s.status === "watched") newStatus = null;
-  const patch = { ratings, status: newStatus };
-  const ctx = cardStack[cardStack.length - 1];
-  if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
-  if (!lib[r.key] && ctx?.cast) patch.cast = ctx.cast;
-  updateNoRender(r, patch);
+  updateNoRender(r, { ratings, status: newStatus });
   const scroll = card.querySelector('.card-scroll');
   if (!scroll) return;
   refreshRatingBlockDOM(scroll, criterionKey, value);
@@ -1031,10 +1077,34 @@ function setSeasonCriterion(r, seasonNum, criterionKey, value) {
   if (Object.keys(cur).length > 0) sr[seasonNum] = cur;
   else delete sr[seasonNum];
   const patch = { seasonRatings: sr };
-  if (value > 0 && s.status !== 'watched') patch.status = 'watching'; // оцінка сезону -> «Дивлюсь»
+  if (value > 0 && s.status !== 'watched') patch.status = 'watching';
   const ctx = cardStack[cardStack.length - 1];
-  if (ctx?.details?.seasons && !s.totalSeasons) patch.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
-  if (!lib[r.key] && ctx?.genres) patch.genres = ctx.genres;
-  if (!lib[r.key] && ctx?.cast) patch.cast = ctx.cast;
-  update(r, patch);
+  updateNoRender(r, patch);
+
+  const scroll = card.querySelector('.card-scroll');
+  if (!scroll) return;
+  const block = scroll.querySelector(`.rating-block[data-season="${seasonNum}"][data-crit="${criterionKey}"]`);
+  if (block) {
+    block.querySelectorAll('.light').forEach((l, i) => l.classList.toggle('on', i + 1 <= value));
+    const valEl = block.querySelector('.rating-block-value');
+    if (valEl) { valEl.textContent = value || '—'; valEl.classList.toggle('empty', !value); }
+  }
+  const seasonAvgBlock = scroll.querySelector('.rating-block.season-average');
+  if (seasonAvgBlock) seasonAvgBlock.replaceWith(renderSeasonAverageBlock(cur));
+
+  const activeSeasonTab = scroll.querySelector('.season-tab-btn.active');
+  if (activeSeasonTab) {
+    const sAvg = computeAverage(cur);
+    let badge = activeSeasonTab.querySelector('.season-tab-badge');
+    if (sAvg > 0) {
+      if (!badge) { badge = el('span', 'season-tab-badge'); activeSeasonTab.append(badge); }
+      badge.textContent = '⭐ ' + fmtNum(sAvg);
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
+  const tvWrap = scroll.querySelector('.card-user-rating.tv-rating-wrap');
+  if (tvWrap && ctx) renderTvRatingSummaryDOM(tvWrap, lib[r.key] || {}, ctx);
+  refreshStatusAndBadgeDOM(scroll, r, (lib[r.key] || {}).status);
 }

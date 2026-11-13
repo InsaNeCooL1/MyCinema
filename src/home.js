@@ -1,7 +1,6 @@
 'use strict';
 
 // ============ RECOMMENDATIONS ENGINE V2 ============
-const RECS_CACHE = 'mycinema.recs.v4';
 const GEN_CACHE = 'mycinema.home.general.v6';
 const RECS_TTL = 6 * 60 * 60 * 1000;  // 6 годин
 const GEN_TTL = 12 * 60 * 60 * 1000;  // 12 годин
@@ -23,9 +22,6 @@ const META_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const META_CACHE_MAX = 220;
 const _memSeedRecs = new Map();
 
-function clampNum(v, min, max) {
-  return Math.max(min, Math.min(max, v));
-}
 
 function hashString32(str) {
   let h = 2166136261 >>> 0;
@@ -193,7 +189,7 @@ function getSeeds() {
 function getAntiSeeds() {
   return Object.values(lib)
     .map(x => ({ ...x, avg: computeItemRating(x).avg }))
-    .filter(x => x.id && (x.status === 'dropped' || x.antiSeed === true) && !isExcludedFromTaste(x, x.avg))
+    .filter(x => x.id && (x.status === 'dropped' || x.antiSeed === true) && x.excludeFromProfile !== true)
     .sort((a, b) => ((b.antiSeed ? 1 : 0) - (a.antiSeed ? 1 : 0)) || ((b.updated || 0) - (a.updated || 0)))
     .slice(0, 5);
 }
@@ -332,15 +328,15 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     }
   }
 
-  // Ручні оцінки акторів (🔥/😞)
+  // Ручні оцінки акторів (🔥/😞) — без повторного множення поверх recSignal
   for (const [aidStr, adj] of Object.entries(actorAdjust || {})) {
     const aid = parseInt(aidStr);
     if (adj > 0) {
-      signals.cast[aid] = (signals.cast[aid] || 0) + adj * 1.5;
+      signals.cast[aid] = Math.max(signals.cast[aid] || 0, adj * 0.85) + adj * 0.30;
       delete anti.cast[aid];
     } else if (adj < 0) {
       if (signals.cast[aid]) signals.cast[aid] = 0;
-      anti.cast[aid] = Math.max(anti.cast[aid] || 0, Math.abs(adj) * 0.9);
+      anti.cast[aid] = Math.max(anti.cast[aid] || 0, Math.abs(adj) * 0.85);
     }
   }
 
@@ -502,7 +498,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         if (adj < 0 || anti.cast[batch.actorId]) continue;
         const prof = actorProfiles.actors.get(batch.actorId);
         const profBoost = prof && prof.recSignal > 0 ? Math.min(0.4, prof.recSignal * 0.16) : 0;
-        entry._sourceRaw += 0.75 + adj * 0.25 + profBoost;
+        entry._sourceRaw += 0.75 + profBoost;
         const aName = names.cast[batch.actorId];
         addReason(entry, 'cast-' + batch.actorId, aName ? `З ${aName}` : 'Актор з улюблених', 7);
       } else if (batch.source === 'personalized') {
@@ -676,14 +672,30 @@ async function buildSmartRecommendations(seeds, mood, mode) {
 
       enriched.sort((a, b) => b._sortScore - a._sortScore);
 
-      // Обмеження засилля однієї франшизи в топі видачі
+      // Diversity: м'яке обмеження засилля однієї франшизи, режисера або головного актора
       const colSeen = {};
+      const dirSeen = {};
+      const leadSeen = {};
       enriched.forEach(entry => {
-        const cid = metaCache[entry.key]?.colId;
-        if (cid) {
-          colSeen[cid] = (colSeen[cid] || 0) + 1;
-          if (colSeen[cid] > 2) entry._sortScore -= 0.18 * (colSeen[cid] - 2);
+        const mc = metaCache[entry.key];
+        if (!mc) return;
+        let colPen = 0, dirPen = 0, leadPen = 0;
+        if (mc.colId) {
+          colSeen[mc.colId] = (colSeen[mc.colId] || 0) + 1;
+          if (colSeen[mc.colId] > 2) colPen = Math.min(0.24, 0.08 * (colSeen[mc.colId] - 2));
         }
+        const dirId = mc.dirs?.[0]?.id;
+        if (dirId) {
+          dirSeen[dirId] = (dirSeen[dirId] || 0) + 1;
+          if (dirSeen[dirId] > 2) dirPen = Math.min(0.18, 0.06 * (dirSeen[dirId] - 2));
+        }
+        const leadId = mc.cast?.[0]?.id;
+        if (leadId) {
+          leadSeen[leadId] = (leadSeen[leadId] || 0) + 1;
+          if (leadSeen[leadId] > 2) leadPen = Math.min(0.15, 0.05 * (leadSeen[leadId] - 2));
+        }
+        const divPen = Math.min(0.24, Math.max(colPen, dirPen + leadPen));
+        if (divPen > 0) entry._sortScore -= divPen;
       });
       enriched.sort((a, b) => b._sortScore - a._sortScore);
     }
@@ -803,7 +815,7 @@ function buildTasteCard(taste) {
 }
 
 function renderTasteSummary(taste) {
-  const container = el('div', 'taste-summary-container');
+  const container = el('div', 'taste-summary-container' + (state.home.tasteExpanded ? ' is-expanded' : ''));
   const hasTaste = taste && taste.count >= 3;
 
   let summaryVal = '—';
@@ -834,6 +846,7 @@ function renderTasteSummary(taste) {
   btn.addEventListener('click', () => {
     state.home.tasteExpanded = !state.home.tasteExpanded;
     btn.classList.toggle('expanded', state.home.tasteExpanded);
+    container.classList.toggle('is-expanded', state.home.tasteExpanded);
     panel.style.display = state.home.tasteExpanded ? 'block' : 'none';
   });
 
@@ -871,7 +884,7 @@ function computeRecsSignature(seeds) {
   const castVals = Object.values(lib).map(x => typeof getItemCastRating === 'function' ? getItemCastRating(x) : 0).filter(v => v > 0);
   const castSig = `${castVals.length}:${castVals.reduce((a, b) => a + b, 0).toFixed(1)}`;
   const day = new Date().toISOString().slice(0, 10);
-  return `v9|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}|mode:${state.home.mode || 'balance'}`;
+  return `v10|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}|mode:${state.home.mode || 'balance'}`;
 }
 
 async function loadHome() {
@@ -1334,10 +1347,7 @@ function buildFactOfDayCard() {
 function buildContinueWatchingSection() {
   const watching = Object.values(lib).filter(x => x.type === 'tv' && x.status === 'watching' && x.watchedEpisodes && x.watchedEpisodes.length > 0).sort((a, b) => b.updated - a.updated).slice(0, 6);
   if (!watching.length) return null;
-  const sec = el('section', 'home-section');
-  sec.style.maxWidth = '720px';
-  sec.style.margin = '0 auto';
-  sec.style.padding = '0 16px';
+  const sec = el('section', 'home-section continue-watching-sec');
   const head = el('div', 'section-head');
   head.append(el('h2', 'section-title', '⏯️ Продовжити'));
   sec.append(head);

@@ -909,7 +909,7 @@ function renderActorsTab() {
       fireBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         setActorAdj(a.id, a.adj > 0 ? 0 : 1);
-        try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
+        try { localStorage.removeItem(RECS_CACHE); } catch {}
         state.home.sig = null;
         renderStatistics();
       });
@@ -919,7 +919,7 @@ function renderActorsTab() {
       sadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         setActorAdj(a.id, a.adj < 0 ? 0 : -1);
-        try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
+        try { localStorage.removeItem(RECS_CACHE); } catch {}
         state.home.sig = null;
         renderStatistics();
       });
