@@ -54,6 +54,13 @@ function plural(n, one, few, many) {
 }
 function ratingClass(avg) { return avg >= 8 ? 'green' : (avg >= 6 ? 'yellow' : 'red'); }
 
+// [ESCAPE-HTML] Безпечне екранування для вставок у HTML
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
 // ============ RATINGS ============
 function computeAverage(ratings) {
   if (!ratings) return 0;

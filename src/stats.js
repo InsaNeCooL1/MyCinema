@@ -614,7 +614,12 @@ function renderFranchisesTab() {
     const ins = el('div', 'insight-card');
     ins.append(el('div', 'insight-label', '🏆 Улюблена франшиза'));
     const txt = el('div', 'insight-text');
-    txt.innerHTML = `Найвище ти оцінив серію <strong>«${favFr.name}»</strong> — середня оцінка <strong>${fmtNum(favFr.avgRating)}/10</strong> (${favFr.watchedCount}/${favFr.totalParts} переглянуто).`;
+    // [XSS-FRANCHISE-FIX]
+    txt.append(document.createTextNode('Найвище ти оцінив серію «'));
+    const b1 = el('strong'); b1.textContent = favFr.name; txt.append(b1);
+    txt.append(document.createTextNode('» — середня оцінка '));
+    const b2 = el('strong'); b2.textContent = fmtNum(favFr.avgRating) + '/10'; txt.append(b2);
+    txt.append(document.createTextNode(` (${favFr.watchedCount}/${favFr.totalParts} переглянуто).`));
     ins.append(txt);
     wrap.append(ins);
   }
@@ -761,11 +766,18 @@ function renderStreamingTab() {
   if (topByCount) {
     const ins = el('div', 'insight-card');
     ins.append(el('div', 'insight-label', '📡 Стрімінг-профіль'));
-    let txt = `Найчастіше ти дивишся проєкти з <strong>${topByCount.name}</strong> (${topByCount.watched} тайтлів).`;
+    // [XSS-STREAMING-FIX] Безпечна побудова без innerHTML
+    const t = el('div', 'insight-text');
+    t.append(document.createTextNode('Найчастіше ти дивишся проєкти з '));
+    const sb1 = el('strong'); sb1.textContent = topByCount.name; t.append(sb1);
+    t.append(document.createTextNode(` (${topByCount.watched} тайтлів).`));
     if (topByQuality) {
-      txt += ` Найвищу середню оцінку від тебе отримує <strong>${topByQuality.name}</strong> — <strong>${fmtNum(topByQuality.ratedSum / topByQuality.ratedCnt)}/10</strong>.`;
+      t.append(document.createTextNode(' Найвищу середню оцінку від тебе отримує '));
+      const sb2 = el('strong'); sb2.textContent = topByQuality.name; t.append(sb2);
+      t.append(document.createTextNode(' — '));
+      const sb3 = el('strong'); sb3.textContent = fmtNum(topByQuality.ratedSum / topByQuality.ratedCnt) + '/10'; t.append(sb3);
+      t.append(document.createTextNode('.'));
     }
-    const t = el('div', 'insight-text'); t.innerHTML = txt;
     ins.append(t);
     wrap.append(ins);
   }

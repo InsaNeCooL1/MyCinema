@@ -995,13 +995,17 @@ async function loadHome() {
   box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Підбираю рекомендації під твій смак...</div>';
   try {
     const data = await buildSmartRecommendations(seeds, state.home.mood, state.home.mode);
+    if (state.home.loading !== sig) return; // [LOADHOME-RACE-FIX] застарілий запит
     writeRecsCache(sig, data);
     state.home.recs = data;
     state.home.sig = sig;
     state.home.shown = { movie: 20, tv: 20 };
     renderHomeContent(taste);
-  } catch (e) { box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${e.message}</div>`; }
-  finally { state.home.loading = false; }
+  } catch (e) {
+    if (state.home.loading !== sig) return;
+    box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${e.message}</div>`;
+  }
+  finally { if (state.home.loading === sig) state.home.loading = false; }
 }
 
 function recCard(item, allowDismiss) {

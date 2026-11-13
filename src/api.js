@@ -51,8 +51,13 @@ async function fetchWikiSitelinks(wikidataId) {
   if (!wikidataId) return null;
   if (_wikiSitelinksCache.has(wikidataId)) return _wikiSitelinksCache.get(wikidataId);
   try {
-    const wdUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(wikidataId)}&props=sitelinks&sitefilter=ukwiki|enwiki&format=json&origin=*`;
-    const wd = await fetchJsonTimeout(wdUrl, 2500);
+    // [WIKI-API-FIX] URLSearchParams для коректного кодування |
+    const wdParams = new URLSearchParams({
+      action: 'wbgetentities', ids: wikidataId, props: 'sitelinks',
+      sitefilter: 'ukwiki|enwiki', format: 'json', origin: '*'
+    });
+    const wdUrl = `https://www.wikidata.org/w/api.php?${wdParams.toString()}`;
+    const wd = await fetchJsonTimeout(wdUrl, 3000);
     const links = wd?.entities?.[wikidataId]?.sitelinks || null;
     if (links) _wikiSitelinksCache.set(wikidataId, links);
     return links;

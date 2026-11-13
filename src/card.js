@@ -141,12 +141,12 @@ async function loadMediaCardData(ctx) {
       if ('franchiseKey' in meta && lib[r.key].franchiseKey === undefined) { lib[r.key].franchiseKey = meta.franchiseKey; dirty = true; }
       if (dirty) save();
     }
-    if (d.external_ids?.imdb_id) {
+        if (d.external_ids?.imdb_id) {
       try {
-        const omdbRes = await fetch(`https://www.omdbapi.com/?i=${d.external_ids.imdb_id}&apikey=${OMDB_KEY}`);
+        const omdbRes = await fetch(`${PROXY_URL}/omdb?i=${d.external_ids.imdb_id}`); // [OMDB-PROXY-FINAL]
         const omdbData = await omdbRes.json();
         if (omdbData.Response === "True") ctx.omdb = omdbData;
-      } catch {}
+      } catch (e) { console.warn('[MyCinema/OMDb] fetch fail:', e); }
     }
     if (r.type === "tv" && d.seasons) {
       const sd = await Promise.all(d.seasons.map(s => tmdbFetch(`/tv/${r.id}/season/${s.season_number}?language=uk-UA`).catch(() => null)));
@@ -221,7 +221,7 @@ window.addEventListener('popstate', async (e) => {
     return;
   }
   while (cardStack.length > depth) cardStack.pop();
-  if (depth === 0) { overlay.classList.remove('open'); refresh(); }
+  if (depth === 0) { flushPendingNotes(); /* [POPSTATE-NOTES-FIX] */ overlay.classList.remove('open'); refresh(); }
   else renderCard(true);
 });
 

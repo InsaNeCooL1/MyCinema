@@ -11,24 +11,23 @@ const PERSON_DEPT_UA = {
   Art: 'Художня постановка'
 };
 
-function fetchJsonTimeout(url, ms = 2500) {
-  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = ctrl ? setTimeout(() => ctrl.abort(), ms) : null;
-  return fetch(url, ctrl ? { signal: ctrl.signal } : {})
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .finally(() => { if (timer) clearTimeout(timer); });
-}
+// [NO-DUP-FETCH-JSON] fetchJsonTimeout живе в api.js — не дублюємо тут
 
+// [WIKI-FIX-V2] URLSearchParams для коректного кодування |
 async function fetchWikiBio(wikidataId) {
   if (!wikidataId) return null;
   try {
-    const wdUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(wikidataId)}&props=sitelinks&sitefilter=ukwiki|enwiki&format=json&origin=*`;
-    const wd = await fetchJsonTimeout(wdUrl, 2500);
+    const wdParams = new URLSearchParams({
+      action: 'wbgetentities', ids: wikidataId, props: 'sitelinks',
+      sitefilter: 'ukwiki|enwiki', format: 'json', origin: '*'
+    });
+    const wdUrl = `https://www.wikidata.org/w/api.php?${wdParams.toString()}`;
+    const wd = await fetchJsonTimeout(wdUrl, 3000);
     const links = wd?.entities?.[wikidataId]?.sitelinks || {};
     if (links.ukwiki?.title) {
       const slug = encodeURIComponent(links.ukwiki.title.replace(/ /g, '_'));
-      const sum = await fetchJsonTimeout(`https://uk.wikipedia.org/api/rest_v1/page/summary/${slug}`, 2500);
-      if (sum?.extract && sum.extract.trim().length >= 60) {
+      const sum = await fetchJsonTimeout(`https://uk.wikipedia.org/api/rest_v1/page/summary/${slug}`, 3000);
+      if (sum?.extract && sum.extract.trim().length >= 40) {
         return {
           text: sum.extract.trim(),
           source: 'Вікіпедія (UA)',
@@ -39,7 +38,7 @@ async function fetchWikiBio(wikidataId) {
     if (links.enwiki?.title) {
       return { enTitle: links.enwiki.title };
     }
-  } catch {}
+  } catch (e) { console.warn('[MyCinema/Wiki] fetch error:', e); }
   return null;
 }
 
@@ -50,12 +49,15 @@ async function resolvePersonBiography(details) {
   let enBio = enTrans ? enTrans.data.biography.trim() : '';
 
   if (ukBio.length >= 120) {
+    console.log('[MyCinema/Bio] TMDB UA >=120 — wiki skip');
     return { text: ukBio, source: 'TMDB (UA)', url: null };
   }
 
   const wid = details?.external_ids?.wikidata_id || null;
+  console.log('[MyCinema/Bio] trying wiki, wikidata_id:', wid); // [BIO-LOG]
   const wikiRes = await fetchWikiBio(wid);
-  if (wikiRes?.text) return wikiRes;
+  if (wikiRes?.text) { console.log('[MyCinema/Bio] wiki OK:', wikiRes.source); return wikiRes; }
+  console.log('[MyCinema/Bio] wiki empty, falling back');
 
   if (ukBio) {
     return { text: ukBio, source: 'TMDB (UA)', url: null };

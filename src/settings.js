@@ -165,8 +165,18 @@ async function submitOnboarding() {
   btn.textContent = 'Збереження...'; btn.disabled = true;
   const items = [];
   onbCategories.forEach(cat => cat.items.forEach(it => { if (onbSelected.has(it.key)) items.push(it); }));
+  // [ONB-TV-FIX] Для TV — сезонні оцінки, інакше computeItemRating().avg = 0
   items.forEach(it => {
-    lib[it.key] = { ...it, status: 'watched', ratings: { overall: 8 }, updated: Date.now(), createdAt: Date.now() };
+    const isTv = it.type === 'tv';
+    lib[it.key] = {
+      ...it,
+      status: 'watched',
+      ...(isTv
+        ? { seasonRatings: { 1: { overall: 8 } }, totalSeasons: 1 }
+        : { ratings: { overall: 8 } }),
+      updated: Date.now(),
+      createdAt: Date.now()
+    };
   });
   localStorage.setItem('onboardingDone', 'true');
   document.getElementById('onboarding-modal').style.display = 'none';

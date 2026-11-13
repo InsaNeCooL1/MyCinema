@@ -168,6 +168,15 @@ history.pushState({ mc: 0 }, '', location.pathname + location.search);
 refresh();
 routeFromHash();
 
+// [GUEST-ONB-FIX] Гість-онбординг при першому запуску
+if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getItem('onboardingDone')) {
+  setTimeout(() => {
+    if (typeof startOnboarding === 'function' && !window.currentUser && Object.keys(lib).length === 0 && !localStorage.getItem('onboardingDone')) {
+      startOnboarding();
+    }
+  }, 800);
+}
+
 // ========== CAPACITOR BACK BUTTON (FIXED) ==========
 (function () {
   const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
