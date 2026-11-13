@@ -2,7 +2,7 @@
 
 // ============ RECOMMENDATIONS ENGINE V2 ============
 const RECS_CACHE = 'mycinema.recs.v4';
-const GEN_CACHE = 'mycinema.home.general.v3';
+const GEN_CACHE = 'mycinema.home.general.v6';
 const RECS_TTL = 6 * 60 * 60 * 1000;  // 6 годин
 const GEN_TTL = 12 * 60 * 60 * 1000;  // 12 годин
 
@@ -18,6 +18,135 @@ function isExcludedShow(raw, type) {
   return false;
 }
 
+const META_CACHE_KEY = 'mycinema.metaCache.v1';
+const META_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+const META_CACHE_MAX = 220;
+const _memSeedRecs = new Map();
+
+function clampNum(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function hashString32(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function seededRandom(str) {
+  let a = hashString32(str) || 1;
+  return function() {
+    a |= 0;
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function isExcludedFromTaste(x, avg) {
+  if (!x) return true;
+  if (x.excludeFromProfile === true) return true;
+  if (x.excludeFromProfile === false) return false;
+  if (x.tmdbRating > 0 && avg > 0 && Math.abs(avg - x.tmdbRating) > 3) return true;
+  return false;
+}
+
+function readMetaCacheAll() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(META_CACHE_KEY)) || {};
+    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  } catch { return {}; }
+}
+
+function writeMetaCacheAll(cache) {
+  try {
+    const entries = Object.entries(cache);
+    if (entries.length > META_CACHE_MAX) {
+      entries.sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
+      cache = Object.fromEntries(entries.slice(0, META_CACHE_MAX));
+    }
+    localStorage.setItem(META_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+function packCompactMeta(d, type) {
+  const dirs = [];
+  const seenDir = new Set();
+  (d.credits?.crew || []).filter(c => c.job === 'Director' || c.job === 'Creator').forEach(c => {
+    if (!seenDir.has(c.id)) { seenDir.add(c.id); dirs.push({ id: c.id, name: c.name }); }
+  });
+  (d.created_by || []).forEach(c => {
+    if (!seenDir.has(c.id)) { seenDir.add(c.id); dirs.push({ id: c.id, name: c.name }); }
+  });
+
+  let cast = [];
+  if (type === 'tv' && Array.isArray(d.aggregate_credits?.cast) && d.aggregate_credits.cast.length) {
+    const rawCast = d.aggregate_credits.cast.slice(0, 12);
+    const maxEps = Math.max(...rawCast.map(c => c.total_episode_count || 1), 1);
+    cast = rawCast.map(c => ({
+      id: c.id,
+      name: c.name,
+      w: clampNum((c.total_episode_count || 1) / maxEps, 0.15, 1)
+    }));
+  } else {
+    cast = (d.credits?.cast || []).slice(0, 10).map((c, idx) => ({
+      id: c.id,
+      name: c.name,
+      w: 1 / Math.sqrt(1 + (typeof c.order === 'number' ? c.order : idx))
+    }));
+  }
+
+  const kws = (d.keywords?.keywords || d.keywords?.results || []).slice(0, 14).map(k => k.id);
+  const genres = (d.genres || []).map(g => g.id);
+
+  return {
+    ts: Date.now(),
+    colId: d.belongs_to_collection?.id || null,
+    netId: d.networks?.[0]?.id || null,
+    dirs: dirs.slice(0, 3),
+    cast,
+    kws,
+    genres
+  };
+}
+
+async function fetchCompactMeta(type, id, needRecs, cacheObj) {
+  const key = `${type}-${id}`;
+  const now = Date.now();
+  const cached = cacheObj[key];
+  const cachedRecs = needRecs ? _memSeedRecs.get(key) : null;
+  if (cached && (now - (cached.ts || 0)) < META_CACHE_TTL && (!needRecs || cachedRecs)) {
+    return { meta: cached, recs: cachedRecs || [] };
+  }
+
+  const parts = [type === 'tv' ? 'credits,aggregate_credits,keywords' : 'credits,keywords'];
+  if (needRecs) parts.push('recommendations');
+  const d = await tmdbFetch(`/${type}/${id}?language=uk-UA&append_to_response=${parts.join(',')}`);
+  const meta = packCompactMeta(d, type);
+  cacheObj[key] = meta;
+
+  let recs = [];
+  if (needRecs) {
+    recs = (d.recommendations?.results || []).slice(0, 12);
+    _memSeedRecs.set(key, recs);
+  }
+  return { meta, recs };
+}
+
+async function mapBatched(items, batchSize, fn) {
+  const out = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const chunk = items.slice(i, i + batchSize);
+    const res = await Promise.all(chunk.map(fn));
+    out.push(...res);
+  }
+  return out;
+}
+
 function getSeeds() {
   const candidates = Object.values(lib)
     .map(x => {
@@ -25,26 +154,37 @@ function getSeeds() {
       const isFav = !!x.favorite;
       const elo = typeof x.elo === 'number' ? x.elo : ELO_START;
       const hasHighElo = (x.eloGames || 0) > 0 && elo >= 1530;
-      if (!x.id || (avg < 7 && !isFav && !hasHighElo)) return null;
+      if (!x.id || x.antiSeed || isExcludedFromTaste(x, avg)) return null;
+      if (avg < 6.5 && !isFav && !hasHighElo) return null;
+
       const base = avg > 0 ? avg : (isFav ? 8.6 : 8.2);
-      const strength = base + (isFav ? 1.4 : 0) + (elo > ELO_START ? Math.min((elo - ELO_START) / 100, 1.5) : 0);
-      return { ...x, avg, isFav, elo, strength };
+      const favBonus = isFav ? 1.2 : 0;
+      const eloBonus = elo > ELO_START ? Math.min((elo - ELO_START) / 100, 1.5) : 0;
+      const strength = Math.min(10, base + favBonus + eloBonus);
+
+      const residual = (avg > 0 && x.tmdbRating > 0)
+        ? (avg - x.tmdbRating)
+        : (avg > 0 ? avg - 7.0 : 0.8);
+      const resFactor = clampNum(1 + residual / 2, 0.3, 2);
+      const decayMult = Math.max(0.1, tasteDecay(x.updated));
+      const rankScore = (strength / 10) * resFactor * (0.35 + 0.65 * decayMult);
+
+      return { ...x, avg, isFav, elo, strength, residual, resFactor, decayMult, rankScore };
     })
     .filter(Boolean);
 
   if (!candidates.length) return [];
 
-  // 50% свіжі оцінки (останні дії) + 50% якірні (найсильніша любов)
   const fresh = [...candidates].sort((a, b) => (b.updated || 0) - (a.updated || 0)).slice(0, 3);
-  const anchors = [...candidates].sort((a, b) => b.strength - a.strength || (b.updated || 0) - (a.updated || 0));
+  const byResidual = [...candidates].sort((a, b) => b.rankScore - a.rankScore || (b.updated || 0) - (a.updated || 0));
 
   const picked = [];
   const seen = new Set();
   for (const s of fresh) {
     if (!seen.has(s.key)) { seen.add(s.key); picked.push(s); }
   }
-  for (const s of anchors) {
-    if (picked.length >= 5) break;
+  for (const s of byResidual) {
+    if (picked.length >= 18) break;
     if (!seen.has(s.key)) { seen.add(s.key); picked.push(s); }
   }
   return picked;
@@ -53,9 +193,9 @@ function getSeeds() {
 function getAntiSeeds() {
   return Object.values(lib)
     .map(x => ({ ...x, avg: computeItemRating(x).avg }))
-    .filter(x => x.id && (x.status === 'dropped' || (x.avg > 0 && x.avg <= 4.5)))
-    .sort((a, b) => (a.avg || 3) - (b.avg || 3) || (b.updated || 0) - (a.updated || 0))
-    .slice(0, 2);
+    .filter(x => x.id && (x.status === 'dropped' || x.antiSeed === true) && !isExcludedFromTaste(x, x.avg))
+    .sort((a, b) => ((b.antiSeed ? 1 : 0) - (a.antiSeed ? 1 : 0)) || ((b.updated || 0) - (a.updated || 0)))
+    .slice(0, 5);
 }
 
 function getDominantCriterion(taste) {
@@ -67,6 +207,18 @@ function getDominantCriterion(taste) {
   return null;
 }
 
+function minMaxNorm(arr) {
+  if (!arr.length) return [];
+  let min = Infinity, max = -Infinity;
+  for (const v of arr) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  const span = max - min;
+  if (span <= 1e-9) return arr.map(() => 0);
+  return arr.map(v => (v - min) / span);
+}
+
 async function buildSmartRecommendations(seeds, mood, mode) {
   mode = mode || 'balance';
   if (!seeds.length) return { items: [], seeds: 0, mood, mode };
@@ -74,79 +226,113 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   const taste = computeTasteVector();
   const domCrit = getDominantCriterion(taste);
   const antiSeeds = getAntiSeeds();
+  const metaCache = readMetaCacheAll();
 
-  const [seedDetails, antiDetails] = await Promise.all([
-    Promise.all(seeds.map(async s => {
-      try {
-        const d = await tmdbFetch(`/${s.type}/${s.id}?language=uk-UA&append_to_response=credits,keywords,recommendations`);
-        return { seed: s, data: d };
-      } catch { return null; }
-    })).then(a => a.filter(Boolean)),
-    Promise.all(antiSeeds.map(async s => {
-      try {
-        const d = await tmdbFetch(`/${s.type}/${s.id}?language=uk-UA&append_to_response=credits,keywords`);
-        return { seed: s, data: d };
-      } catch { return null; }
-    })).then(a => a.filter(Boolean))
-  ]);
+  const seedDetails = (await mapBatched(seeds, 8, async s => {
+    try {
+      const { meta, recs } = await fetchCompactMeta(s.type, s.id, true, metaCache);
+      return { seed: s, meta, recs };
+    } catch { return null; }
+  })).filter(Boolean);
 
-  const signals = { directors: {}, cast: {}, genres: {}, keywords: {} };
-  const anti = { directors: {}, genres: {}, keywords: {} };
+  const antiDetails = (await mapBatched(antiSeeds, 5, async s => {
+    try {
+      const { meta } = await fetchCompactMeta(s.type, s.id, false, metaCache);
+      return { seed: s, meta };
+    } catch { return null; }
+  })).filter(Boolean);
+
+  // Групування сідів тільки за колекцією або самим сідом (без мережі)
+  const groups = new Map();
+  const getGroup = (gKey) => {
+    if (!groups.has(gKey)) groups.set(gKey, { directors: {}, cast: {}, genres: {}, keywords: {} });
+    return groups.get(gKey);
+  };
+  const addGrp = (o, id, v) => {
+    const e = o[id] || (o[id] = { sum: 0, max: 0 });
+    e.sum += v;
+    if (v > e.max) e.max = v;
+  };
+  const combGrp = e => e.max + 0.3 * (e.sum - e.max);
+
+  const dirRes = {};
+  const actorRes = {};
   const names = { directors: {}, cast: {} };
 
-  // Позитивні сигнали (з урахуванням улюбленого, Elo, піврозпаду 180д і Taste DNA)
-  for (const { seed, data } of seedDetails) {
-    let w = (seed.strength / 10) * (0.4 + 0.6 * tasteDecay(seed.updated));
+  for (const { seed, meta } of seedDetails) {
+    let w = (seed.strength / 10) * seed.resFactor * seed.decayMult;
     if (domCrit) {
       const rr = seed.type === 'tv' ? averagedSeasonRatings(seed) : (seed.ratings || {});
       if ((rr[domCrit.key] || 0) >= 8) w *= 1.15;
     }
 
-    const creators = new Set();
-    (data.credits?.crew || []).filter(c => c.job === 'Director' || c.job === 'Creator').forEach(c => {
-      creators.add(c.id); names.directors[c.id] = c.name;
-    });
-    (data.created_by || []).forEach(c => {
-      creators.add(c.id); names.directors[c.id] = c.name;
-    });
-    creators.forEach(id => { signals.directors[id] = (signals.directors[id] || 0) + w * 2.5; });
+    const gKey = meta.colId ? 'col-' + meta.colId : 'seed-' + seed.key;
+    const grp = getGroup(gKey);
 
-    (data.credits?.cast || []).slice(0, 5).forEach(c => {
+    (meta.dirs || []).forEach(c => {
+      names.directors[c.id] = c.name;
+      addGrp(grp.directors, c.id, w * 2.2);
+      if (!dirRes[c.id]) dirRes[c.id] = { sum: 0, n: 0 };
+      dirRes[c.id].sum += seed.residual;
+      dirRes[c.id].n += 1;
+    });
+
+    (meta.cast || []).forEach(c => {
       names.cast[c.id] = c.name;
       const adj = typeof getActorAdj === 'function' ? getActorAdj(c.id) : 0;
       const mult = Math.max(0.3, 1 + adj * 0.45);
-      signals.cast[c.id] = (signals.cast[c.id] || 0) + w * 2.2 * mult;
+      addGrp(grp.cast, c.id, w * 2.0 * (c.w || 1) * mult);
+      if (!actorRes[c.id]) actorRes[c.id] = { sum: 0, n: 0 };
+      actorRes[c.id].sum += seed.residual;
+      actorRes[c.id].n += 1;
     });
 
-    (data.genres || []).forEach(g => {
-      signals.genres[g.id] = (signals.genres[g.id] || 0) + w * 1.5;
+    const gIds = (meta.genres && meta.genres.length) ? meta.genres : (seed.genres || []);
+    gIds.forEach(gid => {
+      addGrp(grp.genres, gid, w * 1.4);
     });
 
-    const kws = data.keywords?.keywords || data.keywords?.results || [];
-    kws.slice(0, 12).forEach(k => {
-      signals.keywords[k.id] = (signals.keywords[k.id] || 0) + w * 1.2;
+    (meta.kws || []).forEach(kid => {
+      addGrp(grp.keywords, kid, w * 1.1);
     });
   }
 
-  // Підмішуємо улюблених акторів із ручним бустом (🔥) або високим власним рейтингом
+  const signals = { directors: {}, cast: {}, genres: {}, keywords: {} };
+  for (const grp of groups.values()) {
+    for (const [id, e] of Object.entries(grp.directors)) signals.directors[id] = (signals.directors[id] || 0) + combGrp(e);
+    for (const [id, e] of Object.entries(grp.cast)) signals.cast[id] = (signals.cast[id] || 0) + combGrp(e);
+    for (const [id, e] of Object.entries(grp.genres)) signals.genres[id] = (signals.genres[id] || 0) + combGrp(e);
+    for (const [id, e] of Object.entries(grp.keywords)) signals.keywords[id] = (signals.keywords[id] || 0) + combGrp(e);
+  }
+
+  // Згладжування за залишком: sum(residual) / (n + 3)
+  for (const [id, stat] of Object.entries(dirRes)) {
+    const smooth = stat.sum / (stat.n + 3);
+    signals.directors[id] *= clampNum(1 + smooth / 2, 0.5, 1.6);
+  }
+  for (const [id, stat] of Object.entries(actorRes)) {
+    const smooth = stat.sum / (stat.n + 3);
+    signals.cast[id] *= clampNum(1 + smooth / 2, 0.5, 1.6);
+  }
+
+  // Ручні оцінки акторів (🔥/😞)
   for (const [aidStr, adj] of Object.entries(actorAdjust || {})) {
     const aid = parseInt(aidStr);
-    if (adj > 0) signals.cast[aid] = (signals.cast[aid] || 0) + adj * 2.5;
+    if (adj > 0) signals.cast[aid] = (signals.cast[aid] || 0) + adj * 2.0;
+    else if (adj < 0 && signals.cast[aid]) signals.cast[aid] = Math.max(0, signals.cast[aid] + adj * 1.5);
   }
 
-  // Негативні сигнали (оцінки <=4, Закинуто + сховані рекомендації)
-  for (const { seed, data } of antiDetails) {
-    const aw = seed.status === 'dropped' ? 1.1 : 1.4;
-    (data.credits?.crew || []).filter(c => c.job === 'Director' || c.job === 'Creator').forEach(c => {
-      anti.directors[c.id] = (anti.directors[c.id] || 0) + aw * 1.5;
-    });
-    (data.created_by || []).forEach(c => { anti.directors[c.id] = (anti.directors[c.id] || 0) + aw * 1.5; });
-    (data.genres || []).forEach(g => { anti.genres[g.id] = (anti.genres[g.id] || 0) + aw * 0.8; });
-    const kws = data.keywords?.keywords || data.keywords?.results || [];
-    kws.slice(0, 10).forEach(k => { anti.keywords[k.id] = (anti.keywords[k.id] || 0) + aw; });
+  // Анти-сигнали (тільки dropped + ручне «не схоже» + сховані)
+  const anti = { directors: {}, genres: {}, keywords: {} };
+  for (const { seed, meta } of antiDetails) {
+    const aw = seed.antiSeed ? 1.4 : 1.0;
+    (meta.dirs || []).forEach(c => { anti.directors[c.id] = (anti.directors[c.id] || 0) + aw; });
+    const gIds = (meta.genres && meta.genres.length) ? meta.genres : (seed.genres || []);
+    gIds.forEach(gid => { anti.genres[gid] = (anti.genres[gid] || 0) + aw * 0.4; });
+    (meta.kws || []).forEach(kid => { anti.keywords[kid] = (anti.keywords[kid] || 0) + aw; });
   }
   for (const d of Object.values(dismissedRecs || {})) {
-    (d.genres || []).forEach(gid => { anti.genres[gid] = (anti.genres[gid] || 0) + 0.35; });
+    (d.genres || []).forEach(gid => { anti.genres[gid] = (anti.genres[gid] || 0) + 0.25; });
   }
 
   const moodData = mood && MOODS[mood] ? MOODS[mood] : null;
@@ -157,10 +343,10 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     .sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id]) => parseInt(id));
   const topCast = Object.entries(signals.cast)
     .filter(([, sc]) => sc > 0)
-    .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id]) => parseInt(id));
+    .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => parseInt(id));
   const topDirectors = Object.entries(signals.directors)
     .filter(([id]) => !anti.directors[id])
-    .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([id]) => parseInt(id));
+    .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => parseInt(id));
 
   const unique = new Map();
   const ensureCandidate = (raw, type) => {
@@ -171,7 +357,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     let entry = unique.get(key);
     if (!entry) {
       const item = normalizeItem({ ...raw, media_type: type });
-      entry = { ...item, _score: 0, _reasons: [], _seenTags: new Set() };
+      entry = { ...item, _sourceRaw: 0, _eloHits: [], _reasons: [], _seenTags: new Set(), _meta: null };
       unique.set(key, entry);
     }
     return entry;
@@ -182,16 +368,18 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     entry._reasons.push({ priority, text });
   };
 
-  // Джерело 1: Прямі TMDB рекомендації від наших сідів (нуль зайвих запитів!)
-  for (const { seed, data } of seedDetails) {
-    const recs = (data.recommendations?.results || []).slice(0, 12);
+  // Джерело 1: Прямі TMDB рекомендації від сідів
+  for (const { seed, recs } of seedDetails) {
     const seedRatingLabel = seed.avg > 0 ? ` (${fmtNum(seed.avg)})` : (seed.isFav ? ' ❤️' : '');
-    const boost = 2.6 * (seed.strength / 10);
+    const boost = Math.min(2.2, (seed.strength / 10) * seed.resFactor * seed.decayMult);
+    const seedEloNorm = (seed.eloGames || 0) > 0 ? clampNum((seed.elo - 1450) / 250, 0, 1) : 0;
+
     recs.forEach((r, idx) => {
       const t = r.media_type || seed.type;
       const entry = ensureCandidate(r, t);
       if (!entry) return;
-      entry._score += boost * (1 - idx * 0.04);
+      entry._sourceRaw += boost * (1 - idx * 0.045);
+      if (seedEloNorm > 0) entry._eloHits.push(seedEloNorm);
       addReason(entry, 'seed-' + seed.key, `Як «${seed.title}»${seedRatingLabel}`, 10);
     });
   }
@@ -220,38 +408,28 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   };
 
   const fetchPromises = [];
-  const pages = [1];
-
-  // Movies & TV Discover за ключовими словами + жанрами
   ['movie', 'tv'].forEach(type => {
     if (topKw.length || topGenres.length) {
-      pages.forEach(page => {
-        const p = baseDiscover(type);
-        p.set('page', String(page));
-        if (topKw.length) p.set('with_keywords', topKw.join('|'));
-        if (topGenres.length) p.set('with_genres', topGenres.slice(0, 3).join('|'));
-        fetchPromises.push(tmdbFetch(`/discover/${type}?${p}`).then(d => ({ type, results: d.results || [], source: 'personalized' })).catch(() => ({ type, results: [], source: 'personalized' })));
-      });
+      const p = baseDiscover(type);
+      p.set('page', '1');
+      if (topKw.length) p.set('with_keywords', topKw.join('|'));
+      if (topGenres.length) p.set('with_genres', topGenres.slice(0, 3).join('|'));
+      fetchPromises.push(tmdbFetch(`/discover/${type}?${p}`).then(d => ({ type, results: d.results || [], source: 'personalized' })).catch(() => ({ type, results: [], source: 'personalized' })));
     }
     if (topGenres.length) {
-      pages.forEach(page => {
-        const pg = baseDiscover(type);
-        pg.set('page', String(page));
-        pg.set('with_genres', topGenres.slice(0, 3).join('|'));
-        fetchPromises.push(tmdbFetch(`/discover/${type}?${pg}`).then(d => ({ type, results: d.results || [], source: 'genres' })).catch(() => ({ type, results: [], source: 'genres' })));
-      });
+      const pg = baseDiscover(type);
+      pg.set('page', '1');
+      pg.set('with_genres', topGenres.slice(0, 3).join('|'));
+      fetchPromises.push(tmdbFetch(`/discover/${type}?${pg}`).then(d => ({ type, results: d.results || [], source: 'genres' })).catch(() => ({ type, results: [], source: 'genres' })));
     }
     if (moodData) {
-      pages.forEach(page => {
-        const pm = baseDiscover(type);
-        pm.set('page', String(page));
-        pm.set('with_genres', (type === 'tv' ? (moodData.tvGenres || moodData.genres) : moodData.genres).join('|'));
-        fetchPromises.push(tmdbFetch(`/discover/${type}?${pm}`).then(d => ({ type, results: d.results || [], source: 'mood' })).catch(() => ({ type, results: [], source: 'mood' })));
-      });
+      const pm = baseDiscover(type);
+      pm.set('page', '1');
+      pm.set('with_genres', (type === 'tv' ? (moodData.tvGenres || moodData.genres) : moodData.genres).join('|'));
+      fetchPromises.push(tmdbFetch(`/discover/${type}?${pm}`).then(d => ({ type, results: d.results || [], source: 'mood' })).catch(() => ({ type, results: [], source: 'mood' })));
     }
   });
 
-  // Акторські запити (фільми через discover with_cast + серіали через person/tv_credits)
   topCast.forEach(aid => {
     const p = baseDiscover('movie');
     p.set('with_cast', String(aid));
@@ -274,7 +452,6 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     );
   });
 
-  // Режисерські запити
   topDirectors.forEach(did => {
     const p = baseDiscover('movie');
     p.set('with_crew', String(did));
@@ -293,73 +470,211 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       if (!entry) continue;
 
       if (batch.source === 'mood') {
-        entry._score += 2.2;
+        entry._sourceRaw += 1.4;
         addReason(entry, 'mood', `${moodData.emoji} ${moodData.label}`, 8);
       } else if (batch.source === 'director') {
-        entry._score += 1.9;
+        entry._sourceRaw += 0.9;
         const dName = names.directors[batch.dirId];
         addReason(entry, 'dir-' + batch.dirId, dName ? `Режисер: ${dName}` : 'Твій режисер', 9);
       } else if (batch.source === 'cast') {
         const adj = typeof getActorAdj === 'function' ? getActorAdj(batch.actorId) : 0;
         if (adj < 0) continue;
-        entry._score += 1.6 + adj * 0.5;
+        entry._sourceRaw += 0.8 + adj * 0.25;
         const aName = names.cast[batch.actorId];
         addReason(entry, 'cast-' + batch.actorId, aName ? `З ${aName}` : 'Актор з улюблених', 7);
       } else if (batch.source === 'personalized') {
-        entry._score += 1.2;
+        entry._sourceRaw += 0.9;
       } else if (batch.source === 'genres') {
-        entry._score += 0.6;
+        entry._sourceRaw += 0.45;
       }
     }
   }
 
-  // Фінальний підрахунок скору + фільтрація під режим + легкий jitter
+  // Насичення жанрів (Lift)
+  const poolGenreCounts = {};
+  let totalPoolGenres = 0;
+  for (const entry of unique.values()) {
+    (entry.genres || []).forEach(gid => {
+      poolGenreCounts[gid] = (poolGenreCounts[gid] || 0) + 1;
+      totalPoolGenres++;
+    });
+  }
+  const userGenreTotal = Object.values(signals.genres).reduce((a, b) => a + b, 0);
+  const genreCountDistinct = Math.max(Object.keys(poolGenreCounts).length, 1);
+  const genreLift = {};
+  for (const gid of Object.keys(poolGenreCounts)) {
+    const uShare = ((signals.genres[gid] || 0) + 0.5) / (userGenreTotal + 0.5 * genreCountDistinct);
+    const pShare = (poolGenreCounts[gid] + 1) / (totalPoolGenres + genreCountDistinct);
+    genreLift[gid] = uShare / pShare;
+  }
+
+  // Попередній фільтр по режиму + попередній скор для відбору топ-60 на credits/keywords
   const byType = { movie: [], tv: [] };
   for (const entry of unique.values()) {
     if (mode === 'gems' && (entry.votes > 2500 || entry.tmdbRating < 7.0)) continue;
     if (mode === 'fresh' && ((parseInt(entry.year) || 0) < currentYear - 2)) continue;
 
-    // Якість + популярність (в "Перлинах" популярність не накручує скор)
-    const qual = (entry.tmdbRating / 10) * 1.1;
-    const pop = mode === 'gems' ? 0 : Math.min(entry.popularity / 180, 0.7);
-    entry._score += qual + pop;
+    let baseRaw = entry.tmdbRating / 10;
+    if (mode === 'gems') baseRaw += clampNum((2500 - entry.votes) / 2500, 0, 0.3);
+    else if (mode === 'fresh') baseRaw += clampNum(((parseInt(entry.year) || currentYear - 2) - (currentYear - 2)) * 0.15, 0, 0.3);
+    else baseRaw += Math.min(entry.popularity / 250, 0.2);
 
-    // Жанровий збіг з твоїм смаком
-    let genreBoost = 0;
-    let bestGenreId = null, bestGenreW = 0;
+    let liftSum = 0, liftCnt = 0;
+    let bestGenreId = null, bestLift = 0;
+    let antiGenre = 0;
     (entry.genres || []).forEach(gid => {
-      const w = signals.genres[gid] || 0;
-      if (w > 0) {
-        genreBoost += Math.min(w * 0.25, 0.8);
-        if (w > bestGenreW) { bestGenreW = w; bestGenreId = gid; }
+      const lf = genreLift[gid] || 1;
+      if (signals.genres[gid] && lf > 1) {
+        const boost = Math.min(lf - 1, 1.8);
+        liftSum += boost;
+        liftCnt++;
+        if (lf > bestLift) { bestLift = lf; bestGenreId = gid; }
       }
-      const aw = anti.genres[gid] || 0;
-      if (aw > 0) entry._score -= Math.min(aw * 0.45, 1.4);
+      if (anti.genres[gid]) antiGenre += anti.genres[gid] * 0.12;
     });
-    entry._score += Math.min(genreBoost, 1.8);
+    const genreMatch = liftCnt > 0 ? Math.min(1.4, (liftSum / liftCnt) * Math.sqrt(liftCnt)) : 0;
 
-    if (bestGenreId && entry._reasons.length === 0) {
-      const g = GENRES.find(x => x.id === bestGenreId);
-      if (g) addReason(entry, 'genre-' + g.id, `Твій жанр · ${g.name}`, 3);
-    }
-    if (domCrit && entry._reasons.length < 2 && entry._score >= 3.0) {
-      addReason(entry, 'dom-crit', `Під «${domCrit.label}»`, 2);
-    }
-
-    entry._reasons = entry._reasons
-      .sort((a, b) => b.priority - a.priority)
-      .slice(0, 2)
-      .map(x => x.text);
-
-    // Легкий jitter (±8%) щоб топ лишався сильним, але оновлення освіжали стрічку
-    entry._sortScore = entry._score * (0.92 + Math.random() * 0.16);
-    delete entry._seenTags;
+    entry._baseRaw = baseRaw;
+    entry._genreMatch = genreMatch;
+    entry._antiGenre = Math.min(0.3, antiGenre);
+    entry._eloRaw = entry._eloHits.length
+      ? entry._eloHits.reduce((a, b) => a + b, 0) / entry._eloHits.length
+      : 0;
+    entry._bestGenreId = bestGenreId;
+    entry._preScore = entry._baseRaw * 0.35 + Math.min(entry._sourceRaw, 3) * 0.2 + entry._genreMatch * 0.3 - entry._antiGenre;
 
     if (byType[entry.type]) byType[entry.type].push(entry);
   }
 
-  const pickTop = (t) => byType[t].sort((a, b) => b._sortScore - a._sortScore).slice(0, 80);
-  return { items: [...pickTop('movie'), ...pickTop('tv')], seeds: seeds.length, mood, mode };
+  // Топ-30 фільмів + Топ-30 серіалів (разом 60) -> дотягуємо credits + keywords з кешем
+  const topMoviesForMeta = [...byType.movie].sort((a, b) => b._preScore - a._preScore).slice(0, 30);
+  const topTvForMeta = [...byType.tv].sort((a, b) => b._preScore - a._preScore).slice(0, 30);
+  const topCandidates = [...topMoviesForMeta, ...topTvForMeta];
+
+  await mapBatched(topCandidates, 10, async entry => {
+    try {
+      const { meta } = await fetchCompactMeta(entry.type, entry.id, false, metaCache);
+      entry._meta = meta;
+    } catch {}
+  });
+  writeMetaCacheAll(metaCache);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const uid = (window.currentUser && window.currentUser.uid) ? window.currentUser.uid : 'guest';
+  const rnd = seededRandom(`${uid}|${todayStr}|${state.home.refreshNonce || 0}`);
+
+  const finalizeReasons = (entry) => {
+    if (entry._bestGenreId && entry._reasons.length === 0) {
+      const g = GENRES.find(x => x.id === entry._bestGenreId);
+      if (g) addReason(entry, 'genre-' + g.id, `Твій жанр · ${g.name}`, 3);
+    }
+    if (domCrit && entry._reasons.length < 2 && ((entry._profileRaw || entry._genreMatch) >= 0.6)) {
+      addReason(entry, 'dom-crit', `Під «${domCrit.label}»`, 2);
+    }
+    entry._reasons = entry._reasons
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 2)
+      .map(x => x.text);
+  };
+
+  const finalizeType = (list) => {
+    if (!list.length) return [];
+
+    const enriched = list.filter(x => !!x._meta);
+    const rest = list.filter(x => !x._meta);
+
+    if (enriched.length) {
+      for (const entry of enriched) {
+        let actorMatch = 0;
+        let directorMatch = 0;
+        let kwMatch = 0;
+        let antiDir = 0;
+        let antiKw = 0;
+
+        let bestActor = null, bestActorScore = 0;
+        (entry._meta.cast || []).forEach(c => {
+          const sig = signals.cast[c.id] || 0;
+          if (sig > 0) {
+            const sc = sig * (c.w || 1) * 0.35;
+            actorMatch += sc;
+            if (sc > bestActorScore) { bestActorScore = sc; bestActor = c; }
+          }
+        });
+        actorMatch = Math.min(0.8, actorMatch);
+        if (bestActor && bestActorScore >= 0.25) {
+          addReason(entry, 'cast-' + bestActor.id, `З ${bestActor.name}`, 7);
+        }
+
+        let bestDir = null, bestDirScore = 0;
+        (entry._meta.dirs || []).forEach(d => {
+          const sig = signals.directors[d.id] || 0;
+          if (sig > 0) {
+            const sc = sig * 0.4;
+            directorMatch += sc;
+            if (sc > bestDirScore) { bestDirScore = sc; bestDir = d; }
+          }
+          if (anti.directors[d.id]) antiDir += anti.directors[d.id] * 0.22;
+        });
+        directorMatch = Math.min(0.8, directorMatch);
+        if (bestDir && bestDirScore >= 0.3) {
+          addReason(entry, 'dir-' + bestDir.id, `Режисер: ${bestDir.name}`, 9);
+        }
+
+        (entry._meta.kws || []).forEach(kid => {
+          if (signals.keywords[kid]) kwMatch += signals.keywords[kid] * 0.12;
+          if (anti.keywords[kid]) antiKw += anti.keywords[kid] * 0.12;
+        });
+        kwMatch = Math.min(0.6, kwMatch);
+
+        entry._profileRaw = entry._genreMatch + actorMatch + directorMatch + kwMatch;
+        entry._antiPenalty = entry._antiGenre + Math.min(0.4, antiDir) + Math.min(0.35, antiKw);
+        finalizeReasons(entry);
+      }
+
+      const baseNorm = minMaxNorm(enriched.map(x => x._baseRaw));
+      const sourceNorm = minMaxNorm(enriched.map(x => Math.min(x._sourceRaw, 3)));
+      const profileNorm = minMaxNorm(enriched.map(x => x._profileRaw));
+      const eloNorm = minMaxNorm(enriched.map(x => x._eloRaw));
+
+      enriched.forEach((entry, i) => {
+        const total = 0.35 * baseNorm[i] + 0.30 * sourceNorm[i] + 0.25 * profileNorm[i] + 0.10 * eloNorm[i] - entry._antiPenalty;
+        entry._score = total;
+        entry._sortScore = total + (rnd() - 0.5) * 0.08;
+        delete entry._seenTags;
+        delete entry._meta;
+      });
+
+      enriched.sort((a, b) => b._sortScore - a._sortScore);
+
+      // Обмеження засилля однієї франшизи в топі видачі
+      const colSeen = {};
+      enriched.forEach(entry => {
+        const cid = metaCache[entry.key]?.colId;
+        if (cid) {
+          colSeen[cid] = (colSeen[cid] || 0) + 1;
+          if (colSeen[cid] > 2) entry._sortScore -= 0.18 * (colSeen[cid] - 2);
+        }
+      });
+      enriched.sort((a, b) => b._sortScore - a._sortScore);
+    }
+
+    for (const entry of rest) {
+      finalizeReasons(entry);
+      entry._sortScore = entry._preScore;
+      delete entry._seenTags;
+      delete entry._meta;
+    }
+    rest.sort((a, b) => b._preScore - a._preScore);
+
+    return [...enriched, ...rest].slice(0, 80);
+  };
+
+  return {
+    items: [...finalizeType(byType.movie), ...finalizeType(byType.tv)],
+    seeds: seeds.length,
+    mood,
+    mode
+  };
 }
 
 function readGeneralCache() {
@@ -368,7 +683,10 @@ function readGeneralCache() {
 }
 function writeGeneralCache(g) {
   try {
-    if (!Object.values(g).some(a => a && a.length)) return;
+    if (!g) return;
+    const hasMovies = (g.trMovies && g.trMovies.length) || (g.newMovies && g.newMovies.length) || (g.topMovies && g.topMovies.length);
+    const hasTv = Array.isArray(g.tvStreams) && g.tvStreams.some(st => (st.pop && st.pop.length) || (st.fresh && st.fresh.length));
+    if (!hasMovies && !hasTv) return;
     localStorage.setItem(GEN_CACHE, JSON.stringify({ ts: Date.now(), data: g }));
   } catch {}
 }
@@ -516,10 +834,12 @@ function renderMoodSelector() {
 
 // ============ LOAD & RENDER ============
 function computeRecsSignature(seeds) {
-  const seedSig = seeds.map(s => `${s.key}:${s.strength.toFixed(1)}`).join('|');
+  const seedSig = seeds.map(s => `${s.key}:${s.strength.toFixed(1)}:${s.resFactor.toFixed(2)}`).join('|');
   const antiSig = getAntiSeeds().map(a => a.key).join(',');
+  const exSig = Object.values(lib).filter(x => x.excludeFromProfile !== undefined).map(x => `${x.key}:${x.excludeFromProfile ? 1 : 0}`).join(',');
   const adjSig = Object.entries(actorAdjust || {}).filter(([, v]) => v !== 0).map(([k, v]) => `${k}:${v}`).join(',');
-  return `${seedSig}|anti:${antiSig}|adj:${adjSig}|mood:${state.home.mood || 'any'}|mode:${state.home.mode || 'balance'}`;
+  const day = new Date().toISOString().slice(0, 10);
+  return `v6|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|mood:${state.home.mood || 'any'}|mode:${state.home.mode || 'balance'}`;
 }
 
 async function loadHome() {
@@ -533,25 +853,82 @@ async function loadHome() {
   if (!state.home.general) { const gc = readGeneralCache(); if (gc) state.home.general = gc; }
   if (!state.home.general) {
     try {
-      const [trM, newM, topM, trT, newT, topT] = await Promise.all([
-        tmdbFetch('/trending/movie/week?language=uk-UA').catch(() => ({ results: [] })),
-        tmdbFetch('/discover/movie?language=uk-UA&sort_by=primary_release_date.desc&vote_count.gte=50&page=1').catch(() => ({ results: [] })),
-        tmdbFetch('/discover/movie?language=uk-UA&sort_by=vote_average.desc&vote_count.gte=1000&page=1').catch(() => ({ results: [] })),
-        tmdbFetch('/trending/tv/week?language=uk-UA').catch(() => ({ results: [] })),
-        tmdbFetch(`/discover/tv?language=uk-UA&sort_by=first_air_date.desc&vote_count.gte=50&without_genres=${EXCLUDED_TV_GENRES.join(',')}&page=1`).catch(() => ({ results: [] })),
-        tmdbFetch(`/discover/tv?language=uk-UA&sort_by=vote_average.desc&vote_count.gte=500&without_genres=${EXCLUDED_TV_GENRES.join(',')}&page=1`).catch(() => ({ results: [] }))
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const twoYearsAgoIso = `${new Date().getFullYear() - 2}-01-01`;
+      const exGenres = EXCLUDED_TV_GENRES.join(',');
+      const TV_STREAMS_DEF = [
+        { id: 'netflix', title: 'Netflix',     net: '213',     logoNet: 213 },
+        { id: 'hbo',     title: 'HBO / Max',   net: '49|3186', logoNet: 49 },
+        { id: 'apple',   title: 'Apple TV+',   net: '2552',    logoNet: 2552 },
+        { id: 'disney',  title: 'Disney+',     net: '2739',    logoNet: 2739 },
+        { id: 'prime',   title: 'Prime Video', net: '1024',    logoNet: 1024 }
+      ];
+
+      const fetchPages = async (buildPath, pages) => {
+        const res = await Promise.all(pages.map(pg => tmdbFetch(buildPath(pg)).catch(() => ({ results: [] }))));
+        return res.flatMap(d => d.results || []);
+      };
+
+      const cleanGen = (rawList, type, limit = 50) => {
+        const seen = new Set();
+        const out = [];
+        for (const r of rawList) {
+          if (!r || !r.poster_path || isExcludedShow(r, type)) continue;
+          const item = normalizeItem({ ...r, media_type: type });
+          if (seen.has(item.key)) continue;
+          seen.add(item.key);
+          item.overview = '';
+          out.push(item);
+          if (out.length >= limit) break;
+        }
+        return out;
+      };
+
+      const [trM, newM, topM] = await Promise.all([
+        fetchPages(pg => `/trending/movie/week?language=uk-UA&page=${pg}`, [1, 2, 3]),
+        fetchPages(pg => `/discover/movie?language=uk-UA&sort_by=primary_release_date.desc&primary_release_date.lte=${todayIso}&vote_count.gte=40&page=${pg}`, [1, 2, 3]),
+        fetchPages(pg => `/discover/movie?language=uk-UA&sort_by=vote_average.desc&vote_count.gte=1000&page=${pg}`, [1, 2, 3])
       ]);
-      const cleanGen = (res, type) => (res.results || [])
-        .filter(r => r.poster_path && !isExcludedShow(r, type))
-        .map(r => normalizeItem({ ...r, media_type: type }))
-        .slice(0, 10);
+
+      const streamRaw = await mapBatched(TV_STREAMS_DEF, 2, async st => {
+        const [popRaw, newRaw, netRes] = await Promise.all([
+          fetchPages(pg => `/discover/tv?language=uk-UA&sort_by=popularity.desc&vote_count.gte=30&vote_average.gte=6.0&with_networks=${encodeURIComponent(st.net)}&without_genres=${exGenres}&page=${pg}`, [1, 2]),
+          fetchPages(pg => `/discover/tv?language=uk-UA&sort_by=first_air_date.desc&first_air_date.gte=${twoYearsAgoIso}&first_air_date.lte=${todayIso}&vote_count.gte=5&with_networks=${encodeURIComponent(st.net)}&without_genres=${exGenres}&page=${pg}`, [1, 2]),
+          tmdbFetch(`/network/${st.logoNet}`).catch(() => null)
+        ]);
+        return {
+          id: st.id,
+          title: st.title,
+          logo: netRes?.logo_path || null,
+          pop: cleanGen(popRaw, 'tv', 36),
+          fresh: cleanGen(newRaw, 'tv', 20)
+        };
+      });
+
+      const knownStreamTvIds = new Set();
+      streamRaw.forEach(st => {
+        st.pop.forEach(x => knownStreamTvIds.add(x.id));
+        st.fresh.forEach(x => knownStreamTvIds.add(x.id));
+      });
+
+      const [otherPopRaw, otherNewRaw] = await Promise.all([
+        fetchPages(pg => `/discover/tv?language=uk-UA&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=6.2&without_genres=${exGenres}&page=${pg}`, [1, 2, 3]),
+        fetchPages(pg => `/discover/tv?language=uk-UA&sort_by=first_air_date.desc&first_air_date.gte=${twoYearsAgoIso}&first_air_date.lte=${todayIso}&vote_count.gte=10&without_genres=${exGenres}&page=${pg}`, [1, 2])
+      ]);
+
+      streamRaw.push({
+        id: 'other',
+        title: 'Інші платформи',
+        logo: null,
+        pop: cleanGen(otherPopRaw.filter(x => !knownStreamTvIds.has(x.id)), 'tv', 36),
+        fresh: cleanGen(otherNewRaw.filter(x => !knownStreamTvIds.has(x.id)), 'tv', 20)
+      });
+
       state.home.general = {
-        trMovies: cleanGen(trM, 'movie'),
-        newMovies: cleanGen(newM, 'movie'),
-        topMovies: cleanGen(topM, 'movie'),
-        trTV: cleanGen(trT, 'tv'),
-        newTV: cleanGen(newT, 'tv'),
-        topTV: cleanGen(topT, 'tv')
+        trMovies: cleanGen(trM, 'movie', 50),
+        newMovies: cleanGen(newM, 'movie', 50),
+        topMovies: cleanGen(topM, 'movie', 50),
+        tvStreams: streamRaw
       };
       writeGeneralCache(state.home.general);
     } catch (e) { console.error(e); }
@@ -741,6 +1118,7 @@ function renderHomeContent(taste) {
     refreshBtn.style.border = '1px solid var(--bg-3)';
     refreshBtn.addEventListener('click', () => {
       try { localStorage.removeItem(RECS_CACHE); } catch {}
+      state.home.refreshNonce = (state.home.refreshNonce || 0) + 1;
       state.home.sig = null; state.home.recs = null;
       state.home.shown = { movie: 20, tv: 20 };
       refresh();
@@ -786,27 +1164,100 @@ function renderHomeContent(taste) {
   // === БЛОК ЗАГАЛЬНИХ ПІДБІРОК ===
   if (state.home.general) {
     const g = state.home.general;
-    const renderBlock = (title, sub, items) => {
+    if (!state.home.genShown) state.home.genShown = {};
+
+    const renderBlock = (blockId, title, sub, items, opts) => {
       if (!items || !items.length) return;
       const s = el('section', 'home-section');
       const head = el('div', 'section-head');
-      head.append(el('h2', 'section-title', title));
-      head.append(el('span', 'section-sub', sub));
+      const h2 = el('h2', 'section-title');
+      if (opts && opts.logo) {
+        const img = el('img', 'stream-head-logo');
+        img.src = TMDB_IMG + 'w154' + opts.logo;
+        img.alt = title;
+        img.loading = 'lazy';
+        h2.append(img);
+      } else if (opts && opts.isOther) {
+        const ic = document.createElement('span');
+        ic.className = 'stream-head-icon';
+        ic.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>';
+        h2.append(ic);
+      }
+      h2.append(el('span', '', title));
+      head.append(h2);
+      if (sub) head.append(el('span', 'section-sub', sub));
       s.append(head);
+
       const grid = el('div', 'home-grid');
-      items.slice(0, 10).forEach(item => grid.append(recCard(item, false)));
+      let shown = state.home.genShown[blockId] || 10;
+      items.slice(0, shown).forEach(item => grid.append(recCard(item, false)));
       s.append(grid);
+
+      if (items.length > shown) {
+        const moreBtn = el('button', 'home-more', 'Показати ще');
+        moreBtn.type = 'button';
+        moreBtn.addEventListener('click', () => {
+          const nextShown = Math.min(items.length, shown + 20);
+          items.slice(shown, nextShown).forEach(item => grid.append(recCard(item, false)));
+          shown = nextShown;
+          state.home.genShown[blockId] = shown;
+          if (shown >= items.length) moreBtn.remove();
+        });
+        s.append(moreBtn);
+      }
       wrap.append(s);
     };
 
+    const tvGenrePref = {};
+    Object.values(lib).forEach(x => {
+      if (x.type !== 'tv') return;
+      const avg = computeItemRating(x).avg;
+      if (avg < 7 && !x.favorite) return;
+      const w = ((avg || 8) / 10) * Math.max(0.2, tasteDecay(x.updated));
+      (x.genres || []).forEach(gid => { tvGenrePref[gid] = (tvGenrePref[gid] || 0) + w; });
+    });
+
+    const mixTvStreamItems = (stream) => {
+      const popPool = (stream.pop || []).filter(x => !(typeof isDismissed === 'function' && isDismissed(x.key)));
+      const newPool = (stream.fresh || []).filter(x => !(typeof isDismissed === 'function' && isDismissed(x.key)));
+
+      // Легка персоналізація популярного блоку: улюблені жанри вище, уже переглянуті/закинуті нижче
+      const rankedPop = popPool
+        .map((x, idx) => {
+          const saved = lib[x.key];
+          const seenPenalty = saved && (saved.status === 'watched' || saved.status === 'dropped') ? 100 : 0;
+          let gBoost = 0;
+          (x.genres || []).forEach(gid => { gBoost += (tvGenrePref[gid] || 0); });
+          return { x, sortVal: idx - Math.min(gBoost, 4) * 1.2 + seenPenalty };
+        })
+        .sort((a, b) => a.sortVal - b.sortVal)
+        .map(o => o.x);
+
+      const maxItems = 50;
+      const popPick = rankedPop.slice(0, 36);
+      const usedKeys = new Set(popPick.map(x => x.key));
+      const newPick = newPool.filter(x => !usedKeys.has(x.key)).slice(0, 20);
+
+      // Пропорція 2:1 до maxItems (до 50 карток)
+      const mixed = [];
+      let pi = 0, ni = 0;
+      while (mixed.length < maxItems && (pi < popPick.length || ni < newPick.length)) {
+        if (pi < popPick.length && mixed.length < maxItems) mixed.push(popPick[pi++]);
+        if (pi < popPick.length && mixed.length < maxItems) mixed.push(popPick[pi++]);
+        if (ni < newPick.length && mixed.length < maxItems) mixed.push(newPick[ni++]);
+      }
+      return mixed;
+    };
+
     if (state.home.tab === 'movie') {
-      renderBlock('🔥 Популярні фільми', 'сьогодні', g.trMovies);
-      renderBlock('🎬 Нові фільми', 'свіже', g.newMovies);
-      renderBlock('🏆 Найрейтинговіші фільми', 'класика', g.topMovies);
-    } else {
-      renderBlock('🔥 Популярні серіали', 'сьогодні', g.trTV);
-      renderBlock('📺 Нові серіали', 'свіже', g.newTV);
-      renderBlock('🏆 Найрейтинговіші серіали', 'класика', g.topTV);
+      renderBlock('trMovies', '🔥 Популярні фільми', 'сьогодні', g.trMovies);
+      renderBlock('newMovies', '🎬 Нові фільми', 'свіже', g.newMovies);
+      renderBlock('topMovies', '🏆 Найрейтинговіші фільми', 'класика', g.topMovies);
+    } else if (Array.isArray(g.tvStreams)) {
+      g.tvStreams.forEach(st => {
+        const mixed = mixTvStreamItems(st);
+        renderBlock('tv-' + st.id, st.title, '', mixed, { logo: st.logo, isOther: st.id === 'other' });
+      });
     }
   }
 

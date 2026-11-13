@@ -179,6 +179,8 @@ input#q::placeholder { color: var(--text-dim); }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
 .section-title { font-family: var(--serif); font-size: 20px; font-weight: 600; letter-spacing: -.3px; display: flex; align-items: center; gap: 8px; }
 .section-title em { font-style: italic; color: var(--accent); }
+.stream-head-logo { height: 24px; max-width: 82px; width: auto; object-fit: contain; background: rgba(255, 255, 255, .94); padding: 3px 8px; border-radius: 8px; flex-shrink: 0; }
+.stream-head-icon { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--bg-2); border: 1px solid rgba(255, 255, 255, .08); color: var(--accent); flex-shrink: 0; }
 .section-sub { font-family: var(--mono); font-size: 11px; color: var(--text-muted); letter-spacing: .5px; }
 .home-note { padding: 12px 16px; color: var(--text-muted); font-size: 13px; text-align: center; }
 .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 16px 12px; }
@@ -311,6 +313,13 @@ input#q::placeholder { color: var(--text-dim); }
 .btn.uakino:hover { background: #ff6b00; color: #fff; }
 
 .card-user-rating { background: var(--bg-1); padding: 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.04); margin-top: 12px; margin-bottom: 16px; }
+.card-taste-flags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.taste-flag-btn { flex: 1 1 auto; padding: 7px 12px; border-radius: 14px; background: var(--bg-1); border: 1px solid rgba(255, 255, 255, .06); color: var(--text-muted); font-size: 12px; font-weight: 500; transition: .2s; }
+.taste-flag-btn.active { background: rgba(var(--accent-rgb), .14); border-color: rgba(var(--accent-rgb), .45); color: var(--accent); font-weight: 600; }
+.taste-flag-btn.anti.active { background: rgba(255, 92, 92, .14); border-color: rgba(255, 92, 92, .45); color: var(--danger); }
+@media (hover: hover) {
+  .taste-flag-btn:hover { background: var(--bg-2); color: var(--text); }
+}
 .ratings-block { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
 .rating-block { display: flex; flex-direction: column; gap: 6px; }
 .rating-block-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

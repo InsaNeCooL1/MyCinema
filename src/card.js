@@ -497,6 +497,32 @@ function renderMediaCard(ctx, scroll) {
   }
   topRight.append(ratingWrap);
 
+  const tasteFlags = el('div', 'card-taste-flags');
+  const itemAvg = computeItemRating(s).avg;
+  const isAutoOutlier = s.excludeFromProfile === undefined && s.tmdbRating > 0 && itemAvg > 0 && Math.abs(itemAvg - s.tmdbRating) > 3;
+  const isEx = s.excludeFromProfile === true || isAutoOutlier;
+
+  const exBtn = el('button', 'taste-flag-btn' + (isEx ? ' active' : ''), isAutoOutlier ? '🙈 Поза смаком (авто)' : (isEx ? '🙈 Поза смаком' : '🙈 Не для смаку'));
+  exBtn.type = 'button';
+  exBtn.title = 'Виключити з побудови рекомендацій';
+  exBtn.addEventListener('click', () => {
+    try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
+    state.home.sig = null;
+    update(r, { excludeFromProfile: !isEx });
+  });
+
+  const antiBtn = el('button', 'taste-flag-btn anti' + (s.antiSeed ? ' active' : ''), s.antiSeed ? '🚫 Менше схожого ✓' : '🚫 Не схоже');
+  antiBtn.type = 'button';
+  antiBtn.title = 'Знизити схожі за режисером, ключовими словами і жанром';
+  antiBtn.addEventListener('click', () => {
+    try { localStorage.removeItem('mycinema.recs.v4'); } catch {}
+    state.home.sig = null;
+    update(r, { antiSeed: !s.antiSeed });
+  });
+
+  tasteFlags.append(exBtn, antiBtn);
+  topRight.append(tasteFlags);
+
   topSection.append(topLeft, topRight);
   scroll.append(topSection);
 
@@ -849,7 +875,8 @@ function updateCore(r, patch) {
   const hasNotes = lib[r.key].notes && lib[r.key].notes.trim();
   const hasElo = lib[r.key].eloGames && lib[r.key].eloGames > 0;
   const hasFav = lib[r.key].favorite === true;
-  if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasNotes && !hasElo && !hasFav) removeLibItem(r.key);
+  const hasTasteFlags = lib[r.key].excludeFromProfile !== undefined || lib[r.key].antiSeed === true;
+  if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasNotes && !hasElo && !hasFav && !hasTasteFlags) removeLibItem(r.key);
   save();
 }
 function update(r, patch) { updateCore(r, patch); renderCard(); }
