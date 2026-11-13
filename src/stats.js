@@ -374,14 +374,12 @@ function renderSeriesTab() {
   const wt = computeWatchTimeStats();
 
   let totalSeasonsWatched = 0;
-  let totalEpsKnown = 0;
   allTv.forEach(x => {
     if (x.status === 'watched') totalSeasonsWatched += (x.totalSeasons || Object.keys(x.seasonRatings || {}).length || 1);
     else if (x.status === 'watching' && x.watchedEpisodes?.length) {
       const sSet = new Set(x.watchedEpisodes.map(k => k.split('-')[0]));
       totalSeasonsWatched += sSet.size;
     }
-    if (x.status === 'watching' && x.episode_count > 0) totalEpsKnown += x.episode_count;
   });
 
   const sg = el('div', 'stats-grid');
@@ -942,7 +940,7 @@ function renderActorsTab() {
     it.append(info);
     const v = valueFn(a);
     it.append(el('div', 'actor-rank-value ' + v.cls, v.text));
-    it.addEventListener('click', () => openPerson(a.id, { name: a.name }));
+    it.addEventListener('click', () => openPerson(a.id));
     list.append(it);
   });
   content.append(list);

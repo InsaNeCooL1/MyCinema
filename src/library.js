@@ -249,7 +249,7 @@ function createPersonResult(p) {
     if (titles) info.append(el("div", "meta", titles));
   }
   item.append(info);
-  item.addEventListener("click", () => openPerson(p.id, p));
+  item.addEventListener("click", () => openPerson(p.id));
   return item;
 }
 

@@ -49,15 +49,15 @@ async function resolvePersonBiography(details) {
   let enBio = enTrans ? enTrans.data.biography.trim() : '';
 
   if (ukBio.length >= 120) {
-    console.log('[MyCinema/Bio] TMDB UA >=120 — wiki skip');
+    
     return { text: ukBio, source: 'TMDB (UA)', url: null };
   }
 
   const wid = details?.external_ids?.wikidata_id || null;
-  console.log('[MyCinema/Bio] trying wiki, wikidata_id:', wid); // [BIO-LOG]
+   // [BIO-LOG]
   const wikiRes = await fetchWikiBio(wid);
-  if (wikiRes?.text) { console.log('[MyCinema/Bio] wiki OK:', wikiRes.source); return wikiRes; }
-  console.log('[MyCinema/Bio] wiki empty, falling back');
+  if (wikiRes?.text) {  return wikiRes; }
+  
 
   if (ukBio) {
     return { text: ukBio, source: 'TMDB (UA)', url: null };

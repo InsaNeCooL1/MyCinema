@@ -2388,3 +2388,75 @@ input#q::-webkit-search-cancel-button {
     max-width: 100% !important;
   }
 }
+
+
+/* ========================================================= */
+/* [MOOD-OVERFLOW-V2] Плитки в один рядок, поступове звуження */
+/* ========================================================= */
+
+/* Запобіжник для контейнера */
+.mood-section {
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+}
+.mood-pills {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Мобільний: горизонтальний скрол + видимий скролбар */
+@media (max-width: 899px) {
+    .mood-pills {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 8px !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: var(--accent) rgba(255,255,255,0.05) !important;
+    }
+    .mood-pills::-webkit-scrollbar {
+        display: block !important;
+        height: 4px;
+    }
+    .mood-pills::-webkit-scrollbar-thumb {
+        background: var(--accent);
+        border-radius: 2px;
+    }
+    .mood-pills::-webkit-scrollbar-track {
+        background: rgba(255,255,255,0.05);
+        border-radius: 2px;
+    }
+}
+
+/* Десктоп: один рядок, поступове зменшення відступів */
+@media (min-width: 900px) and (min-height: 600px) {
+    body #results > .mood-section {
+        overflow: hidden !important;
+        min-width: 0 !important;
+    }
+    body #results .mood-pills {
+        flex-wrap: nowrap !important; /* СУВОРО ОДИН РЯДОК */
+        height: 44px !important;
+        max-height: 44px !important;
+        overflow-x: auto !important; /* Якщо не влазить - горизонтальний скрол */
+        overflow-y: hidden !important;
+        padding: 4px !important;
+        align-items: center !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: var(--accent) rgba(255,255,255,0.05) !important;
+    }
+    /* Прибираємо скролбар-смужку, бо на десктопі вона зайва (скролимо мишкою/тачем) */
+    body #results .mood-pills::-webkit-scrollbar {
+        height: 0px !important;
+        display: none !important;
+    }
+    body #results .mood-pill {
+        height: 34px !important;
+        /* Поступове зменшення відступів та шрифту */
+        padding: 0 clamp(6px, 1vw, 16px) !important;
+        font-size: clamp(11px, 1vw, 13px) !important;
+        gap: clamp(2px, 0.5vw, 6px) !important;
+        flex-shrink: 0 !important; /* Не стискаємо самі плитки, але вони самі зменшуються */
+    }
+}

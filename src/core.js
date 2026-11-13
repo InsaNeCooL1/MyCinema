@@ -580,12 +580,16 @@ async function reconcileWithCloud() {
 
   const extrasChanged = mergeCloudExtras(cloudExtras);
 
-  // 4. Пишемо назад (Upsert)
-  const upsertData = Object.entries(lib).map(([key, val]) => ({
-    user_id: uid,
-    item_key: key,
-    user_data: val
-  }));
+  // 4. Пишемо назад ТІЛЬКИ ЗМІНЕНІ елементи (Upsert)
+  const keysToUpsert = Array.from(_dirtyItems);
+  const upsertData = keysToUpsert.map(key => {
+    if (!lib[key]) return null; // Якщо видалено
+    return {
+      user_id: uid,
+      item_key: key,
+      user_data: lib[key]
+    };
+  }).filter(Boolean);
 
   if (upsertData.length > 0) {
     const { error: errUp } = await window.supabase
@@ -593,6 +597,7 @@ async function reconcileWithCloud() {
       .upsert(upsertData, { onConflict: 'user_id,item_key' });
     if (errUp) throw errUp;
   }
+  _dirtyItems.clear(); // Очищаємо після успішного запису
 
   // Видаляємо tombstones з бази
   const deletedKeys = Object.keys(libTombstones);
@@ -618,20 +623,24 @@ async function reconcileWithCloud() {
   return libChanged || extrasChanged;
 }
 
+let _dirtyItems = new Set();
 let _saveTimer = null;
 function save() { saveLocalOnly(); clearTimeout(_saveTimer); _saveTimer = setTimeout(saveToCloud, 800); }
 function saveNow() { saveLocalOnly(); clearTimeout(_saveTimer); return saveToCloud(); }
 
 let _syncing = Promise.resolve();
-function saveToCloud() {
+function saveToCloud(isManual = false) {
   if (!window.currentUser || !window.firebaseReady) return Promise.resolve();
-  _syncing = _syncing.then(async () => { // черга, щоб запити не перетиналися
+  _syncing = _syncing.then(async () => {
     try {
-      setSyncStatus('saving', 'Зберігаю...');
+      setSyncStatus('saving', isManual ? 'Синхронізую...' : 'Зберігаю...');
       const changed = await reconcileWithCloud();
       if (changed) refresh();
-      setSyncStatus('saved', '✓');
-    } catch (e) { setSyncStatus('error', '⚠ Помилка'); console.error(e); }
+      setSyncStatus('saved', isManual ? '✓ Синхронізовано' : '✓');
+    } catch (e) { 
+      setSyncStatus('error', '⚠ Помилка'); 
+      console.error(e); 
+    }
   });
   return _syncing;
 }
@@ -648,13 +657,13 @@ async function pullFromCloud() {
       refresh();
       showCenterToast('✅ Дані оновлено з хмари');
     } else {
-      showCenterToast('✨ Все вже синхронізовано');
+      
     }
     setSyncStatus('saved', '✓');
   } catch (e) {
     setSyncStatus('error', '⚠ Помилка');
     console.error(e);
-    showCenterToast('⚠ Помилка синхронізації');
+    
   }
 }
 
@@ -868,13 +877,62 @@ function recordEloMatch(winner, loser) {
   const delta = Math.round(ELO_K * (1 - expectedWin));
 
   w.elo = Math.round(wElo + delta);
+  _dirtyItems.add(w.key);
   w.eloGames = (w.eloGames || 0) + 1;
   w.updated = Date.now();
 
   l.elo = Math.round(lElo - delta);
+  _dirtyItems.add(l.key);
   l.eloGames = (l.eloGames || 0) + 1;
   l.updated = Date.now();
 
   save();
   return { delta, winnerElo: w.elo, loserElo: l.elo };
 }
+
+
+// [SAFE-A11Y] Додає підтримку клавіатури без зміни тегів та CSS
+(function initSafeA11y() {
+  const selectors = [
+    '.item', '.rec-card', '.light', '.actor-tile', '.episode-body',
+    '.elo-row', '.actor-rank-item', '.franchise-head', '.series-prog-row',
+    '.note-card', '.mood-pill', '.card-tab', '.top-number', '.episode-poster-wrap'
+  ].join(', ');
+
+  const makeFocusable = (node) => {
+    if (node.nodeType === 1 && node.matches(selectors) && !node.hasAttribute('tabindex')) {
+      node.setAttribute('tabindex', '0');
+      node.setAttribute('role', 'button');
+    }
+  };
+
+  // Обробляємо існуючі елементи
+  document.querySelectorAll(selectors).forEach(makeFocusable);
+
+  // Обсервер для нових елементів (картки, що підвантажуються)
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.addedNodes.length) {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === 1) {
+            if (node.matches(selectors)) makeFocusable(node);
+            node.querySelectorAll(selectors).forEach(makeFocusable);
+          }
+        });
+      }
+    });
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // Глобальний слухач Enter/Space
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const active = document.activeElement;
+      if (active && active.matches(selectors)) {
+        e.preventDefault(); // Запобігає скролу при Space
+        active.click();
+      }
+    }
+  });
+})();

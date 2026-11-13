@@ -99,7 +99,7 @@ function renderLoading() {
 async function loadMediaCardData(ctx) {
   const r = ctx.item;
   try {
-    const d = await tmdbFetch(`/${r.type}/${r.id}?language=uk-UA&include_video_language=uk,en,null&append_to_response=credits,videos,external_ids,watch/providers,recommendations,similar,images`);
+    const d = await tmdbFetch(`/${r.type}/${r.id}?language=uk-UA&include_video_language=uk,en,null&append_to_response=credits,videos,external_ids,watch/providers,recommendations,similar`);
     ctx.details = d;
     const wikiPromise = (d.external_ids?.wikidata_id && typeof fetchWikiMediaDescription === 'function')
       ? fetchWikiMediaDescription(d.external_ids.wikidata_id)
@@ -141,16 +141,9 @@ async function loadMediaCardData(ctx) {
       if ('franchiseKey' in meta && lib[r.key].franchiseKey === undefined) { lib[r.key].franchiseKey = meta.franchiseKey; dirty = true; }
       if (dirty) save();
     }
-        if (d.external_ids?.imdb_id) {
-      try {
-        const omdbRes = await fetch(`${PROXY_URL}/omdb?i=${d.external_ids.imdb_id}`); // [OMDB-PROXY-FINAL]
-        const omdbData = await omdbRes.json();
-        if (omdbData.Response === "True") ctx.omdb = omdbData;
-      } catch (e) { console.warn('[MyCinema/OMDb] fetch fail:', e); }
-    }
-    if (r.type === "tv" && d.seasons) {
-      const sd = await Promise.all(d.seasons.map(s => tmdbFetch(`/tv/${r.id}/season/${s.season_number}?language=uk-UA`).catch(() => null)));
-      ctx.details.seasons = d.seasons.map((s, i) => ({ ...s, episode_count: sd[i] ? sd[i].episodes.length : s.episode_count, episodes: sd[i] ? sd[i].episodes : [] }));
+        if (r.type === "tv" && d.seasons) {
+      // [LAZY-SEASONS] Не вантажимо всі серії одразу
+      ctx.details.seasons = d.seasons.map(s => ({ ...s, episodes: [], episodesLoaded: false }));
       const totalSeasons = d.seasons.filter(s => s.season_number !== 0).length;
       if (!r.runtime && typeof extractItemMeta === 'function') {
         const refined = extractItemMeta(ctx.details, 'tv');
@@ -166,17 +159,34 @@ async function loadMediaCardData(ctx) {
     }
     ctx.watchProviders = d['watch/providers']?.results?.UA || null;
     
-
-
     const recs = d.recommendations?.results || [];
     const sims = d.similar?.results || [];
     const pool = recs.length > 0 ? recs : sims;
     ctx.similar = pool.map(item => normalizeItem({ ...item, media_type: r.type })).filter(item => item.poster && item.id !== r.id);
-    const wiki = await wikiPromise;
-    if (wiki?.text) {
-      ctx.wikiOverview = wiki.text;
-      ctx.wikiUrl = wiki.url || null;
-      if (!ctx.overviewSource) ctx.overviewSource = 'wiki';
+
+    // [ASYNC-OMDB] Завантажуємо у фоні, оновлюємо картку коли прийде
+    if (d.external_ids?.imdb_id) {
+      fetch(`${PROXY_URL}/omdb?i=${d.external_ids.imdb_id}`)
+        .then(res => res.json())
+        .then(omdbData => {
+          if (omdbData.Response === "True") {
+            ctx.omdb = omdbData;
+            if (cardStack[cardStack.length - 1] === ctx) renderCard(true);
+          }
+        })
+        .catch(e => console.warn('[MyCinema/OMDb] fetch fail:', e));
+    }
+
+    // [ASYNC-WIKI] Завантажуємо у фоні, оновлюємо картку коли прийде
+    if (d.external_ids?.wikidata_id && typeof fetchWikiMediaDescription === 'function') {
+      fetchWikiMediaDescription(d.external_ids.wikidata_id).then(wiki => {
+        if (wiki?.text) {
+          ctx.wikiOverview = wiki.text;
+          ctx.wikiUrl = wiki.url || null;
+          if (!ctx.overviewSource) ctx.overviewSource = 'wiki';
+          if (cardStack[cardStack.length - 1] === ctx) renderCard(true);
+        }
+      });
     }
   } catch (e) { ctx.error = e.message; }
 }
@@ -697,7 +707,7 @@ function renderCastTab(ctx) {
     if (a.profile_path) { photo.src = TMDB_IMG + 'w185' + a.profile_path; photo.loading = 'lazy'; }
     tile.append(photo, el('div', 'actor-tile-name', a.name));
     if (a.character) tile.append(el('div', 'actor-tile-role', a.character));
-    tile.addEventListener('click', () => openPerson(a.id, a));
+    tile.addEventListener('click', () => openPerson(a.id));
     grid.append(tile);
   }
   return [grid];
@@ -738,6 +748,21 @@ function renderSeasonsTab(ctx) {
   const sel = seasons.find(x => x.season_number === selNum) || seasons[0];
   const wrap = el('div');
   
+  // [LAZY-SEASONS] Завантажуємо серії, якщо їх ще немає
+  if (sel && !sel.episodesLoaded && !ctx.seasonState.loadingSeason) {
+    ctx.seasonState.loadingSeason = true;
+    tmdbFetch(`/tv/${r.id}/season/${selNum}?language=uk-UA`).then(data => {
+      sel.episodes = data.episodes || [];
+      sel.episodesLoaded = true;
+      ctx.seasonState.loadingSeason = false;
+      if (cardStack[cardStack.length - 1] === ctx) renderCard(true);
+    }).catch(() => {
+      sel.episodesLoaded = true;
+      ctx.seasonState.loadingSeason = false;
+      if (cardStack[cardStack.length - 1] === ctx) renderCard(true);
+    });
+  }
+
   const tabsBar = el('div', 'season-tabs-bar');
   seasons.forEach(season => {
     const sr = (s.seasonRatings || {})[season.season_number] || {};
@@ -762,6 +787,11 @@ function renderSeasonsTab(ctx) {
   for (const crit of RATING_CRITERIA) rb.append(renderSeasonRatingBlock(r, selNum, crit, seasonRatings[crit.key] || 0));
   rb.append(renderSeasonAverageBlock(seasonRatings));
   wrap.append(rb);
+
+  if (!sel.episodesLoaded) {
+    wrap.append(el('div', 'avail-empty', 'Завантаження серій...'));
+    return [wrap];
+  }
 
   const episodes = sel.episodes || [];
   wrap.append(el('div', 'label', `Серії (${episodes.length || sel.episode_count || 0})`));
@@ -975,6 +1005,7 @@ function updateCore(r, patch) {
   const ctx = cardStack[cardStack.length - 1];
   attachCtxMeta(merged, ctx);
   lib[r.key] = merged;
+  _dirtyItems.add(r.key); // Позначаємо для синхронізації
   const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
   const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
   const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
