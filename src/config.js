@@ -2,7 +2,6 @@
 
 // ============ API ============
 const PROXY_URL = "https://mycinema-proxy.insaneteresh123.workers.dev";
-const OMDB_KEY = "cf56e7ab";
 const TMDB_IMG = "https://image.tmdb.org/t/p/";
 
 // ============ CONSTANTS ============

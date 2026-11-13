@@ -227,6 +227,18 @@ if (window.firebaseReady) {
 }
 syncNavActive();
 
+// Auto-sync when app comes to foreground
+let _lastAutoSync = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && window.currentUser && window.firebaseReady) {
+    const now = Date.now();
+    if (now - _lastAutoSync > 30000) { // не частіше ніж раз на 30 секунд
+      _lastAutoSync = now;
+      pullFromCloud();
+    }
+  }
+});
+
 // Закриття модалок по кліку на темний фон
 document.getElementById('settings-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'settings-modal') closeSettings();

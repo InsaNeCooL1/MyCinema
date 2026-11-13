@@ -636,6 +636,28 @@ function saveToCloud() {
   return _syncing;
 }
 
+async function pullFromCloud() {
+  if (!window.currentUser || !window.firebaseReady) {
+    showSyncToast('❌ Увійдіть в акаунт');
+    return;
+  }
+  try {
+    setSyncStatus('saving', 'Оновлюю...');
+    const changed = await reconcileWithCloud();
+    if (changed) {
+      refresh();
+      showCenterToast('✅ Дані оновлено з хмари');
+    } else {
+      showCenterToast('✨ Все вже синхронізовано');
+    }
+    setSyncStatus('saved', '✓');
+  } catch (e) {
+    setSyncStatus('error', '⚠ Помилка');
+    console.error(e);
+    showCenterToast('⚠ Помилка синхронізації');
+  }
+}
+
 async function syncFromCloud() {
   if (!window.currentUser || !window.firebaseReady) return;
   await saveToCloud(); // читання + злиття + запис
