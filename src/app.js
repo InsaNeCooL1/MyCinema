@@ -48,6 +48,120 @@ function refresh() {
 
 window.addEventListener('firebase-ready', syncFromCloud);
 
+// ========== COLD START SPLASH (TEST 6s) ==========
+const SPLASH_POOL_KEY = 'mycinema.splashPool.v1';
+const SPLASH_POOL_TTL = 12 * 60 * 60 * 1000;
+const SPLASH_DURATION_MS = 3000;
+
+function readSplashPool() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SPLASH_POOL_KEY));
+    if (raw && Array.isArray(raw.items) && raw.items.length) return raw;
+  } catch {}
+  return null;
+}
+
+function writeSplashPool(items) {
+  try {
+    localStorage.setItem(SPLASH_POOL_KEY, JSON.stringify({ ts: Date.now(), items }));
+  } catch {}
+}
+
+function initColdSplash() {
+  if (document.getElementById('cold-splash')) return;
+
+  const splash = document.createElement('div');
+  splash.id = 'cold-splash';
+  splash.className = 'cold-splash';
+
+  const mediaWrap = document.createElement('div');
+  mediaWrap.className = 'splash-media';
+
+  const vignette = document.createElement('div');
+  vignette.className = 'splash-vignette';
+
+  const content = document.createElement('div');
+  content.className = 'splash-content';
+
+  const logo = document.createElement('div');
+  logo.className = 'splash-logo';
+  logo.textContent = 'MyCinema';
+
+  const status = document.createElement('div');
+  status.className = 'splash-status';
+  status.append(document.createTextNode('Завантажуємо'));
+  const dot = document.createElement('span');
+  dot.className = 'splash-dot';
+  dot.textContent = '.';
+  status.append(dot);
+
+  content.append(logo, status);
+  splash.append(mediaWrap, vignette, content);
+  document.body.appendChild(splash);
+
+  const applyPick = (pick) => {
+    if (!pick || !splash.isConnected) return;
+    const desktopPath = pick.backdrop || pick.poster;
+    const mobilePath = pick.poster || pick.backdrop;
+    if (!desktopPath && !mobilePath) return;
+
+    mediaWrap.replaceChildren();
+    const pic = document.createElement('picture');
+    pic.className = 'splash-picture';
+
+    if (desktopPath) {
+      const srcDesk = document.createElement('source');
+      srcDesk.media = '(min-width: 900px) and (min-height: 600px)';
+      srcDesk.srcset = TMDB_IMG + 'w1280' + desktopPath;
+      pic.append(srcDesk);
+    }
+
+    const img = document.createElement('img');
+    img.className = 'splash-bg-img';
+    img.alt = '';
+    img.decoding = 'async';
+    img.addEventListener('load', () => img.classList.add('loaded'));
+    img.src = TMDB_IMG + 'w780' + mobilePath;
+    if (img.complete) img.classList.add('loaded');
+
+    pic.append(img);
+    mediaWrap.append(pic);
+  };
+
+  const cached = readSplashPool();
+  if (cached) {
+    const pick = cached.items[Math.floor(Math.random() * cached.items.length)];
+    applyPick(pick);
+  }
+
+  // Оновлення пулу популярних фільмів TMDB (або перше завантаження)
+  if (!cached || (Date.now() - (cached.ts || 0)) >= SPLASH_POOL_TTL) {
+    tmdbFetch('/movie/popular?language=uk-UA&page=1')
+      .then(d => {
+        const items = (d.results || [])
+          .filter(x => x && x.poster_path && x.backdrop_path)
+          .map(x => ({ poster: x.poster_path, backdrop: x.backdrop_path }));
+        if (!items.length) return;
+        writeSplashPool(items);
+        if (!cached) {
+          const pick = items[Math.floor(Math.random() * items.length)];
+          applyPick(pick);
+        }
+      })
+      .catch(() => {});
+  }
+
+  setTimeout(() => {
+    splash.classList.add('hiding');
+    setTimeout(() => {
+      if (splash.isConnected) splash.remove();
+    }, 420);
+  }, SPLASH_DURATION_MS);
+}
+
+if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+  initColdSplash();
+}
 history.pushState({ mc: 0 }, '', location.pathname + location.search);
 refresh();
 routeFromHash();

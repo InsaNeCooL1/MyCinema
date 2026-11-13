@@ -2636,3 +2636,87 @@ body:has(#overlay.open) .mcm-snow::after {
   background: var(--accent);
   color: var(--accent-fg);
 }
+
+/* =========================================
+   COLD START SPLASH
+   ========================================= */
+.cold-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: var(--bg-0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  opacity: 1;
+  transition: opacity .4s ease;
+}
+.cold-splash.hiding {
+  opacity: 0;
+  pointer-events: none;
+}
+.splash-media,
+.splash-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.splash-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(4px);
+  transform: scale(1.05);
+  opacity: 0;
+  transition: opacity .45s ease;
+}
+.splash-bg-img.loaded {
+  opacity: 1;
+}
+.splash-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(8, 7, 10, .30) 25%,
+    rgba(8, 7, 10, .72) 75%,
+    rgba(8, 7, 10, .96) 100%
+  );
+}
+.splash-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 24px;
+}
+.splash-logo {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 700;
+  font-size: clamp(32px, 6vw, 48px);
+  color: var(--accent);
+  letter-spacing: -.5px;
+  text-shadow: 0 6px 24px rgba(0, 0, 0, .75);
+  margin-bottom: 10px;
+}
+.splash-status {
+  font-family: var(--sans);
+  font-size: clamp(15px, 2.4vw, 18px);
+  font-weight: 600;
+  letter-spacing: .5px;
+  color: var(--text);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .9);
+}
+.splash-dot {
+  display: inline-block;
+  margin-left: 1px;
+  color: var(--accent);
+  animation: splashBlink 1s infinite ease-in-out;
+}
+@keyframes splashBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .15; }
+}
