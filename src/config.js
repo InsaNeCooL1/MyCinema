@@ -22,7 +22,9 @@ const ACTOR_PENALTY_START = -0.35;
 const ACTOR_PENALTY_10_DELTA = -0.85;
 const ACTOR_PENALTY_CAP = 0.25;
 const ACTOR_FRANCHISE_CAP = 0.09;
-const MCU_COMPANY_IDS = [420, 38679]; // Marvel Studios (420), Marvel Television (38679) // Marvel Studios (420), Marvel Television (38679)
+const MCU_COMPANY_IDS = [420, 38679];
+/* FIX-LOCAL-KEYS */
+window.MC_LOCAL_KEYS = ['mycinema.library','mycinema.library.v','mycinema.deleted','mycinema.dismissed','mycinema.dismissedClearedAt','mycinema.actorAdjustments','mycinema.actorAdjustTs','mycinema.search_history','kingOfTheHillHistory','mycinema.recs.v4','mycinema.home.general.v6','mycinema.metaCache.v1','mycinema.colCache.v1','mycinema.appearance.ts','mycinema.splashPool.v1','mycinema.factDismissedDate','onboardingDone','mycinema.librarySort','mycinema.home.tab','mycinema.home.mode']; /* FIX-PERSIST-KEYS */ // Marvel Studios (420), Marvel Television (38679) // Marvel Studios (420), Marvel Television (38679)
 
 // ============ MOODS ============
 const MOODS = {

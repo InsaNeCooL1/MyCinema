@@ -38,6 +38,13 @@ function trailerLabel(t) {
 // ============ WIKIDATA / WIKIPEDIA ============
 const _wikiSitelinksCache = new Map();
 const _wikiMediaCache = new Map();
+const _WIKI_CACHE_MAX = 500; /* FIX-WIKI-LRU-DECL */
+function _lruTrimWiki(map) {
+  while (map.size > _WIKI_CACHE_MAX) {
+    const fk = map.keys().next().value;
+    map.delete(fk);
+  }
+}
 
 function fetchJsonTimeout(url, ms = 2500) {
   const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -59,7 +66,7 @@ async function fetchWikiSitelinks(wikidataId) {
     const wdUrl = `https://www.wikidata.org/w/api.php?${wdParams.toString()}`;
     const wd = await fetchJsonTimeout(wdUrl, 3000);
     const links = wd?.entities?.[wikidataId]?.sitelinks || null;
-    if (links) _wikiSitelinksCache.set(wikidataId, links);
+    if (links) { _wikiSitelinksCache.set(wikidataId, links); _lruTrimWiki(_wikiSitelinksCache); } /* FIX-WIKI-LRU-SET-1 */
     return links;
   } catch {
     return null;
@@ -128,6 +135,7 @@ async function fetchWikiMediaDescription(wikidataId) {
     const url = page?.fullurl || ('https://uk.wikipedia.org/wiki/' + encodeURIComponent(ukTitle.replace(/ /g, '_')));
     const res = { text, url };
     _wikiMediaCache.set(wikidataId, res);
+    _lruTrimWiki(_wikiMediaCache); /* FIX-WIKI-LRU-SET-2 */
     return res;
   } catch {
     return null;

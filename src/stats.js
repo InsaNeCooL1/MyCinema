@@ -42,14 +42,14 @@ function renderStatistics() {
 }
 
 function getMissingMetaItems() {
-  return Object.values(lib).filter(x =>
-    !x.cast?.length ||
-    !x.platforms?.length ||
-    !x.runtime ||
-    x.franchiseKey === undefined ||
-    (x.type === 'tv' && !x.episode_count) ||
-    (x.type === 'movie' && x.collection === undefined)
-  );
+  /* FIX-MISSING-META */
+  return Object.values(lib).filter(x => {
+    const isActive = hasWatched(x) || x.status === 'planned' || x.favorite === true; /* FIX-MISSING-META-FAV */
+    if (!isActive) return false;
+    if (!x.cast?.length) return true;
+    if (x.type === 'movie' && !x.runtime) return true;
+    return false;
+  });
 }
 
 function buildMetaLoaderBanner() {
@@ -88,19 +88,23 @@ async function fetchAllMissingMeta() {
         const d = await tmdbFetch(`/${item.type}/${item.id}?language=uk-UA&append_to_response=credits,watch/providers`);
         if (!lib[item.key]) return;
         const meta = typeof extractItemMeta === 'function' ? extractItemMeta(d, item.type) : {};
-        if (meta.cast && !lib[item.key].cast?.length) lib[item.key].cast = meta.cast;
-        if (meta.genres && !lib[item.key].genres?.length) lib[item.key].genres = meta.genres;
-        if (meta.runtime && !lib[item.key].runtime) lib[item.key].runtime = meta.runtime;
-        if (meta.episode_count && !lib[item.key].episode_count) lib[item.key].episode_count = meta.episode_count;
-        if (meta.totalSeasons && !lib[item.key].totalSeasons) lib[item.key].totalSeasons = meta.totalSeasons;
-        if (meta.platforms && !lib[item.key].platforms?.length) lib[item.key].platforms = meta.platforms;
-        if (lib[item.key].franchiseKey === undefined && 'franchiseKey' in meta) lib[item.key].franchiseKey = meta.franchiseKey;
-        if (item.type === 'movie' && lib[item.key].collection === undefined && 'collection' in meta) lib[item.key].collection = meta.collection;
+        /* FIX-META-SAVE */
+        let changed = false;
+        if (meta.cast && !lib[item.key].cast?.length) { lib[item.key].cast = meta.cast; changed = true; }
+        if (meta.genres && !lib[item.key].genres?.length) { lib[item.key].genres = meta.genres; changed = true; }
+        if (meta.runtime && !lib[item.key].runtime) { lib[item.key].runtime = meta.runtime; changed = true; }
+        if (meta.episode_count && !lib[item.key].episode_count) { lib[item.key].episode_count = meta.episode_count; changed = true; }
+        if (meta.totalSeasons && !lib[item.key].totalSeasons) { lib[item.key].totalSeasons = meta.totalSeasons; changed = true; }
+        if (meta.platforms && !lib[item.key].platforms?.length) { lib[item.key].platforms = meta.platforms; changed = true; }
+        if (lib[item.key].franchiseKey === undefined && 'franchiseKey' in meta) { lib[item.key].franchiseKey = meta.franchiseKey; changed = true; }
+        if (item.type === 'movie' && lib[item.key].collection === undefined && 'collection' in meta) { lib[item.key].collection = meta.collection; changed = true; }
+        if (changed) { _dirtyItems.add(item.key); lib[item.key].updated = Date.now(); }
       } catch {}
     }));
     state.stats.castProgress.done = Math.min(missing.length, i + batchSize);
     const lt = document.getElementById('meta-loader-progress-text');
     if (lt) lt.textContent = `Оновлюю метадані (актори, час, стрімінги): ${state.stats.castProgress.done}/${state.stats.castProgress.total}...`;
+    save(); /* FIX-META-SAVE-BATCH */
     await new Promise(r => setTimeout(r, 200));
   }
   save();
@@ -229,7 +233,7 @@ function renderTasteTab() {
     const bestScore = sortedTop[0].r.avg;
     const tiedCount = sortedTop.filter(x => Math.abs(x.r.avg - bestScore) < 0.05).length;
     const tieNote = tiedCount > 1 ? ` (разом із ще ${tiedCount - 1})` : '';
-    insights.push({ icon: '👑', text: `Твій найвищий бал — <strong>${fmtNum(bestScore)}/10</strong> — у «${sortedTop[0].item.title}»${tieNote}.` });
+    insights.push({ icon: '👑', text: `Твій найвищий бал — <strong>${fmtNum(bestScore)}/10</strong> — у «${escapeHtml(sortedTop[0].item.title)}»${tieNote}.` });
   }
 
   // 4. Фільми vs Серіали (тепер реально працює!)
@@ -260,12 +264,12 @@ function renderTasteTab() {
     if (over && over.delta >= 1.5) {
       insights.push({
         icon: '💎',
-        text: `Твій особистий скарб проти натовпу: «${over.item.title}» — твоя оцінка <strong>${fmtNum(over.r.avg)}</strong> при TMDB ${over.item.tmdbRating.toFixed(1)}.`
+        text: `Твій особистий скарб проти натовпу: «${escapeHtml(over.item.title)}» — твоя оцінка <strong>${fmtNum(over.r.avg)}</strong> при TMDB ${over.item.tmdbRating.toFixed(1)}.`
       });
     } else if (under && under.delta <= -1.5) {
       insights.push({
         icon: '🤨',
-        text: `Не зайшло попри хайп: «${under.item.title}» — ти поставив <strong>${fmtNum(under.r.avg)}</strong> при TMDB ${under.item.tmdbRating.toFixed(1)}.`
+        text: `Не зайшло попри хайп: «${escapeHtml(under.item.title)}» — ти поставив <strong>${fmtNum(under.r.avg)}</strong> при TMDB ${under.item.tmdbRating.toFixed(1)}.`
       });
     }
   }
@@ -478,7 +482,7 @@ function renderSeriesTab() {
 
 
 const COL_CACHE_KEY = 'mycinema.colCache.v1';
-const COL_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+const COL_CACHE_TTL = 24 * 60 * 60 * 1000; /* FIX-COL-TTL */
 
 function readColCache() {
   try {

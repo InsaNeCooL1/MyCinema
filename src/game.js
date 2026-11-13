@@ -168,7 +168,7 @@ async function startGame(type, source) {
     const challenger = items.shift();
     state.game = {
       active: true, type, source: 'library',
-      round: 0, totalRounds: Math.min(20, items.length + 1),
+      round: 0, totalRounds: Math.min(20, Math.max(1, items.length - 1)), /* FIX-TOTAL-ROUNDS */
       champion, challenger, history: [], finished: false,
       pool: items, seen: new Set([champion.key, challenger.key]),
       usedPages: new Set(), loadingNext: false, loadError: false

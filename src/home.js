@@ -20,7 +20,13 @@ function isExcludedShow(raw, type) {
 const META_CACHE_KEY = 'mycinema.metaCache.v1';
 const META_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const META_CACHE_MAX = 220;
-const _memSeedRecs = new Map();
+const _memSeedRecs = new Map(); /* FIX-MEMSEED-LRU */
+function _trimMemSeedRecs() {
+  while (_memSeedRecs.size > 200) {
+    const fk = _memSeedRecs.keys().next().value;
+    _memSeedRecs.delete(fk);
+  }
+}
 
 
 function hashString32(str) {
@@ -129,6 +135,7 @@ async function fetchCompactMeta(type, id, needRecs, cacheObj) {
   if (needRecs) {
     recs = (d.recommendations?.results || []).slice(0, 12);
     _memSeedRecs.set(key, recs);
+    _trimMemSeedRecs(); /* FIX-MEMSEED-LRU-2 */
   }
   return { meta, recs };
 }
@@ -987,7 +994,7 @@ async function loadHome() {
   }
   if (state.home.recs && state.home.sig === sig) { renderHomeContent(taste); return; }
   const cached = readRecsCache(sig);
-  if (cached) { state.home.recs = cached; state.home.sig = sig; renderHomeContent(taste); return; }
+  if (cached) { /* FIX-CACHE-RESET */ state.home.recs = cached; state.home.sig = sig; state.home.shown = { movie: 20, tv: 20 }; renderHomeContent(taste); return; }
   if (state.home.loading === sig) return;
 
   state.home.loading = sig;
@@ -1003,7 +1010,7 @@ async function loadHome() {
     renderHomeContent(taste);
   } catch (e) {
     if (state.home.loading !== sig) return;
-    box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${e.message}</div>`;
+    box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(e.message)}</div>`; /* FIX-HOME-ERR-ESC */
   }
   finally { if (state.home.loading === sig) state.home.loading = false; }
 }
@@ -1135,6 +1142,7 @@ function renderHomeContent(taste) {
       mb.addEventListener('click', () => {
         if ((state.home.mode || 'balance') === m.id) return;
         state.home.mode = m.id;
+        try { localStorage.setItem('mycinema.home.mode', m.id); } catch (e) {} /* FIX-MODE-SAVE */
         state.home.shown = { movie: 20, tv: 20 };
         refresh();
       });
@@ -1157,9 +1165,15 @@ function renderHomeContent(taste) {
 
     if (allItems.length > shownCount) {
       const moreBtn = el('button', 'home-more', 'Показати ще');
+      /* FIX-SHOWMORE */
       moreBtn.addEventListener('click', () => {
-        state.home.shown[type] += 20;
-        renderHomeContent(taste);
+        const grid = sec.querySelector('.home-grid');
+        const current = state.home.shown[type] || 20;
+        const fresh = (state.home.recs?.items || []).filter(x => x.type === type && !(typeof isDismissed === 'function' && isDismissed(x.key)));
+        const nextShown = Math.min(fresh.length, current + 20);
+        if (grid) fresh.slice(current, nextShown).forEach(item => grid.append(recCard(item, true)));
+        state.home.shown[type] = nextShown;
+        if (nextShown >= fresh.length) moreBtn.remove();
       });
       sec.append(moreBtn);
     }
@@ -1173,6 +1187,7 @@ function renderHomeContent(taste) {
       state.home.refreshNonce = (state.home.refreshNonce || 0) + 1;
       state.home.sig = null; state.home.recs = null;
       state.home.shown = { movie: 20, tv: 20 };
+      state.home.genShown = {}; /* FIX-GENSHOWN-RESET */
       refresh();
       showSyncToast('✨ Оновлено');
     });
@@ -1196,6 +1211,7 @@ function renderHomeContent(taste) {
     mTab.addEventListener('click', () => {
       if (state.home.tab !== 'movie') {
         state.home.tab = 'movie';
+        try { localStorage.setItem('mycinema.home.tab', 'movie'); } catch (e) {} /* FIX-TAB-SAVE-M */
         state.home.shown.movie = 20;
         renderHomeContent(taste);
       }
@@ -1203,6 +1219,7 @@ function renderHomeContent(taste) {
     tTab.addEventListener('click', () => {
       if (state.home.tab !== 'tv') {
         state.home.tab = 'tv';
+        try { localStorage.setItem('mycinema.home.tab', 'tv'); } catch (e) {} /* FIX-TAB-SAVE-T */
         state.home.shown.tv = 20;
         renderHomeContent(taste);
       }

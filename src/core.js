@@ -9,6 +9,9 @@ const settings = {
 
 // ============ STATE ============
 let lib = load();
+/* FIX-HOIST */
+let _dirtyItems = new Set();
+let _saveTimer = null;
 let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_ADJUST_KEY)) || {}; } catch { return {}; } })();
 let state = {
   tab: 'home', typeFilter: 'all', topTypeFilter: 'all',
@@ -18,15 +21,15 @@ let state = {
     recs: null, 
     sig: null, 
     shown: { movie: 20, tv: 20 }, // <--- ДОДАНО ОСЬ ЦЕ
-    tab: 'movie', 
+    tab: localStorage.getItem('mycinema.home.tab') || 'movie', /* FIX-TAB-PERSIST */ 
     general: null, 
     mood: null, 
-    mode: 'balance',
+    mode: localStorage.getItem('mycinema.home.mode') || 'balance', /* FIX-MODE-PERSIST */
     tasteExpanded: false 
   },
   game: { active: false, type: 'movie', round: 0, totalRounds: 20, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() },
   stats: { tab: 'taste', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } },
-  librarySearch: '', librarySort: 'updated',
+  librarySearch: '', librarySort: localStorage.getItem('mycinema.librarySort') || 'updated', /* FIX-SORT-PERSIST */
   calendarMonth: null, calendarStatus: 'all'
 };
 let cardStack = [];
@@ -546,6 +549,7 @@ function applyCloudAppearance(app) {
     if (snowEl) snowEl.checked = snowOn;
   }
   if (typeof cardStack !== 'undefined' && cardStack.length && typeof renderCard === 'function') {
+    /* FIX-APPCLOUD-SCROLL */ if (typeof saveCardScroll === 'function') saveCardScroll();
     renderCard(true);
   }
   return true;
@@ -577,6 +581,13 @@ async function reconcileWithCloud() {
   lib = merged.items;
   libTombstones = merged.deleted;
   saveLocalOnly();
+
+  /* FIX-SYNC-RESIDUAL */
+  for (const k of Object.keys(merged.items)) {
+    const localUpd = merged.items[k].updated || 0;
+    const cloudUpd = cloudLib[k]?.updated || 0;
+    if (localUpd > cloudUpd) _dirtyItems.add(k);
+  }
 
   const extrasChanged = mergeCloudExtras(cloudExtras);
 
@@ -623,9 +634,8 @@ async function reconcileWithCloud() {
   return libChanged || extrasChanged;
 }
 
-let _dirtyItems = new Set();
-let _saveTimer = null;
-function save() { saveLocalOnly(); clearTimeout(_saveTimer); _saveTimer = setTimeout(saveToCloud, 800); }
+/* FIX-HOIST-REMOVED */
+function save() { saveLocalOnly(); clearTimeout(_saveTimer); _saveTimer = setTimeout(function(){ saveToCloud().catch(function(e){ console.warn('[saveToCloud]', e); }); }, 800); } /* FIX-SAVE-CLOUD-ERR */
 function saveNow() { saveLocalOnly(); clearTimeout(_saveTimer); return saveToCloud(); }
 
 let _syncing = Promise.resolve();
@@ -638,7 +648,7 @@ function saveToCloud(isManual = false) {
       if (changed) refresh();
       setSyncStatus('saved', isManual ? '✓ Синхронізовано' : '✓');
     } catch (e) { 
-      setSyncStatus('error', '⚠ Помилка'); 
+      setSyncStatus('error', typeof navigator !== 'undefined' && navigator.onLine === false ? '📴 Офлайн' : '⚠ Помилка'); 
       console.error(e); 
     }
   });
@@ -661,7 +671,7 @@ async function pullFromCloud() {
     }
     setSyncStatus('saved', '✓');
   } catch (e) {
-    setSyncStatus('error', '⚠ Помилка');
+    setSyncStatus('error', typeof navigator !== 'undefined' && navigator.onLine === false ? '📴 Офлайн' : '⚠ Помилка');
     console.error(e);
     
   }
@@ -680,6 +690,8 @@ function setSyncStatus(status, text) {
 }
 
 function showCenterToast(text) {
+  /* FIX-TOAST-STACK */
+  document.querySelectorAll('.center-toast').forEach(t => t.remove());
   const toast = document.createElement('div');
   toast.className = 'center-toast';
   toast.textContent = text;

@@ -130,6 +130,7 @@ function renderLibrary() {
   });
   sortSel.addEventListener('change', () => {
     state.librarySort = sortSel.value;
+    try { localStorage.setItem('mycinema.librarySort', sortSel.value); } catch (e) {} /* FIX-SORT-SAVE */
     renderLibraryItems();
   });
   sortRow.append(sortSel);
@@ -275,6 +276,7 @@ function removeFromLibrary(key) {
   if (hasR || hasSR || hasNotes || hasElo || hasFav || hasEps || hasTasteFlags) {
     lib[key].status = null;
     lib[key].updated = Date.now();
+    _dirtyItems.add(key); /* SYNC-FIX-REMOVE-LIB */
     saveNow();
   } else {
     removeLibItem(key);
@@ -282,7 +284,9 @@ function removeFromLibrary(key) {
   }
   refresh();
   const ctx = cardStack[cardStack.length - 1];
-  if (ctx && ctx.type === 'media' && ctx.item.key === key) renderCard();
+  if (ctx && ctx.type === 'media' && ctx.item.key === key) {
+    /* FIX-REMOVE-CLOSE */ if (!lib[key] && typeof closeCard === 'function') { history.back(); } else { renderCard(); }
+  }
   showSyncToast('🗑️ Прибрано');
 }
 
@@ -535,7 +539,7 @@ async function doFetchFilter(append) {
       resultsList.append(el('div', 'avail-empty', hasMore ? 'На цій сторінці немає збігів під фільтри. Натисни «Показати ще».' : 'Нічого не знайдено'));
     }
   } catch (e) {
-    if (reqId === filterReqId) resultsList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger);">Помилка: ${e.message}</div>`;
+    if (reqId === filterReqId) resultsList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger);">Помилка: ${escapeHtml(e.message)}</div>`; /* FIX-FILTER-ERR-ESC */
   } finally {
     if (reqId === filterReqId) filterLoading = false;
   }

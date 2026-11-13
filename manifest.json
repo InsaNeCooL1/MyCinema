@@ -2,7 +2,7 @@
   "name": "MyCinema",
   "short_name": "MyCinema",
   "description": "Мій кінощоденник",
-  "start_url": "/MyCinema/",
+  "start_url": "./",
   "scope": "/MyCinema/",
   "display": "standalone",
   "background_color": "#05060f",

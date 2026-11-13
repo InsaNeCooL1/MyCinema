@@ -131,8 +131,19 @@ async function loadPersonCardData(ctx) {
     ]);
     ctx.details = details;
     ctx.images = (imagesData?.profiles || []).filter(p => p.file_path);
-    ctx.bioMeta = await resolvePersonBiography(details);
-  } catch (e) { ctx.error = e.message; }
+    /* FIX-BIO-ASYNC */
+    const _fallbackBio = (details.biography || '').trim();
+    ctx.bioMeta = { text: _fallbackBio, source: _fallbackBio ? 'TMDB (UA)' : '', url: null };
+    resolvePersonBiography(details).then(function(bio) {
+      if (bio && bio.text && bio.text !== _fallbackBio) {
+        ctx.bioMeta = bio;
+        if (cardStack[cardStack.length - 1] === ctx && ctx.personTab === 'bio') {
+          saveCardScroll();
+          renderCard(true);
+        }
+      }
+    }).catch(function() {});
+  } catch (e) { ctx.error = escapeHtml(e.message); } /* FIX-PERSON-ERR-ESC */
 }
 
 async function loadPersonForForward(id) {
@@ -190,7 +201,8 @@ function renderPersonCard(ctx, scroll) {
   }
   if (d.place_of_birth) info.append(el('div', 'person-meta', d.place_of_birth));
 
-  const libStat = getPersonLibraryStats(ctx.id, d);
+  /* FIX-LIBSTAT-CACHE */ if (!ctx.libStat) ctx.libStat = getPersonLibraryStats(ctx.id, d);
+  const libStat = ctx.libStat;
   if (libStat.count > 0) {
     const statTxt = `📚 У бібліотеці: ${libStat.count}` + (libStat.avg > 0 ? ` · ⭐ ${fmtNum(libStat.avg)}` : '');
     info.append(el('div', 'person-lib-badge', statTxt));

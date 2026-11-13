@@ -19,6 +19,7 @@ function syncNavActive() {
 function setTab(t, opts) {
   state.tab = t;
   closeSidebar();
+  /* FIX-SETTAB-NAV */ if (typeof closeNavDropdowns === 'function') closeNavDropdowns();
   if (!(opts && opts.keepFilter) && typeof hideFilterDropdown === 'function') hideFilterDropdown();
   if (typeof hideAutocomplete === 'function') hideAutocomplete();
   document.body.classList.toggle('no-search', !(t === 'home' || t === 'filter'));
@@ -53,7 +54,7 @@ window.addEventListener('firebase-ready', syncFromCloud);
 // ========== COLD START SPLASH (APK only, 3s) ==========
 const SPLASH_POOL_KEY = 'mycinema.splashPool.v1';
 const SPLASH_POOL_TTL = 12 * 60 * 60 * 1000;
-const SPLASH_DURATION_MS = 3000;
+const SPLASH_DURATION_MS = 1500; /* FIX-SPLASH-SHORT */
 
 function readSplashPool() {
   try {
@@ -164,7 +165,9 @@ function initColdSplash() {
 if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
   initColdSplash();
 }
-history.pushState({ mc: 0 }, '', location.pathname + location.search);
+/* FIX-DEEPLINK */
+var _initialHash = /^#\/(movie|tv|person)\/\d+$/.test(location.hash) ? location.hash : '';
+history.pushState({ mc: 0 }, '', location.pathname + location.search + _initialHash);
 refresh();
 routeFromHash();
 
@@ -227,6 +230,17 @@ if (window.firebaseReady) {
 }
 syncNavActive();
 
+/* FIX-ESC-OVERLAY */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+  if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
+  if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
+  if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }
+  if (overlay.classList.contains('open') && cardStack.length) { history.back(); return; }
+});
+
 // Auto-sync when app comes to foreground
 let _lastAutoSync = 0;
 document.addEventListener('visibilitychange', () => {
@@ -246,3 +260,72 @@ document.getElementById('settings-modal')?.addEventListener('click', (e) => {
 document.getElementById('auth-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'auth-modal') closeAuthModal();
 });
+
+
+/* FIX-FOCUS-TRAP — Tab wrap inside open modals */
+(function initFocusTrap() {
+  function openModals() {
+    var ids = ['settings-modal', 'auth-modal', 'onboarding-modal'];
+    var out = [];
+    for (var i = 0; i < ids.length; i++) {
+      var m = document.getElementById(ids[i]);
+      if (!m) continue;
+      if (m.classList.contains('open') || m.style.display === 'flex') out.push(m);
+    }
+    return out;
+  }
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Tab') return;
+    var modals = openModals();
+    if (!modals.length) return;
+    var modal = modals[modals.length - 1];
+    var f = modal.querySelectorAll('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])');
+    var vis = [];
+    for (var i = 0; i < f.length; i++) {
+      var el = f[i];
+      if (el.offsetParent === null && el.offsetWidth === 0 && el.offsetHeight === 0) continue;
+      vis.push(el);
+    }
+    if (!vis.length) return;
+    var first = vis[0], last = vis[vis.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+})();
+
+
+/* FIX-RADIO-ROLE — a11y for rating lights */
+(function initRadioRoles() {
+  function apply() {
+    var groups = document.querySelectorAll('.rating-lights');
+    for (var g = 0; g < groups.length; g++) {
+      var rg = groups[g];
+      if (rg.getAttribute('role') !== 'radiogroup') rg.setAttribute('role', 'radiogroup');
+      var lights = rg.querySelectorAll('.light');
+      for (var i = 0; i < lights.length; i++) {
+        var l = lights[i];
+        if (l.getAttribute('role') !== 'radio') {
+          l.setAttribute('role', 'radio');
+          l.setAttribute('aria-label', 'Оцінка ' + (i + 1));
+        }
+        l.setAttribute('aria-checked', l.classList.contains('on') ? 'true' : 'false');
+      }
+    }
+  }
+  if (document.readyState !== 'loading') apply();
+  else document.addEventListener('DOMContentLoaded', apply);
+  var obs = new MutationObserver(apply);
+  obs.observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('click', function(e) {
+    var light = e.target.closest && e.target.closest('.light');
+    if (!light) return;
+    var rg = light.parentElement;
+    if (!rg || !rg.classList.contains('rating-lights')) return;
+    setTimeout(function() {
+      var all = rg.querySelectorAll('.light');
+      for (var i = 0; i < all.length; i++) {
+        all[i].setAttribute('aria-checked', all[i].classList.contains('on') ? 'true' : 'false');
+      }
+    }, 0);
+  });
+})();

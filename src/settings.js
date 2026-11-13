@@ -76,17 +76,31 @@ function importLibrary() {
     if (!file) return;
     try {
       const text = await file.text();
-      const data = JSON.parse(text);
+      let data = JSON.parse(text);
       if (typeof data !== 'object' || Array.isArray(data)) throw new Error('Невірний формат');
+      /* FIX-IMPORT-VALIDATE */
+      const cleanData = {};
+      let skippedN = 0;
+      for (const k of Object.keys(data)) {
+        const v = data[k];
+        if (!v || typeof v !== 'object' || Array.isArray(v)) { skippedN++; continue; }
+        if (!v.key || !v.type || !v.title) { skippedN++; continue; }
+        if (v.type !== 'movie' && v.type !== 'tv') { skippedN++; continue; }
+        cleanData[k] = v;
+      }
+      if (Object.keys(cleanData).length === 0) throw new Error('Немає валідних тайтлів у файлі');
+      if (skippedN > 0 && !confirm('У файлі ' + skippedN + ' невалідних записів буде пропущено. Продовжити?')) return;
+      data = cleanData;
       const count = Object.keys(data).length;
       if (!confirm('Імпортувати ' + count + ' тайтлів? Поточні буде замінено.')) return;
       const nowTs = Date.now();
       for (const k of Object.keys(lib)) if (!(k in data)) libTombstones[k] = nowTs;
       for (const k of Object.keys(data)) {
         delete libTombstones[k];
-        if (data[k] && typeof data[k] === 'object') data[k].updated = nowTs;
+        if (data[k] && typeof data[k] === 'object' && !data[k].updated) data[k].updated = nowTs; /* FIX-IMPORT-UPDATED */
       }
       lib = data;
+      for (const k of Object.keys(data)) _dirtyItems.add(k); /* SYNC-FIX-IMPORT */
       await saveNow();
       refresh();
       showSyncToast('📥 ' + count);
@@ -129,12 +143,13 @@ async function startOnboarding() {
     ].filter(c => c.items.length > 0);
     
     renderOnbGrids();
-  } catch (e) { sc.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${e.message}</div>`; }
+  } catch (e) { sc.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(e.message)}</div>`; } /* FIX-ONB-ERR-ESC */
 }
 
 function renderOnbGrids() {
   const sc = document.getElementById('onb-scroll');
   sc.innerHTML = '';
+  sc.scrollTop = 0; /* FIX-ONB-SCROLL */
   onbCategories.forEach(cat => {
     const catEl = el('div', 'onb-category');
     catEl.append(el('div', 'onb-category-title', cat.title));
@@ -177,6 +192,7 @@ async function submitOnboarding() {
       updated: Date.now(),
       createdAt: Date.now()
     };
+    _dirtyItems.add(it.key); /* SYNC-FIX-ONB */
   });
   localStorage.setItem('onboardingDone', 'true');
   document.getElementById('onboarding-modal').style.display = 'none';

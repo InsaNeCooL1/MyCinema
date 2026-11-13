@@ -28,7 +28,7 @@ function saveCardScroll() {
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
   overlay.classList.add("open");
-  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
+  const ctx = { type: 'media', item: r, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' }; /* FIX-OVERSRC-1 */
   cardStack = [ctx];
   pushCardState();
   renderLoading();
@@ -38,8 +38,10 @@ async function openCard(r) {
 }
 
 async function openMediaFromStack(item) {
+  /* FIX-OMFS */
+  overlay.classList.add("open");
   saveCardScroll();
-  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' };
   cardStack.push(ctx);
   pushCardState();
   renderLoading();
@@ -139,22 +141,18 @@ async function loadMediaCardData(ctx) {
       if (meta.platforms && (!lib[r.key].platforms || !lib[r.key].platforms.length)) { lib[r.key].platforms = meta.platforms; dirty = true; }
       if (r.type === 'movie' && 'collection' in meta && lib[r.key].collection === undefined) { lib[r.key].collection = meta.collection; dirty = true; }
       if ('franchiseKey' in meta && lib[r.key].franchiseKey === undefined) { lib[r.key].franchiseKey = meta.franchiseKey; dirty = true; }
-      if (dirty) save();
+      if (dirty) { _dirtyItems.add(r.key); save(); } /* SYNC-FIX-META-MOVIE */
     }
         if (r.type === "tv" && d.seasons) {
       // [LAZY-SEASONS] Не вантажимо всі серії одразу
       ctx.details.seasons = d.seasons.map(s => ({ ...s, episodes: [], episodesLoaded: false }));
       const totalSeasons = d.seasons.filter(s => s.season_number !== 0).length;
-      if (!r.runtime && typeof extractItemMeta === 'function') {
-        const refined = extractItemMeta(ctx.details, 'tv');
-        if (refined.runtime) r.runtime = refined.runtime;
-      }
-      r.totalSeasons = totalSeasons;
+      /* FIX-REFINED-REMOVED */ r.totalSeasons = totalSeasons;
       if (lib[r.key]) {
         let tvDirty = false;
         if (lib[r.key].totalSeasons !== totalSeasons) { lib[r.key].totalSeasons = totalSeasons; tvDirty = true; }
         if (r.runtime && !lib[r.key].runtime) { lib[r.key].runtime = r.runtime; tvDirty = true; }
-        if (tvDirty) save();
+        if (tvDirty) { _dirtyItems.add(r.key); save(); } /* SYNC-FIX-META-TV */
       }
     }
     ctx.watchProviders = d['watch/providers']?.results?.UA || null;
@@ -171,7 +169,7 @@ async function loadMediaCardData(ctx) {
         .then(omdbData => {
           if (omdbData.Response === "True") {
             ctx.omdb = omdbData;
-            if (cardStack[cardStack.length - 1] === ctx) renderCard(true);
+            if (cardStack[cardStack.length - 1] === ctx) { saveCardScroll(); renderCard(true); } /* FIX-OMDB-SCROLL */
           }
         })
         .catch(e => console.warn('[MyCinema/OMDb] fetch fail:', e));
@@ -183,8 +181,7 @@ async function loadMediaCardData(ctx) {
         if (wiki?.text) {
           ctx.wikiOverview = wiki.text;
           ctx.wikiUrl = wiki.url || null;
-          if (!ctx.overviewSource) ctx.overviewSource = 'wiki';
-          if (cardStack[cardStack.length - 1] === ctx) renderCard(true);
+          if (cardStack[cardStack.length - 1] === ctx) { saveCardScroll(); renderCard(true); } /* FIX-WIKI-SCROLL */
         }
       });
     }
@@ -203,7 +200,7 @@ function closeCard() {
 async function loadMediaForForward(s) {
   overlay.classList.add("open");
   const item = { key: s.key, id: s.id, type: s.media_type, title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 };
-  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false };
+  const ctx = { type: 'media', item, activeTab: 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' }; /* FIX-LMFF */
   cardStack.push(ctx);
   renderLoading();
   await loadMediaCardData(ctx);
@@ -260,7 +257,7 @@ function renderCard(restore) {
   const scroll = el('div', 'card-scroll');
   card.append(scroll);
   if (!ctx.details && !ctx.error) scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
-  else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${ctx.error}</div>`;
+  else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(ctx.error)}</div>`; /* FIX-CARD-ERR-ESC */
   else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
   else renderMediaCard(ctx, scroll);
   if (savedScroll > 0) scroll.scrollTop = savedScroll;
@@ -293,6 +290,16 @@ function renderMediaCard(ctx, scroll) {
     iframe.allowFullscreen = true;
     iframe.className = 'card-hero-video';
     heroWrap.append(iframe);
+    /* FIX-TRAILER-STOP */
+    const stopBtn = el('button', 'card-hero-stop', '✕');
+    stopBtn.type = 'button';
+    stopBtn.title = 'Зупинити трейлер';
+    stopBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      ctx.playingTrailer = false;
+      renderCard();
+    });
+    heroWrap.append(stopBtn);
   } else {
     if (backdropPath) {
       const img = el('img', 'card-hero-img');
@@ -335,6 +342,7 @@ function renderMediaCard(ctx, scroll) {
     <span>Лампа</span>
   `;
   watchBtn.title = 'Відкрити в Lampa';
+  watchBtn.setAttribute('aria-label', 'Відкрити в Lampa'); /* FIX-ARIA-LAMPA */
   watchBtn.addEventListener('click', () => openInLampa(r));
   actionRowTop.append(watchBtn);
   
@@ -344,6 +352,7 @@ function renderMediaCard(ctx, scroll) {
   const searchUrl = `https://uakino.best/index.php?do=search&subaction=search&story=${encodeURIComponent(cleanSearchTitle)}`;
   const uakinoBtn = el('button', 'action-btn-main uakino');
   uakinoBtn.innerHTML = '<span class="uakino-ua">UA</span><span class="uakino-kino">KINO</span>';
+  uakinoBtn.setAttribute('aria-label', 'Пошук на UAKino'); /* FIX-ARIA-UAKINO */
   uakinoBtn.addEventListener('click', () => window.open(searchUrl, '_blank'));
   actionRowTop.append(uakinoBtn);
   
@@ -424,7 +433,7 @@ function renderMediaCard(ctx, scroll) {
   });
   rr.append(watchedBtn);
 
-  if (hasR || rr.children.length > 0) topRight.append(rr);
+  /* FIX-DEAD-RR-CHECK */ topRight.append(rr);
 
   // 5. Статуси (Решта в один ряд)
   const statusRow = el('div', 'status-section-row');
@@ -662,9 +671,11 @@ function renderNotesTab(ctx) {
       const next = { ...cur, notes: val, updated: Date.now() };
       if (!next.createdAt) next.createdAt = Date.now();
       attachCtxMeta(next, ctx);
+      _dirtyItems.add(r.key); /* SYNC-FIX-NOTES-SET */
       lib[r.key] = next;
     } else if (lib[r.key]) {
       if (!lib[r.key].notes) return;
+      _dirtyItems.add(r.key); /* SYNC-FIX-NOTES-DEL */
       delete lib[r.key].notes;
       const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
       const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;

@@ -206,12 +206,12 @@ window.loginUser = async () => {
   if (!email || !password) { err.textContent = "Введіть email та пароль"; return; }
   
   try { 
-    document.getElementById('btn-login').textContent = 'Вхід...'; 
+    /* FIX-AUTH-NO-DOUBLE */ var _lb = document.getElementById('btn-login'); _lb.disabled = true; _lb.textContent = 'Вхід...'; 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   } catch (e) { 
     err.textContent = e.message === 'Invalid login credentials' ? "Невірний email або пароль" : "Помилка: " + e.message; 
-    document.getElementById('btn-login').textContent = 'Увійти'; 
+    var _lb2 = document.getElementById('btn-login'); _lb2.disabled = false; _lb2.textContent = 'Увійти'; 
   }
 };
 
@@ -240,6 +240,20 @@ window.registerUser = async () => {
     document.getElementById('btn-register').textContent = 'Створити новий акаунт'; 
   }
 };
+
+/* FIX-AUTH-ENTER-KEY */
+['auth-email','auth-password','auth-username'].forEach(function(_id) {
+  var _inp = document.getElementById(_id);
+  if (_inp) _inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var _l = document.getElementById('btn-login');
+      var _r = document.getElementById('btn-register');
+      if (_l && _l.style.display !== 'none' && !_l.disabled) _l.click();
+      else if (_r && _r.style.display !== 'none' && !_r.disabled) _r.click();
+    }
+  });
+});
 
 window.switchAuthMode = (mode) => {
   const title = document.getElementById('auth-title');
@@ -299,15 +313,24 @@ window.resetPassword = async () => {
 };
 
 window.logoutUser = async () => {
-  if (confirm('Ви впевнені, що хочете вийти?')) {
-    await supabase.auth.signOut();
-    location.reload();
-  }
+  /* FIX-LOGOUT-CLEAR */
+  if (!confirm('Вийти з акаунту?\n\nЛокальні дані буде очищено. Усе, що встигло зберегтися в акаунті, відновиться при наступному вході.')) return;
+  try { if (typeof saveToCloud === 'function') await saveToCloud(); } catch (e) {}
+  try {
+    var _keys = (window.MC_LOCAL_KEYS || ['mycinema.library','mycinema.deleted','onboardingDone']);
+    _keys.forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+  } catch (e) {}
+  await supabase.auth.signOut();
+  location.reload();
 };
 
 window.openAuthModal = () => {
+  /* FIX-AUTH-NATIVE-FORGOT */
   document.getElementById('auth-modal').style.display = 'flex';
   if (typeof window.switchAuthMode === 'function') window.switchAuthMode('login');
+  var _isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  var _fBtn = document.getElementById('btn-forgot');
+  if (_fBtn) _fBtn.style.display = _isNative ? 'none' : 'block';
 };
 
 window.closeAuthModal = () => { document.getElementById('auth-modal').style.display = 'none'; };
@@ -335,6 +358,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     window.dispatchEvent(new CustomEvent('firebase-ready'));
   } else {
     window.currentUser = null; window.firebaseReady = false;
+    /* FIX-SYNC-CLEAR */ try { if (typeof _dirtyItems !== 'undefined' && _dirtyItems) _dirtyItems.clear(); } catch (e) {}
     document.getElementById('auth-banner').classList.add('visible');
     document.getElementById('sidebar-email').textContent = 'Гість';
     document.getElementById('sidebar-login-btn').style.display = 'block';
