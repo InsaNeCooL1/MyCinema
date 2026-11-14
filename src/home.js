@@ -494,7 +494,10 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       if (!entry) continue;
 
       if (batch.source === 'mood') {
-        entry._sourceRaw += 1.4;
+        /* FIX-MOOD-WEIGHT-SRC */
+        const _mw = moodData.weight || 1.0;
+        entry._sourceRaw += 2.0 * _mw; /* FIX-MOOD-AGGR-SRC */
+        entry._moodMatch = _mw;
         addReason(entry, 'mood', `${moodData.emoji} ${moodData.label}`, 8);
       } else if (batch.source === 'director') {
         entry._sourceRaw += 0.9;
@@ -567,7 +570,19 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       ? entry._eloHits.reduce((a, b) => a + b, 0) / entry._eloHits.length
       : 0;
     entry._bestGenreId = bestGenreId;
-    entry._preScore = entry._baseRaw * 0.35 + Math.min(entry._sourceRaw, 3) * 0.2 + entry._genreMatch * 0.3 - entry._antiGenre;
+
+    /* FIX-MOOD-WEIGHT-PRE — mood genre match + source bonus */
+    let _moodBoost = 0;
+    if (moodData) {
+      const _mw2 = moodData.weight || 1.0;
+      const _mg = entry.type === 'tv' ? (moodData.tvGenres || moodData.genres) : moodData.genres;
+      const _hits = (entry.genres || []).filter(g => _mg.includes(g)).length;
+      if (_hits > 0) _moodBoost += Math.min(0.18, _hits * 0.05) * _mw2; /* FIX-MOOD-AGGR-BOOST */
+      if (entry._moodMatch) _moodBoost += 0.12 * (entry._moodMatch);
+    }
+    entry._moodBoost = _moodBoost;
+
+    entry._preScore = entry._baseRaw * 0.35 + Math.min(entry._sourceRaw, 5) * 0.2 /* FIX-MOOD-AGGR-CAP */ + entry._genreMatch * 0.3 - entry._antiGenre + _moodBoost * 0.7; /* FIX-MOOD-AGGR-PRE */
 
     if (byType[entry.type]) byType[entry.type].push(entry);
   }
@@ -672,9 +687,11 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       enriched.forEach((entry, i) => {
         const total = 0.35 * baseNorm[i] + 0.30 * sourceNorm[i] + 0.25 * profileNorm[i] + 0.10 * eloNorm[i] - entry._antiPenalty;
         entry._score = total;
-        entry._sortScore = total + (rnd() - 0.5) * 0.08;
+        /* FIX-MOOD-WEIGHT-ENR */
+        entry._sortScore = total + Math.min(0.40, entry._moodBoost || 0) + (rnd() - 0.5) * 0.08; /* FIX-MOOD-AGGR-SORT */
         delete entry._seenTags;
         delete entry._meta;
+        delete entry._moodBoost;
       });
 
       enriched.sort((a, b) => b._sortScore - a._sortScore);
@@ -701,7 +718,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
           leadSeen[leadId] = (leadSeen[leadId] || 0) + 1;
           if (leadSeen[leadId] > 2) leadPen = Math.min(0.15, 0.05 * (leadSeen[leadId] - 2));
         }
-        const divPen = Math.min(0.24, Math.max(colPen, dirPen + leadPen));
+        const divPen = Math.min(0.28, Math.max(colPen, dirPen + leadPen)); /* FIX-MOOD-AGGR-DIV */
         if (divPen > 0) entry._sortScore -= divPen;
       });
       enriched.sort((a, b) => b._sortScore - a._sortScore);
@@ -709,9 +726,11 @@ async function buildSmartRecommendations(seeds, mood, mode) {
 
     for (const entry of rest) {
       finalizeReasons(entry);
-      entry._sortScore = entry._preScore;
+      /* FIX-MOOD-WEIGHT-REST */
+      entry._sortScore = entry._preScore + Math.min(0.40, (entry._moodBoost || 0) * 0.5); /* FIX-MOOD-AGGR-REST */
       delete entry._seenTags;
       delete entry._meta;
+      delete entry._moodBoost;
     }
     rest.sort((a, b) => b._preScore - a._preScore);
 
@@ -891,7 +910,8 @@ function computeRecsSignature(seeds) {
   const castVals = Object.values(lib).map(x => typeof getItemCastRating === 'function' ? getItemCastRating(x) : 0).filter(v => v > 0);
   const castSig = `${castVals.length}:${castVals.reduce((a, b) => a + b, 0).toFixed(1)}`;
   const day = new Date().toISOString().slice(0, 10);
-  return `v10|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}|mode:${state.home.mode || 'balance'}`;
+  const moodW = state.home.mood && MOODS[state.home.mood] ? (MOODS[state.home.mood].weight || 1) : 0; /* FIX-MOOD-AGGR-SIG */
+  return `v11|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}`;
 }
 
 async function loadHome() {
@@ -994,7 +1014,7 @@ async function loadHome() {
   }
   if (state.home.recs && state.home.sig === sig) { renderHomeContent(taste); return; }
   const cached = readRecsCache(sig);
-  if (cached) { /* FIX-CACHE-RESET */ state.home.recs = cached; state.home.sig = sig; state.home.shown = { movie: 20, tv: 20 }; renderHomeContent(taste); return; }
+  if (cached) { /* FIX-CACHE-RESET */ state.home.recs = cached; state.home.sig = sig; state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */; renderHomeContent(taste); return; }
   if (state.home.loading === sig) return;
 
   state.home.loading = sig;
@@ -1006,7 +1026,7 @@ async function loadHome() {
     writeRecsCache(sig, data);
     state.home.recs = data;
     state.home.sig = sig;
-    state.home.shown = { movie: 20, tv: 20 };
+    state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
     renderHomeContent(taste);
   } catch (e) {
     if (state.home.loading !== sig) return;
@@ -1072,13 +1092,7 @@ function buildPlannedByMoodSection() {
   const sec = el('section', 'home-section planned-mood-sec');
   const head = el('div', 'section-head');
   const titleWrap = el('div', 'planned-head-left');
-  titleWrap.append(el('h2', 'section-title', '🎯 З твого «Планую»'));
-  const subTxt = moodData
-    ? (pool === allPlanned && !allPlanned.some(x => (x.genres || []).some(g => moodData.genres.includes(g)))
-        ? `немає точних під ${moodData.emoji}, показую всі (${allPlanned.length})`
-        : `під настрій ${moodData.emoji} ${moodData.label} (${pool.length})`)
-    : `${pool.length} у списку`;
-  titleWrap.append(el('span', 'section-sub', subTxt));
+  titleWrap.append(el('h2', 'section-title', '🎯 З твого «Планую»')); /* FIX-HOME-NO-SUB-PLANNED */
 
   const rouletteBtn = el('button', 'roulette-btn', '🎲 Вибрати за мене');
   rouletteBtn.type = 'button';
@@ -1090,11 +1104,9 @@ function buildPlannedByMoodSection() {
   head.append(titleWrap, rouletteBtn);
   sec.append(head);
 
-  const strip = el('div', 'planned-strip');
+  const strip = el('div', 'home-grid'); /* FIX-PLANNED-GRID */
   pool.slice(0, 14).forEach(item => {
-    const card = recCard(item, false);
-    card.classList.add('planned-strip-card');
-    strip.append(card);
+    strip.append(recCard(item, false));
   });
   sec.append(strip);
   return sec;
@@ -1124,9 +1136,7 @@ function renderHomeContent(taste) {
   if (recs && recs.items && recs.items.length) {
     const sec = el('section', 'home-section');
     const head = el('div', 'section-head');
-    const moodLabel = recs.mood && MOODS[recs.mood] ? ` · ${MOODS[recs.mood].emoji} ${MOODS[recs.mood].label}` : '';
-    head.append(el('h2', 'section-title', '✨ Для тебе'));
-    head.append(el('span', 'section-sub', `на основі ${recs.seeds} якорів${moodLabel}`));
+    head.append(el('h2', 'section-title', '✨ Для тебе')); /* FIX-HOME-NO-SUB-FORYOU */
     sec.append(head);
 
     // Перемикач режимів видачі
@@ -1143,7 +1153,7 @@ function renderHomeContent(taste) {
         if ((state.home.mode || 'balance') === m.id) return;
         state.home.mode = m.id;
         try { localStorage.setItem('mycinema.home.mode', m.id); } catch (e) {} /* FIX-MODE-SAVE */
-        state.home.shown = { movie: 20, tv: 20 };
+        state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
         refresh();
       });
       modesBar.append(mb);
@@ -1152,7 +1162,7 @@ function renderHomeContent(taste) {
 
     const type = state.home.tab;
     const allItems = recs.items.filter(x => x.type === type && !(typeof isDismissed === 'function' && isDismissed(x.key)));
-    const shownCount = state.home.shown[type] || 20;
+    const shownCount = state.home.shown[type] || 14 /* FIX-SHOWN-14 */;
     const visibleItems = allItems.slice(0, shownCount);
 
     if (visibleItems.length) {
@@ -1168,9 +1178,9 @@ function renderHomeContent(taste) {
       /* FIX-SHOWMORE */
       moreBtn.addEventListener('click', () => {
         const grid = sec.querySelector('.home-grid');
-        const current = state.home.shown[type] || 20;
+        const current = state.home.shown[type] || 14 /* FIX-SHOWN-14 */;
         const fresh = (state.home.recs?.items || []).filter(x => x.type === type && !(typeof isDismissed === 'function' && isDismissed(x.key)));
-        const nextShown = Math.min(fresh.length, current + 20);
+        const nextShown = Math.min(fresh.length, current + 14) /* FIX-SHOWN-14 */;
         if (grid) fresh.slice(current, nextShown).forEach(item => grid.append(recCard(item, true)));
         state.home.shown[type] = nextShown;
         if (nextShown >= fresh.length) moreBtn.remove();
@@ -1186,7 +1196,7 @@ function renderHomeContent(taste) {
       try { localStorage.removeItem(RECS_CACHE); } catch {}
       state.home.refreshNonce = (state.home.refreshNonce || 0) + 1;
       state.home.sig = null; state.home.recs = null;
-      state.home.shown = { movie: 20, tv: 20 };
+      state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
       state.home.genShown = {}; /* FIX-GENSHOWN-RESET */
       refresh();
       showSyncToast('✨ Оновлено');
@@ -1212,7 +1222,7 @@ function renderHomeContent(taste) {
       if (state.home.tab !== 'movie') {
         state.home.tab = 'movie';
         try { localStorage.setItem('mycinema.home.tab', 'movie'); } catch (e) {} /* FIX-TAB-SAVE-M */
-        state.home.shown.movie = 20;
+        state.home.shown.movie = 14; /* FIX-SHOWN-14 */
         renderHomeContent(taste);
       }
     });
@@ -1220,7 +1230,7 @@ function renderHomeContent(taste) {
       if (state.home.tab !== 'tv') {
         state.home.tab = 'tv';
         try { localStorage.setItem('mycinema.home.tab', 'tv'); } catch (e) {} /* FIX-TAB-SAVE-T */
-        state.home.shown.tv = 20;
+        state.home.shown.tv = 14; /* FIX-SHOWN-14 */
         renderHomeContent(taste);
       }
     });

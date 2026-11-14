@@ -20,7 +20,7 @@ let state = {
     loading: false, 
     recs: null, 
     sig: null, 
-    shown: { movie: 20, tv: 20 }, // <--- ДОДАНО ОСЬ ЦЕ
+    shown: { movie: 14, tv: 14 }, /* FIX-SHOWN-14-INIT */ // <--- ДОДАНО ОСЬ ЦЕ
     tab: localStorage.getItem('mycinema.home.tab') || 'movie', /* FIX-TAB-PERSIST */ 
     general: null, 
     mood: null, 

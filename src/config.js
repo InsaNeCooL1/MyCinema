@@ -27,13 +27,17 @@ const MCU_COMPANY_IDS = [420, 38679];
 window.MC_LOCAL_KEYS = ['mycinema.library','mycinema.library.v','mycinema.deleted','mycinema.dismissed','mycinema.dismissedClearedAt','mycinema.actorAdjustments','mycinema.actorAdjustTs','mycinema.search_history','kingOfTheHillHistory','mycinema.recs.v4','mycinema.home.general.v6','mycinema.metaCache.v1','mycinema.colCache.v1','mycinema.appearance.ts','mycinema.splashPool.v1','mycinema.factDismissedDate','onboardingDone','mycinema.librarySort','mycinema.home.tab','mycinema.home.mode']; /* FIX-PERSIST-KEYS */ // Marvel Studios (420), Marvel Television (38679) // Marvel Studios (420), Marvel Television (38679)
 
 // ============ MOODS ============
+/* FIX-MOOD-WEIGHT-CFG
+   weight — наскільки сильно настрій впливає на рекомендації.
+   1.0 = нейтрально. 1.5 = сильно тягне вгору. 0.5 = слабкий біас.
+   Зміна weight інвалідовує кеш (потрібен reload + клік mood-pill). */
 const MOODS = {
-  chill:      { label: 'Спокій',  emoji: '🌊', genres: [35, 10749, 16], tvGenres: [35, 16, 18] },
-  intense:    { label: 'Напруга', emoji: '⚡', genres: [53, 80, 28], tvGenres: [80, 9648, 10768] },
-  thoughtful: { label: 'Роздуми', emoji: '🕯️', genres: [18, 99, 9648], tvGenres: [18, 99, 9648] },
-  fun:        { label: 'Розвага', emoji: '🎈', genres: [12, 35, 16], tvGenres: [35, 16, 10751, 10762] },
-  dark:       { label: 'Похмуре', emoji: '🌑', genres: [80, 27, 53], tvGenres: [80, 9648, 18] },
-  epic:       { label: 'Епічне',  emoji: '🌋', genres: [12, 14, 10752], tvGenres: [10765, 10768, 18] }
+  chill:      { label: 'Спокій',  emoji: '🌊', genres: [35, 10749, 16], tvGenres: [35, 16, 18], weight: 3.0 },
+  intense:    { label: 'Напруга', emoji: '⚡', genres: [53, 80, 28], tvGenres: [80, 9648, 10768], weight: 3.0 },
+  thoughtful: { label: 'Роздуми', emoji: '🕯️', genres: [18, 99, 9648], tvGenres: [18, 99, 9648], weight: 3.0 },
+  fun:        { label: 'Розвага', emoji: '🎈', genres: [12, 35, 16], tvGenres: [35, 16, 10751, 10762], weight: 3.0 },
+  dark:       { label: 'Похмуре', emoji: '🌑', genres: [80, 27, 53], tvGenres: [80, 9648, 18], weight: 3.0 },
+  epic:       { label: 'Епічне',  emoji: '🌋', genres: [12, 14, 10752], tvGenres: [10765, 10768, 18], weight: 3.0 } /* FIX-MOOD-WEIGHT-23 */
 };
 
 // ============ STREAMING ============
@@ -86,3 +90,5 @@ const ACCENTS = {
   emerald:{ name: 'Emerald',accent:'#10b981', hover:'#22c997', fg:'#ffffff' },
   rose:   { name: 'Rose',   accent:'#ff6b9d', hover:'#ff85ad', fg:'#2a0520' }
 };
+
+/* FIX-MOOD-WEIGHT-30 */

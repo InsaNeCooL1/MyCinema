@@ -16,7 +16,29 @@ function syncNavActive() {
   if (moreGroup) moreGroup.classList.toggle('has-active', !!moreGroup.querySelector('.nav-item.active'));
 }
 
+/* FIX-SETTAB-CLOSE-CARD */
+let _pendingSetTab = null;
+let _cardClosingForNav = false;
+
+function _flushPendingSetTab() {
+  _cardClosingForNav = false;
+  if (!_pendingSetTab) return false;
+  const p = _pendingSetTab;
+  _pendingSetTab = null;
+  setTab(p.t, p.opts);
+  return true;
+}
+
 function setTab(t, opts) {
+  if (cardStack.length) {
+    _pendingSetTab = { t, opts };
+    if (!_cardClosingForNav) {
+      _cardClosingForNav = true;
+      history.go(-cardStack.length);
+    }
+    return;
+  }
+  _cardClosingForNav = false;
   state.tab = t;
   closeSidebar();
   /* FIX-SETTAB-NAV */ if (typeof closeNavDropdowns === 'function') closeNavDropdowns();

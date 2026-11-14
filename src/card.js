@@ -228,7 +228,13 @@ window.addEventListener('popstate', async (e) => {
     return;
   }
   while (cardStack.length > depth) cardStack.pop();
-  if (depth === 0) { flushPendingNotes(); /* [POPSTATE-NOTES-FIX] */ overlay.classList.remove('open'); refresh(); }
+  if (depth === 0) {
+    flushPendingNotes();
+    overlay.classList.remove('open');
+    /* FIX-POPSTATE-FLUSH */
+    var _didFlush = (typeof _flushPendingSetTab === 'function') ? _flushPendingSetTab() : false;
+    if (!_didFlush) refresh();
+  }
   else renderCard(true);
 });
 
@@ -339,8 +345,8 @@ function renderMediaCard(ctx, scroll) {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
       <path d="M8 5v14l11-7z"/>
     </svg>
-    <span>Лампа</span>
-  `;
+    <span>LAMPA</span>
+  `; /* FIX-LAMPA-LABEL */
   watchBtn.title = 'Відкрити в Lampa';
   watchBtn.setAttribute('aria-label', 'Відкрити в Lampa'); /* FIX-ARIA-LAMPA */
   watchBtn.addEventListener('click', () => openInLampa(r));
