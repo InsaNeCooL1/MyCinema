@@ -351,3 +351,105 @@ document.getElementById('auth-modal')?.addEventListener('click', (e) => {
     }, 0);
   });
 })();
+
+
+/* ═══════════════════════════════════════════════════════════
+   FIX-ACCOUNT-MENU: Account context menu + Lang toggle + Sync
+   ═══════════════════════════════════════════════════════════ */
+
+function openAccountMenu(evt) {
+  /* FIX-ACCOUNT-MENU-V2 */
+  if (evt && evt.stopPropagation) evt.stopPropagation();
+  document.querySelectorAll('.account-menu').forEach(function(m) { m.remove(); });
+  var btn = document.getElementById('sidebar-logout-btn');
+  if (!btn) return;
+
+  var menu = document.createElement('div');
+  menu.className = 'account-menu';
+
+  function mkItem(text, cls, handler) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'account-menu-item' + (cls ? ' ' + cls : '');
+    b.textContent = text;
+    b.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      menu.remove();
+      setTimeout(handler, 0);
+    });
+    return b;
+  }
+
+  menu.appendChild(mkItem('Вийти', '', function() {
+    if (typeof logoutUser === 'function') logoutUser();
+  }));
+  menu.appendChild(mkItem('Пройти онбординг знову', '', function() {
+    if (typeof closeSidebar === 'function') closeSidebar();
+    if (confirm('Пройти налаштування знову? Обрані тайтли додадуться з оцінкою 8.')) {
+      try { localStorage.removeItem('onboardingDone'); } catch (e) {}
+      if (typeof startOnboarding === 'function') startOnboarding();
+    }
+  }));
+  menu.appendChild(mkItem('Видалити акаунт', 'danger', function() {
+    deleteAccount();
+  }));
+
+  document.body.appendChild(menu);
+
+  var r = btn.getBoundingClientRect();
+  var mRect = menu.getBoundingClientRect();
+  var top = r.bottom + 8;
+  var left = r.right - mRect.width;
+  if (top + mRect.height > window.innerHeight - 10) top = r.top - mRect.height - 8;
+  if (top < 10) top = 10;
+  if (left < 10) left = 10;
+  if (left + mRect.width > window.innerWidth - 10) left = window.innerWidth - mRect.width - 10;
+  menu.style.top = top + 'px';
+  menu.style.left = left + 'px';
+
+  setTimeout(function() {
+    function off(e) {
+      if (!menu.contains(e.target)) {
+        menu.remove();
+        document.removeEventListener('click', off);
+      }
+    }
+    document.addEventListener('click', off);
+  }, 100);
+}
+
+async function deleteAccount() {
+  if (!confirm('Видалити акаунт?\n\nЦе видалить усі дані з хмари (бібліотека, нотатки, оцінки) та локально. Дію не можна скасувати.')) return;
+  if (!confirm('Точно видалити? Друге підтвердження.')) return;
+
+  try {
+    if (window.currentUser && window.supabase) {
+      var uid = window.currentUser.uid;
+      await window.supabase.from('user_library').delete().eq('user_id', uid);
+      await window.supabase.from('profiles').delete().eq('id', uid);
+    }
+  } catch (e) {
+    console.warn('[deleteAccount]', e);
+  }
+
+  try {
+    var keys = (window.MC_LOCAL_KEYS || []).concat(['mycinema.lang']);
+    keys.forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+  } catch (e) {}
+
+  try { if (window.supabase) await window.supabase.auth.signOut(); } catch (e) {}
+  location.reload();
+}
+
+/* FIX-LANG-REMOVED — lang toggle прибрано */
+
+function syncFromSettings() {
+  if (!window.currentUser) {
+    if (typeof showSyncToast === 'function') showSyncToast('❌ Увійдіть в акаунт');
+    return;
+  }
+  if (typeof pullFromCloud === 'function') pullFromCloud();
+}
+
+/* FIX-LANG-REMOVED — init онулено (мова завжди UA) */

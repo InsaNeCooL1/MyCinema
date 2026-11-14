@@ -101,7 +101,9 @@ function renderLoading() {
 async function loadMediaCardData(ctx) {
   const r = ctx.item;
   try {
-    const d = await tmdbFetch(`/${r.type}/${r.id}?language=uk-UA&include_video_language=uk,en,null&append_to_response=credits,videos,external_ids,watch/providers,recommendations,similar`);
+    /* FIX-RELEASE-CARD-FETCH */
+    const _extraParts = r.type === 'movie' ? ',release_dates' : '';
+    const d = await tmdbFetch(`/${r.type}/${r.id}?language=uk-UA&include_video_language=uk,en,null&append_to_response=credits,videos,external_ids,watch/providers,recommendations,similar${_extraParts}`);
     ctx.details = d;
     const wikiPromise = (d.external_ids?.wikidata_id && typeof fetchWikiMediaDescription === 'function')
       ? fetchWikiMediaDescription(d.external_ids.wikidata_id)
@@ -124,6 +126,16 @@ async function loadMediaCardData(ctx) {
     if (meta.platforms) r.platforms = meta.platforms;
     if (meta.genres) { ctx.genres = meta.genres; r.genres = meta.genres; }
     if (meta.cast) ctx.cast = meta.cast;
+    /* FIX-RELEASE-CARD-SAVE */
+    if (r.type === 'movie') {
+      const _dd = extractDigitalDate(d);
+      r.digitalReleaseDate = _dd;
+      if (lib[r.key]) lib[r.key].digitalReleaseDate = _dd;
+    }
+    const _provUA = extractProvidersUA(d);
+    r.streamingUA = _provUA;
+    if (lib[r.key]) lib[r.key].streamingUA = _provUA;
+    _dirtyItems.add(r.key);
     if ('franchiseKey' in meta) {
       ctx.franchiseKey = meta.franchiseKey;
       r.franchiseKey = meta.franchiseKey;
@@ -415,6 +427,7 @@ function renderMediaCard(ctx, scroll) {
     rr.append(b);
   }
 
+  /* FIX-RELEASE-BADGE-REMOVED (badges moved to home posters) */
   // Кнопка "Переглянуто"
   const watchedBtn = el("button", "status-btn-watched" + (s.status === "watched" ? " active" : ""), "✅ Переглянуто");
   watchedBtn.addEventListener("click", () => {

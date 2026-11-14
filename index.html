@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- FIX-SWAP-ACC-TOP -->
 
 <div id="sidebar-backdrop" onclick="closeSidebar()"></div>
 <div id="sidebar">
@@ -17,35 +18,35 @@
     <div class="sidebar-email" id="sidebar-email">Гість</div>
   </div>
   <div class="sidebar-nav" id="sidebar-nav">
-    <div class="nav-item nav-top-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> Головна</div>
+    <div class="nav-item nav-top-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> <span data-i18n="nav.home">Головна</span></div>
 
     <div class="nav-group nav-top-item" data-group="lists">
       <button type="button" class="nav-group-btn" onclick="toggleNavGroup('lists', event)">
-        <span class="nav-icon">📚</span> Списки <span class="nav-caret">▾</span>
+        <span class="nav-icon">📚</span> <span data-i18n="nav.lists">Списки</span> <span class="nav-caret">▾</span>
       </button>
       <div class="nav-dropdown">
-        <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> Дивлюсь</div>
-        <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> Переглянуто</div>
-        <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> Планую</div>
-        <div class="nav-item" data-tab="dropped" onclick="setTab('dropped')"><span class="nav-icon">🕸️</span> Закинуто</div>
-        <div class="nav-item" data-tab="favorites" onclick="setTab('favorites')"><span class="nav-icon">❤️</span> Улюблене</div>
+        <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> <span data-i18n="nav.watching">Дивлюсь</span></div>
+        <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> <span data-i18n="nav.watched">Переглянуто</span></div>
+        <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> <span data-i18n="nav.planned">Планую</span></div>
+        <div class="nav-item" data-tab="dropped" onclick="setTab('dropped')"><span class="nav-icon">🕸️</span> <span data-i18n="nav.dropped">Закинуто</span></div>
+        <div class="nav-item" data-tab="favorites" onclick="setTab('favorites')"><span class="nav-icon">❤️</span> <span data-i18n="nav.favorites">Улюблене</span></div>
       </div>
     </div>
 
-    <div class="nav-item nav-top-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> Нотатки</div>
+    <div class="nav-item nav-top-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> <span data-i18n="nav.notes">Нотатки</span></div>
 
     <div class="nav-group nav-top-item" data-group="overview">
       <button type="button" class="nav-group-btn" onclick="toggleNavGroup('overview', event)">
-        <span class="nav-icon">📊</span> Огляд <span class="nav-caret">▾</span>
+        <span class="nav-icon">📊</span> <span data-i18n="nav.overview">Огляд</span> <span class="nav-caret">▾</span>
       </button>
       <div class="nav-dropdown">
-        <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> Мій топ</div>
-        <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> Календар</div>
-        <div class="nav-item" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> Обсерваторія</div>
+        <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> <span data-i18n="nav.top">Мій топ</span></div>
+        <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> <span data-i18n="nav.calendar">Календар</span></div>
+        <div class="nav-item" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> <span data-i18n="nav.stats">Обсерваторія</span></div>
       </div>
     </div>
 
-    <div class="nav-item nav-top-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> Цар гори</div>
+    <div class="nav-item nav-top-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> <span data-i18n="nav.game">Цар гори</span></div>
 
     <div class="nav-group nav-more-group" data-group="more" style="display:none;">
       <button type="button" class="nav-group-btn" onclick="toggleNavGroup('more', event)">
@@ -61,17 +62,16 @@
         <span class="btn-label">Увійти в акаунт</span>
       </span>
     </button>
-    <button class="logout-btn-side icon-compact-btn logged-in" id="sidebar-logout-btn" style="display:none;" title="Акаунт (вийти)" onclick="logoutUser()">
+    <button class="logout-btn-side icon-compact-btn" id="sidebar-top-btn" title="Мій топ" onclick="setTab('top')">
+      <span class="icon-btn-inner">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+      </span>
+    </button>
+    <button class="logout-btn-side icon-compact-btn logged-in" id="sidebar-logout-btn" style="display:none;" title="Акаунт" onclick="openAccountMenu(event)">
       <span class="icon-btn-inner">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span class="account-dot" aria-hidden="true"></span>
         <span class="btn-label">Вийти з акаунту</span>
-      </span>
-    </button>
-    <button class="logout-btn-side icon-compact-btn" id="sidebar-sync-btn" title="Синхронізувати" onclick="pullFromCloud()">
-      <span class="icon-btn-inner">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-        <span class="btn-label">Синхронізувати</span>
       </span>
     </button>
     <button class="logout-btn-side icon-compact-btn settings-compact-btn" id="sidebar-settings-btn" style="border-color:var(--accent);color:var(--accent)" title="Налаштування" onclick="openSettings()">
@@ -118,34 +118,49 @@
 <div id="settings-modal">
   <div class="settings-box">
     <div class="settings-header">
-      <h2>⚙️ Налаштування</h2>
+      <h2>Налаштування</h2>
       <button class="settings-close" onclick="closeSettings()">✕</button>
     </div>
     
     <div class="settings-section">
-      <div class="settings-section-title">🎨 Колір фону</div>
+      <div class="settings-section-title">Тема</div>
+      <div class="settings-subsection-label">Колір фону</div>
       <div id="bg-swatches" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-    </div>
-    
-    <div class="settings-section">
-      <div class="settings-section-title">✨ Колір виділення</div>
+      <div class="settings-subsection-label">Колір виділення</div>
       <div id="accent-swatches" style="display:flex;gap:10px;flex-wrap:wrap"></div>
     </div>
     
     <div class="settings-section">
-      <div class="settings-section-title">🖼️ Вигляд</div>
+      <div class="settings-section-title">Вигляд</div>
       <label class="settings-toggle">
         <input type="checkbox" id="poster-bg-toggle" onchange="onPosterBgToggle(this.checked)">
         <span>Постер як фон на картці тайтлу</span>
+      </label>
+      <label class="settings-toggle">
+        <input type="checkbox" id="status-badge-toggle" onchange="onStatusBadgeToggle(this.checked)">
+        <span>Статус тайтлу (бейджі на постерах)</span>
       </label>
     </div>
 
 
     <div class="settings-section">
-      <div class="settings-section-title">📁 Дані</div>
-      <button class="settings-btn" onclick="exportLibrary()">💾 Експорт бібліотеки</button>
-      <button class="settings-btn" onclick="importLibrary()">📥 Імпорт бібліотеки</button>
-      <button class="settings-btn" onclick="restartOnboardingFromSettings()">🔄 Пройти онбординг знову</button>
+      <div class="settings-section-title">Релізи</div>
+      <label class="settings-toggle">
+        <input type="checkbox" id="digital-only-toggle" onchange="onDigitalOnlyToggle(this.checked)">
+        <span>Тільки те, що вже вийшло в цифрі</span>
+      </label>
+      <label class="settings-toggle">
+        <input type="checkbox" id="streaming-ua-toggle" onchange="onStreamingUAToggle(this.checked)">
+        <span>Тільки доступне на стрімінгу в UA</span>
+      </label>
+      <div class="notes-hint" style="font-size:12px;padding:0 4px">Фільтрує рекомендації та загальні підбірки. Впливає тільки на тайтли без даних у бібліотеці — відкрий картку, щоб підтягнути метадані.</div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Дані</div>
+      <button class="settings-btn" onclick="exportLibrary()">Експорт бібліотеки</button>
+      <button class="settings-btn" onclick="importLibrary()">Імпорт бібліотеки</button>
+      <button class="settings-btn" onclick="syncFromSettings()">Синхронізувати з хмарою</button>
     </div>
   </div>
 </div>

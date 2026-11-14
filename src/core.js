@@ -4,8 +4,33 @@
 const settings = {
   themeBg: localStorage.getItem('mycinema.theme.bg') || 'navy',
   themeAccent: localStorage.getItem('mycinema.theme.accent') || 'amber',
-  posterBg: localStorage.getItem('mycinema.posterBg') === 'true'
+  posterBg: localStorage.getItem('mycinema.posterBg') === 'true',
+  /* FIX-RELEASE-SETTINGS */
+  digitalOnly: localStorage.getItem('mycinema.digitalOnly') !== 'false',       // default true
+  streamingOnlyUA: localStorage.getItem('mycinema.streamingOnlyUA') === 'true', // default false
+  showStatusBadges: localStorage.getItem('mycinema.showStatusBadges') !== 'false' // FIX-STATUS-TOGGLE
 };
+
+/* FIX-RELEASE-HELPERS — спільні для card.js і home.js */
+function extractDigitalDate(d) {
+  const results = (d && d.release_dates && d.release_dates.results) || [];
+  const regions = ['UA', 'US', 'GB', 'PL'];
+  for (let i = 0; i < regions.length; i++) {
+    const reg = results.find(x => x.iso_3166_1 === regions[i]);
+    const dig = reg && reg.release_dates && reg.release_dates.find(x => x.type === 4 && x.release_date);
+    if (dig) return dig.release_date.slice(0, 10);
+  }
+  return null;
+}
+function extractProvidersUA(d) {
+  const wp = (d && d['watch/providers'] && d['watch/providers'].results) || {};
+  const ua = (wp.UA && wp.UA.flatrate) || (wp.US && wp.US.flatrate) || [];
+  return ua.map(p => ({
+    key: (typeof normalizePlatformInfo === 'function' ? normalizePlatformInfo({ name: p.provider_name }).key : p.provider_name),
+    name: p.provider_name,
+    logo: p.logo_path || null
+  }));
+}
 
 // ============ STATE ============
 let lib = load();
@@ -509,6 +534,7 @@ function getAppearancePayload() {
     themeAccent: settings.themeAccent,
     posterBg: !!settings.posterBg,
     snowEnabled: snowRaw === null ? true : snowRaw === 'true',
+    showStatusBadges: settings.showStatusBadges !== false, /* FIX-STATUS-TOGGLE */
     ts: getAppearanceTs()
   };
 }
@@ -529,12 +555,15 @@ function applyCloudAppearance(app) {
   const ac = ACCENTS[app.themeAccent] ? app.themeAccent : settings.themeAccent;
   const posterBg = typeof app.posterBg === 'boolean' ? app.posterBg : settings.posterBg;
   const snowOn = typeof app.snowEnabled === 'boolean' ? app.snowEnabled : true;
+  const statusBadgesOn = typeof app.showStatusBadges === 'boolean' ? app.showStatusBadges : settings.showStatusBadges; /* FIX-STATUS-TOGGLE */
 
   applyTheme(bg, ac);
   settings.posterBg = posterBg;
   try {
     localStorage.setItem('mycinema.posterBg', posterBg ? 'true' : 'false');
     localStorage.setItem('mycinema.snowEnabled', snowOn ? 'true' : 'false');
+    localStorage.setItem('mycinema.showStatusBadges', statusBadgesOn ? 'true' : 'false'); /* FIX-STATUS-TOGGLE */
+    settings.showStatusBadges = statusBadgesOn;
     localStorage.setItem(LS_APP_TS, String(cTs));
   } catch {}
 

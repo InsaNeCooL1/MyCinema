@@ -7,7 +7,7 @@ const TMDB_IMG = "https://image.tmdb.org/t/p/";
 // ============ CONSTANTS ============
 const LS = "mycinema.library";
 const LS_VER = "mycinema.library.v";
-const RECS_CACHE = "mycinema.recs.v4";
+const RECS_CACHE = "mycinema.recs.v5"; /* FIX-CACHE-BUMP */
 const EXCLUDED_TV_GENRES = [10763, 10764, 10767];
 const ANIMATION_GENRE_ID = 16;
 const CAST_LIMIT = 10;
@@ -24,7 +24,7 @@ const ACTOR_PENALTY_CAP = 0.25;
 const ACTOR_FRANCHISE_CAP = 0.09;
 const MCU_COMPANY_IDS = [420, 38679];
 /* FIX-LOCAL-KEYS */
-window.MC_LOCAL_KEYS = ['mycinema.library','mycinema.library.v','mycinema.deleted','mycinema.dismissed','mycinema.dismissedClearedAt','mycinema.actorAdjustments','mycinema.actorAdjustTs','mycinema.search_history','kingOfTheHillHistory','mycinema.recs.v4','mycinema.home.general.v6','mycinema.metaCache.v1','mycinema.colCache.v1','mycinema.appearance.ts','mycinema.splashPool.v1','mycinema.factDismissedDate','onboardingDone','mycinema.librarySort','mycinema.home.tab','mycinema.home.mode']; /* FIX-PERSIST-KEYS */ // Marvel Studios (420), Marvel Television (38679) // Marvel Studios (420), Marvel Television (38679)
+window.MC_LOCAL_KEYS = ['mycinema.library','mycinema.library.v','mycinema.deleted','mycinema.dismissed','mycinema.dismissedClearedAt','mycinema.actorAdjustments','mycinema.actorAdjustTs','mycinema.search_history','kingOfTheHillHistory','mycinema.recs.v5','mycinema.home.general.v6','mycinema.metaCache.v1','mycinema.colCache.v1','mycinema.appearance.ts','mycinema.splashPool.v1','mycinema.factDismissedDate','onboardingDone','mycinema.librarySort','mycinema.home.tab','mycinema.home.mode']; /* FIX-PERSIST-KEYS */ // Marvel Studios (420), Marvel Television (38679) // Marvel Studios (420), Marvel Television (38679)
 
 // ============ MOODS ============
 /* FIX-MOOD-WEIGHT-CFG
@@ -77,7 +77,10 @@ const THEMES = {
   black: { name: 'Black', bg0:'#000000', bg1:'#0a0a0a', bg2:'#141414', bg3:'#1e1e1e', bg4:'#2a2a2a', sidebar:'#050505', query:'#000000', text:'#f0f0f0', textSecondary:'#c0c0c0', textMuted:'#888', textDim:'#444' },
   plum:  { name: 'Plum',  bg0:'#0c0512', bg1:'#150a20', bg2:'#1f0e2f', bg3:'#301848', bg4:'#422458', sidebar:'#0a0410', query:'#070310', text:'#f0e8f5', textSecondary:'#d8cfe6', textMuted:'#9a8fb5', textDim:'#5a4f7a' },
   forest:{ name: 'Forest',light: false, bg0:'#030b06', bg1:'#0a1510', bg2:'#0f2018', bg3:'#183020', bg4:'#22432f', sidebar:'#050d08', query:'#020705', text:'#e8f2ec', textSecondary:'#cfe6d8', textMuted:'#8fb5a0', textDim:'#4f7a5a' },
-  mocha: { name: 'Mocha', bg0:'#0b0805', bg1:'#150f0a', bg2:'#1f1710', bg3:'#2f2618', bg4:'#403522', sidebar:'#0a0705', query:'#060403', text:'#f2ebe0', textSecondary:'#e6d8c7', textMuted:'#b5a08f', textDim:'#7a5f4a' }
+  mocha: { name: 'Mocha', bg0:'#0b0805', bg1:'#150f0a', bg2:'#1f1710', bg3:'#2f2618', bg4:'#403522', sidebar:'#0a0705', query:'#060403', text:'#f2ebe0', textSecondary:'#e6d8c7', textMuted:'#b5a08f', textDim:'#7a5f4a' },
+  /* FIX-THEMES-2 — Ocean, Wine */
+  ocean: { name: 'Ocean', bg0:'#050a14', bg1:'#0a1320', bg2:'#0f1c2e', bg3:'#182a42', bg4:'#223a56', sidebar:'#040810', query:'#03060c', text:'#e6eef8', textSecondary:'#c5d5e8', textMuted:'#7a8fa8', textDim:'#4a5a70' },
+  wine:  { name: 'Wine',  bg0:'#0a0508', bg1:'#14080f', bg2:'#1e0c18', bg3:'#2e1426', bg4:'#421e35', sidebar:'#080407', query:'#050203', text:'#f5e8ee', textSecondary:'#e6c8d8', textMuted:'#a88098', textDim:'#704a62' }
 };
 
 // ============ ACCENTS ============
@@ -92,3 +95,21 @@ const ACCENTS = {
 };
 
 /* FIX-MOOD-WEIGHT-30 */
+
+/* FIX-I18N */
+const I18N = {
+  ua: {
+    'nav.home': 'Головна', 'nav.lists': 'Списки', 'nav.notes': 'Нотатки',
+    'nav.overview': 'Огляд', 'nav.game': 'Цар гори', 'nav.more': 'Ще',
+    'nav.watching': 'Дивлюсь', 'nav.watched': 'Переглянуто', 'nav.planned': 'Планую',
+    'nav.dropped': 'Закинуто', 'nav.favorites': 'Улюблене',
+    'nav.top': 'Мій топ', 'nav.calendar': 'Календар', 'nav.stats': 'Обсерваторія'
+  },
+  en: {
+    'nav.home': 'Home', 'nav.lists': 'Lists', 'nav.notes': 'Notes',
+    'nav.overview': 'Overview', 'nav.game': 'King of the Hill', 'nav.more': 'More',
+    'nav.watching': 'Watching', 'nav.watched': 'Watched', 'nav.planned': 'Planned',
+    'nav.dropped': 'Dropped', 'nav.favorites': 'Favorites',
+    'nav.top': 'My Top', 'nav.calendar': 'Calendar', 'nav.stats': 'Observatory'
+  }
+};

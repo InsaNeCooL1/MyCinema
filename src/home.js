@@ -1,8 +1,8 @@
 'use strict';
 
 // ============ RECOMMENDATIONS ENGINE V2 ============
-const GEN_CACHE = 'mycinema.home.general.v6';
-const RECS_TTL = 6 * 60 * 60 * 1000;  // 6 годин
+const GEN_CACHE = 'mycinema.home.general.v7'; /* FIX-GEN-CACHE-BUMP */
+const RECS_TTL = 48 * 60 * 60 * 1000;  // 48 годин /* FIX-RECS-CACHE-V2 */
 const GEN_TTL = 12 * 60 * 60 * 1000;  // 12 годин
 
 function isExcludedShow(raw, type) {
@@ -17,7 +17,7 @@ function isExcludedShow(raw, type) {
   return false;
 }
 
-const META_CACHE_KEY = 'mycinema.metaCache.v1';
+const META_CACHE_KEY = 'mycinema.metaCache.v2'; /* FIX-META-CACHE-BUMP */
 const META_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const META_CACHE_MAX = 220;
 const _memSeedRecs = new Map(); /* FIX-MEMSEED-LRU */
@@ -112,7 +112,10 @@ function packCompactMeta(d, type) {
     dirs: dirs.slice(0, 3),
     cast,
     kws,
-    genres
+    genres,
+    /* FIX-RELEASE-PACK-META */
+    digitalDate: (typeof extractDigitalDate === 'function') ? extractDigitalDate(d) : null,
+    providersUA: (typeof extractProvidersUA === 'function') ? extractProvidersUA(d) : []
   };
 }
 
@@ -125,7 +128,8 @@ async function fetchCompactMeta(type, id, needRecs, cacheObj) {
     return { meta: cached, recs: cachedRecs || [] };
   }
 
-  const parts = [type === 'tv' ? 'credits,aggregate_credits,keywords' : 'credits,keywords'];
+  /* FIX-RELEASE-COMPACT-FETCH */
+  const parts = [type === 'tv' ? 'credits,aggregate_credits,keywords,watch/providers' : 'credits,keywords,release_dates,watch/providers'];
   if (needRecs) parts.push('recommendations');
   const d = await tmdbFetch(`/${type}/${id}?language=uk-UA&append_to_response=${parts.join(',')}`);
   const meta = packCompactMeta(d, type);
@@ -378,6 +382,15 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     if (isExcludedShow(raw, type)) return null;
     const key = `${type}-${raw.id}`;
     if (lib[key] || (typeof isDismissed === 'function' && isDismissed(key))) return null;
+    /* FIX-RELEASE-ENSURE — Level 1+2 pre-filter */
+    const _today = new Date().toISOString().slice(0, 10);
+    const _rel = (raw.release_date || raw.first_air_date || '').slice(0, 10);
+    if (settings.digitalOnly && type === 'movie') {
+      if (_rel && _rel > _today) return null;  // ще не вийшов — точно немає digital
+    }
+    if (settings.streamingOnlyUA) {
+      if (_rel && _rel > _today) return null;  // streaming точно немає
+    }
     let entry = unique.get(key);
     if (!entry) {
       const item = normalizeItem({ ...raw, media_type: type });
@@ -621,8 +634,21 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   const finalizeType = (list) => {
     if (!list.length) return [];
 
-    const enriched = list.filter(x => !!x._meta);
-    const rest = list.filter(x => !x._meta);
+    /* FIX-RELEASE-FINALIZE — post-filter on enriched (has _meta) */
+    const _today = new Date().toISOString().slice(0, 10);
+    const filtered = list.filter(x => {
+      if (!x._meta) return true;  // без meta не можемо перевірити — пропускаємо
+      if (settings.digitalOnly && x.type === 'movie') {
+        if (x._meta.digitalDate && x._meta.digitalDate > _today) return false;
+      }
+      if (settings.streamingOnlyUA) {
+        if (!x._meta.providersUA || x._meta.providersUA.length === 0) return false;
+      }
+      return true;
+    });
+
+    const enriched = filtered.filter(x => !!x._meta);
+    const rest = filtered.filter(x => !x._meta); /* FIX-RELEASE-FINALIZE-REST */
 
     if (enriched.length) {
       for (const entry of enriched) {
@@ -689,6 +715,9 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         entry._score = total;
         /* FIX-MOOD-WEIGHT-ENR */
         entry._sortScore = total + Math.min(0.40, entry._moodBoost || 0) + (rnd() - 0.5) * 0.08; /* FIX-MOOD-AGGR-SORT */
+        /* FIX-RELEASE-COPY-META — copy before delete for poster badges */
+        entry.digitalReleaseDate = (entry._meta && entry._meta.digitalDate) || null;
+        entry.streamingUA = (entry._meta && entry._meta.providersUA) || [];
         delete entry._seenTags;
         delete entry._meta;
         delete entry._moodBoost;
@@ -758,11 +787,19 @@ function writeGeneralCache(g) {
     localStorage.setItem(GEN_CACHE, JSON.stringify({ ts: Date.now(), data: g }));
   } catch {}
 }
-function readRecsCache(sig) {
-  try { const c = JSON.parse(localStorage.getItem(RECS_CACHE)); if (c && c.sig === sig && Date.now() - c.ts < RECS_TTL) return c.data; } catch {}
+/* FIX-RECS-CACHE-V2 */
+function readRecsCache(sig, critical) {
+  try {
+    const c = JSON.parse(localStorage.getItem(RECS_CACHE));
+    if (!c) return null;
+    const age = Date.now() - c.ts;
+    if (age >= RECS_TTL) return null;
+    if (critical && c.critical === critical) return c.data;
+    if (c.sig === sig) return c.data;
+  } catch {}
   return null;
 }
-function writeRecsCache(sig, data) { try { localStorage.setItem(RECS_CACHE, JSON.stringify({ sig, ts: Date.now(), data })); } catch {} }
+function writeRecsCache(sig, critical, data) { try { localStorage.setItem(RECS_CACHE, JSON.stringify({ sig, critical, ts: Date.now(), data })); } catch {} } /* FIX-RECS-CACHE-V2 */
 
 // ============ TASTE DNA (SVG & UI) ============
 function tasteRadarSVG(taste, size = 240) {
@@ -902,6 +939,11 @@ function renderMoodSelector() {
 }
 
 // ============ LOAD & RENDER ============
+/* FIX-RECS-CACHE-V2 */
+function computeCriticalSig() {
+  return `mood:${state.home.mood || 'any'}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`;
+}
+
 function computeRecsSignature(seeds) {
   const seedSig = seeds.map(s => `${s.key}:${s.strength.toFixed(1)}:${s.resFactor.toFixed(2)}`).join('|');
   const antiSig = getAntiSeeds().map(a => a.key).join(',');
@@ -911,7 +953,7 @@ function computeRecsSignature(seeds) {
   const castSig = `${castVals.length}:${castVals.reduce((a, b) => a + b, 0).toFixed(1)}`;
   const day = new Date().toISOString().slice(0, 10);
   const moodW = state.home.mood && MOODS[state.home.mood] ? (MOODS[state.home.mood].weight || 1) : 0; /* FIX-MOOD-AGGR-SIG */
-  return `v11|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}`;
+  return `v13|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-RELEASE-SIG */
 }
 
 async function loadHome() {
@@ -921,6 +963,7 @@ async function loadHome() {
   const seeds = getSeeds();
   const taste = computeTasteVector();
   const sig = computeRecsSignature(seeds);
+  const critical = computeCriticalSig(); /* FIX-RECS-CACHE-V2 */
 
   if (!state.home.general) { const gc = readGeneralCache(); if (gc) state.home.general = gc; }
   if (!state.home.general) {
@@ -944,8 +987,14 @@ async function loadHome() {
       const cleanGen = (rawList, type, limit = 50) => {
         const seen = new Set();
         const out = [];
+        /* FIX-RELEASE-CLEANGEN — Level 1 filter for general sections */
+        const _todayIso = new Date().toISOString().slice(0, 10);
         for (const r of rawList) {
           if (!r || !r.poster_path || isExcludedShow(r, type)) continue;
+          if ((settings.digitalOnly || settings.streamingOnlyUA) && type === 'movie') {
+            const _rd = (r.release_date || '').slice(0, 10);
+            if (_rd && _rd > _todayIso) continue;
+          }
           const item = normalizeItem({ ...r, media_type: type });
           if (seen.has(item.key)) continue;
           seen.add(item.key);
@@ -1013,7 +1062,7 @@ async function loadHome() {
     return;
   }
   if (state.home.recs && state.home.sig === sig) { renderHomeContent(taste); return; }
-  const cached = readRecsCache(sig);
+  const cached = readRecsCache(sig, critical); /* FIX-RECS-CACHE-V2 */
   if (cached) { /* FIX-CACHE-RESET */ state.home.recs = cached; state.home.sig = sig; state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */; renderHomeContent(taste); return; }
   if (state.home.loading === sig) return;
 
@@ -1023,7 +1072,7 @@ async function loadHome() {
   try {
     const data = await buildSmartRecommendations(seeds, state.home.mood, state.home.mode);
     if (state.home.loading !== sig) return; // [LOADHOME-RACE-FIX] застарілий запит
-    writeRecsCache(sig, data);
+    writeRecsCache(sig, critical, data); /* FIX-RECS-CACHE-V2 */
     state.home.recs = data;
     state.home.sig = sig;
     state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
@@ -1058,6 +1107,23 @@ function recCard(item, allowDismiss) {
     });
     wrap.append(disBtn);
   }
+  /* FIX-RELEASE-REC-BADGE — badge on poster */
+  if (settings.showStatusBadges !== false) try {
+    const _today = new Date().toISOString().slice(0, 10);
+    const _rel = (item.releaseDate || (item.year ? item.year + '-01-01' : '')).slice(0, 10);
+    const _libItem = (typeof lib !== 'undefined' && lib[item.key]) || {}; /* FIX-RELEASE-REC-BADGE-LIB */
+    const _dig = _libItem.digitalReleaseDate || item.digitalReleaseDate || null;
+    const _str = (_libItem.streamingUA && _libItem.streamingUA.length ? _libItem.streamingUA : item.streamingUA) || [];
+    let _b = null;
+    /* FIX-RELEASE-OLD-FALLBACK */
+    const _oldDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    if (_str && _str.length > 0) _b = { cls: 'stream', txt: '📺 UA' };
+    else if (_dig && _dig <= _today) _b = { cls: 'ok', txt: '💾 Цифра' };
+    else if (_rel && _rel > _today) _b = { cls: 'wait', txt: '⏳ Скоро' };
+    else if (_rel && _rel <= _today && _rel < _oldDate) _b = { cls: 'ok', txt: '💾 Цифра' };
+    else if (_rel && _rel <= _today && (!_dig || _dig > _today) && item.type === 'movie') _b = { cls: 'cinema', txt: '🎬 Кіно' };
+    if (_b) wrap.append(el('span', 'rec-badge ' + _b.cls, _b.txt));
+  } catch (e) {}
   c.append(wrap);
   c.append(el('div', 'row-title', item.title));
   let meta = item.year || '';
@@ -1188,7 +1254,18 @@ function renderHomeContent(taste) {
       sec.append(moreBtn);
     }
 
-    const refreshBtn = el('button', 'home-more', '🔄 Оновити рекомендації');
+    /* FIX-RECS-AGE */
+    let _cacheAge = '';
+    try {
+      const _c = JSON.parse(localStorage.getItem(RECS_CACHE));
+      if (_c && _c.ts) {
+        const _hrs = Math.floor((Date.now() - _c.ts) / 3600000);
+        if (_hrs < 1) _cacheAge = ' (щойно)';
+        else if (_hrs < 24) _cacheAge = ` (${_hrs} год. тому)`;
+        else _cacheAge = ` (${Math.floor(_hrs / 24)} дн. тому)`;
+      }
+    } catch (e) {}
+    const refreshBtn = el('button', 'home-more', '🔄 Оновити рекомендації' + _cacheAge);
     refreshBtn.style.marginTop = '12px';
     refreshBtn.style.background = 'transparent';
     refreshBtn.style.border = '1px solid var(--bg-3)';

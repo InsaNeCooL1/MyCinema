@@ -5,9 +5,47 @@ function openSettings() {
   closeSidebar();
   renderSettingsSwatches();
   document.getElementById('poster-bg-toggle').checked = settings.posterBg;
+  /* FIX-RELEASE-HANDLERS */
+  var _d = document.getElementById('digital-only-toggle');
+  if (_d) _d.checked = !!settings.digitalOnly;
+  var _s = document.getElementById('streaming-ua-toggle');
+  if (_s) _s.checked = !!settings.streamingOnlyUA;
+  var _sb = document.getElementById('status-badge-toggle'); /* FIX-STATUS-TOGGLE */
+  if (_sb) _sb.checked = settings.showStatusBadges !== false;
   injectSnowToggle();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
   document.getElementById('settings-modal').classList.add('open');
+}
+
+/* FIX-RELEASE-HANDLERS-2 */
+function _clearReleaseCaches() {
+  try { localStorage.removeItem(RECS_CACHE); } catch (e) {}
+  try { localStorage.removeItem(GEN_CACHE); } catch (e) {}
+  state.home.sig = null;
+  state.home.recs = null;
+  state.home.general = null;
+}
+function onDigitalOnlyToggle(on) {
+  settings.digitalOnly = !!on;
+  localStorage.setItem('mycinema.digitalOnly', on ? 'true' : 'false');
+  _clearReleaseCaches();
+  showSyncToast(on ? '💾 Тільки цифра' : '🎬 Всі релізи');
+  if (state.tab === 'home') refresh();
+}
+function onStreamingUAToggle(on) {
+  settings.streamingOnlyUA = !!on;
+  localStorage.setItem('mycinema.streamingOnlyUA', on ? 'true' : 'false');
+  _clearReleaseCaches();
+  showSyncToast(on ? '📺 Тільки UA стрімінг' : '📺 Будь-який стрімінг');
+  if (state.tab === 'home') refresh();
+}
+
+/* FIX-STATUS-TOGGLE */
+function onStatusBadgeToggle(on) {
+  settings.showStatusBadges = !!on;
+  localStorage.setItem('mycinema.showStatusBadges', on ? 'true' : 'false');
+  if (typeof touchAppearance === 'function') touchAppearance();
+  if (state.tab === 'home') refresh();
 }
 
 function closeSettings() { 
@@ -234,7 +272,7 @@ function injectSnowToggle() {
   });
 
   const span = document.createElement('span');
-  span.textContent = '❄️ Сніг на фоні';
+  span.textContent = 'Сніг на фоні';
 
   label.appendChild(input);
   label.appendChild(span);
@@ -266,11 +304,11 @@ function injectDismissedReset() {
       if (typeof clearDismissed === 'function') clearDismissed();
       state.home.sig = null;
       try { localStorage.removeItem(RECS_CACHE); } catch {}
-      btn.textContent = '🙈 Повернути сховані рекомендації (0)';
+      btn.textContent = 'Повернути сховані рекомендації (0)';
       showSyncToast('✅ Сховані рекомендації повернуто');
       if (state.tab === 'home') refresh();
     });
     target.appendChild(btn);
   }
-  btn.textContent = `🙈 Повернути сховані рекомендації (${getCount()})`;
+  btn.textContent = `Повернути сховані рекомендації (${getCount()})`;
 }

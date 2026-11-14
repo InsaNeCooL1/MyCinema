@@ -877,10 +877,10 @@ html, body {
 
 .status-btn-text:not(.active),
 .status-btn-watched:not(.active) {
-  filter: grayscale(100%) opacity(.4);
+  filter: grayscale(100%) opacity(.7); /* FIX-INACTIVE-CONTRAST — 0.4 → 0.7 */
   background: transparent;
   border: 1px solid var(--bg-3);
-  color: var(--text-muted);
+  color: var(--text-secondary); /* --text-muted → --text-secondary */
 }
 
 .status-btn-text.active,
@@ -2501,3 +2501,130 @@ input#q::-webkit-search-cancel-button {
 
 
 /* FIX-MOOD-PILL-RADIUS — unified 8px (var --r-sm) for mood pills and container */
+
+/* FIX-RELEASE-BADGE-CSS — removed (replaced by .rec-badge) */
+
+
+/* FIX-RELEASE-REC-BADGE-CSS — badge on poster (home) */
+.rec-badge {
+  position: absolute;
+  top: 8px; /* FIX-BADGE-BIGGER */
+  left: 8px;
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: .38px;
+  background: rgba(8, 7, 10, .85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid;
+  z-index: 2;
+  pointer-events: none;
+  line-height: 1.2;
+}
+.rec-badge.ok { color: var(--mint); border-color: rgba(157, 229, 195, .5); }
+.rec-badge.wait { color: var(--violet); border-color: rgba(197, 163, 255, .5); }
+.rec-badge.cinema { color: var(--accent); border-color: rgba(var(--accent-rgb), .5); }
+.rec-badge.stream { color: var(--coral); border-color: rgba(255, 123, 92, .5); }
+
+
+/* FIX-SETTINGS-REORG — шрифти, підзаголовки, account-menu, lang-btn */
+.settings-box {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.settings-box h2 {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-style: normal;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.settings-section-title {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  letter-spacing: .8px;
+}
+.settings-subsection-label {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  margin-bottom: 2px;
+  font-weight: 500;
+  letter-spacing: .1px;
+}
+.settings-toggle {
+  font-size: 14.5px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.settings-btn {
+  font-size: 14px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.settings-close {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.account-menu {
+  position: fixed;
+  min-width: 220px;
+  background: var(--bg-1);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: var(--r-md);
+  box-shadow: 0 16px 40px rgba(0,0,0,.7);
+  padding: 6px;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: fadeUp .15s ease-out;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.account-menu-item {
+  padding: 10px 14px;
+  text-align: left;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  color: var(--text);
+  transition: .15s;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  width: 100%;
+}
+.account-menu-item:hover { background: var(--bg-3); }
+.account-menu-item.danger { color: var(--danger); }
+.account-menu-item.danger:hover { background: rgba(255, 92, 92, .12); }
+
+#sidebar-top-btn {
+  border: 1px solid rgba(255, 255, 255, .12);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, .04);
+}
+#sidebar-top-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), .12);
+}
+
+
+/* FIX-MENU-SVG-V2 */
+.account-menu {
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+}
+.account-menu-item {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+.icon-compact-btn svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  flex-shrink: 0 !important;
+  stroke: currentColor !important;
+}
