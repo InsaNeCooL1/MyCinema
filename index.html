@@ -18,35 +18,35 @@
     <div class="sidebar-email" id="sidebar-email">Гість</div>
   </div>
   <div class="sidebar-nav" id="sidebar-nav">
-    <div class="nav-item nav-top-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> <span data-i18n="nav.home">Головна</span></div>
+    <div class="nav-item nav-top-item active" data-tab="home" onclick="setTab('home')"><span class="nav-icon">🏠</span> <span>Головна</span></div>
 
     <div class="nav-group nav-top-item" data-group="lists">
       <button type="button" class="nav-group-btn" onclick="toggleNavGroup('lists', event)">
-        <span class="nav-icon">📚</span> <span data-i18n="nav.lists">Списки</span> <span class="nav-caret">▾</span>
+        <span class="nav-icon">📚</span> <span>Списки</span> <span class="nav-caret">▾</span>
       </button>
       <div class="nav-dropdown">
-        <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> <span data-i18n="nav.watching">Дивлюсь</span></div>
-        <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> <span data-i18n="nav.watched">Переглянуто</span></div>
-        <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> <span data-i18n="nav.planned">Планую</span></div>
-        <div class="nav-item" data-tab="dropped" onclick="setTab('dropped')"><span class="nav-icon">🕸️</span> <span data-i18n="nav.dropped">Закинуто</span></div>
-        <div class="nav-item" data-tab="favorites" onclick="setTab('favorites')"><span class="nav-icon">❤️</span> <span data-i18n="nav.favorites">Улюблене</span></div>
+        <div class="nav-item" data-tab="watching" onclick="setTab('watching')"><span class="nav-icon">▶️</span> <span>Дивлюсь</span></div>
+        <div class="nav-item" data-tab="watched" onclick="setTab('watched')"><span class="nav-icon">✅</span> <span>Переглянуто</span></div>
+        <div class="nav-item" data-tab="planned" onclick="setTab('planned')"><span class="nav-icon">📅</span> <span>Планую</span></div>
+        <div class="nav-item" data-tab="dropped" onclick="setTab('dropped')"><span class="nav-icon">🕸️</span> <span>Закинуто</span></div>
+        <div class="nav-item" data-tab="favorites" onclick="setTab('favorites')"><span class="nav-icon">❤️</span> <span>Улюблене</span></div>
       </div>
     </div>
 
-    <div class="nav-item nav-top-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> <span data-i18n="nav.notes">Нотатки</span></div>
+    <div class="nav-item nav-top-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> <span>Нотатки</span></div>
 
     <div class="nav-group nav-top-item" data-group="overview">
       <button type="button" class="nav-group-btn" onclick="toggleNavGroup('overview', event)">
-        <span class="nav-icon">📊</span> <span data-i18n="nav.overview">Огляд</span> <span class="nav-caret">▾</span>
+        <span class="nav-icon">📊</span> <span>Огляд</span> <span class="nav-caret">▾</span>
       </button>
       <div class="nav-dropdown">
-        <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> <span data-i18n="nav.top">Мій топ</span></div>
-        <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> <span data-i18n="nav.calendar">Календар</span></div>
-        <div class="nav-item" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> <span data-i18n="nav.stats">Обсерваторія</span></div>
+        <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> <span>Мій топ</span></div>
+        <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> <span>Календар</span></div>
+        <div class="nav-item" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> <span>Обсерваторія</span></div>
       </div>
     </div>
 
-    <div class="nav-item nav-top-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> <span data-i18n="nav.game">Цар гори</span></div>
+    <div class="nav-item nav-top-item" data-tab="game" onclick="setTab('game')"><span class="nav-icon">👑</span> <span>Цар гори</span></div>
 
     <div class="nav-group nav-more-group" data-group="more" style="display:none;">
       <button type="button" class="nav-group-btn" onclick="toggleNavGroup('more', event)">
@@ -203,7 +203,6 @@
 
 
 <!-- ============ SUPABASE MODULE ============ -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -234,13 +233,15 @@ window.registerUser = async () => {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
   const username = document.getElementById('auth-username').value;
-  const err = document.getElementById('auth-error'); err.textContent = '';
+  const err = document.getElementById('auth-error'); err.textContent = ''; err.style.color = 'var(--danger)';
+  const btnReg = document.getElementById('btn-register');
   
   if (!email || !password || !username) { err.textContent = "Заповніть всі поля"; return; }
   if (password.length < 6) { err.textContent = "Пароль має бути мінімум 6 символів"; return; }
   
   try { 
-    document.getElementById('btn-register').textContent = 'Створення...'; 
+    btnReg.disabled = true;
+    btnReg.textContent = 'Створення...'; 
     const { error } = await supabase.auth.signUp({ 
       email, 
       password,
@@ -252,7 +253,9 @@ window.registerUser = async () => {
     alert('Акаунт створено! Якщо ви не увійшли автоматично, перевірте пошту для підтвердження.');
   } catch (e) { 
     err.textContent = "Помилка: " + e.message; 
-    document.getElementById('btn-register').textContent = 'Створити новий акаунт'; 
+  } finally {
+    btnReg.disabled = false;
+    btnReg.textContent = 'Зареєструватися';
   }
 };
 
@@ -278,7 +281,9 @@ window.switchAuthMode = (mode) => {
   const btnForgot = document.getElementById('btn-forgot');
   const inputUsername = document.getElementById('auth-username');
   const inputPassword = document.getElementById('auth-password');
-  const err = document.getElementById('auth-error'); err.textContent = '';
+  const err = document.getElementById('auth-error'); err.textContent = ''; err.style.color = 'var(--danger)';
+  btnLogin.disabled = false;
+  btnRegister.disabled = false;
   
   if (mode === 'login') {
     title.textContent = 'Вхід до MyCinema';
@@ -309,13 +314,15 @@ window.switchAuthMode = (mode) => {
 
 window.resetPassword = async () => {
   const email = document.getElementById('auth-email').value;
-  const err = document.getElementById('auth-error'); err.textContent = '';
+  const err = document.getElementById('auth-error'); err.textContent = ''; err.style.color = 'var(--danger)';
+  const btn = document.getElementById('btn-login');
   if (!email) { err.textContent = "Введіть email"; return; }
   
   try {
-    document.getElementById('btn-login').textContent = 'Надсилаємо...';
+    btn.disabled = true;
+    btn.textContent = 'Надсилаємо...';
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/#update-password'
+      redirectTo: window.location.origin + window.location.pathname + '#update-password'
     });
     if (error) throw error;
     err.textContent = "Перевірте пошту!";
@@ -323,7 +330,9 @@ window.resetPassword = async () => {
   } catch (e) {
     err.textContent = "Помилка: " + e.message;
     err.style.color = "var(--danger)";
-    document.getElementById('btn-login').textContent = 'Надіслати посилання';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Надіслати посилання';
   }
 };
 

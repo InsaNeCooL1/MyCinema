@@ -30,9 +30,10 @@ function renderDetailsTab(ctx) {
 }
 
 function renderNotesTab(ctx) {
+  /* FIX-NOTES-LEGACY-DEL */
   const r = ctx.item;
   const s = lib[r.key] || {};
-  const hist = s.notesHistory || [];
+  const hist = [...(s.notesHistory || [])];
   
   /* Міграція старого тексту, якщо він є, а масиву ще нема */
   if (s.notes && s.notes.trim() && !hist.some(n => n.text === s.notes)) {
@@ -65,8 +66,8 @@ function renderNotesTab(ctx) {
     delBtn.title = 'Видалити запис';
     delBtn.onclick = () => {
       if (confirm('Видалити цю нотатку?')) {
-        const newHist = hist.filter(x => x.ts !== n.ts);
-        update(r, { notesHistory: newHist });
+        const newHist = hist.filter(x => x.ts !== n.ts || x.text !== n.text);
+        update(r, { notesHistory: newHist, notes: null });
       }
     };
     top.append(delBtn);
@@ -314,6 +315,34 @@ function renderSeasonsTab(ctx) {
     } else {
       posterWrap.append(el('div', 'episode-poster-empty', String(epNum)));
     }
+    posterWrap.title = isWatched ? 'Прибрати відмітку перегляду' : 'Позначити серію переглянутою';
+    posterWrap.addEventListener('click', (e) => {
+      e.stopPropagation();
+      let wEps = [...(s.watchedEpisodes || [])];
+      let newStatus = s.status;
+      if (isWatched) {
+        if (statusIsWatched) {
+          wEps = [];
+          (d.seasons || []).forEach(ss => {
+            if (ss.season_number !== 0) {
+              const cnt = (ss.episodes && ss.episodes.length) ? ss.episodes.length : (ss.episode_count || 0);
+              for (let i = 1; i <= cnt; i++) {
+                const k = ss.season_number + '-' + i;
+                if (k !== epKey) wEps.push(k);
+              }
+            }
+          });
+          newStatus = 'watching';
+        } else {
+          wEps = wEps.filter(k => k !== epKey);
+          if (wEps.length === 0 && newStatus === 'watching') newStatus = 'planned';
+        }
+      } else {
+        if (!wEps.includes(epKey)) wEps.push(epKey);
+        if (newStatus !== 'watched') newStatus = 'watching';
+      }
+      update(r, { watchedEpisodes: wEps, status: newStatus });
+    });
     epCard.append(posterWrap);
       
     const body = el('div', 'episode-body');
@@ -363,17 +392,19 @@ function renderStudiosTab(ctx) {
 
 function buildCardTabs(ctx) {
   const r = ctx.item;
+  const isDesktop = window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
   let tabsList;
   if (r.type === 'tv') {
     tabsList = [{ id: 'seasons', label: 'Сезони' }, { id: 'cast', label: 'Актори' }];
   } else {
     tabsList = [{ id: 'cast', label: 'Актори' }];
   }
+  if (!isDesktop) tabsList.push({ id: 'details', label: 'Деталі' });
   tabsList.push({ id: 'studios', label: 'Студії' });
   if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
   tabsList.push({ id: 'notes', label: 'Нотатки' });
 
-  if (!ctx.activeTab) ctx.activeTab = tabsList[0].id;
+  if (!ctx.activeTab || !tabsList.some(t => t.id === ctx.activeTab)) ctx.activeTab = tabsList[0].id;
 
   const tabs = el('div', 'card-tabs');
   for (const t of tabsList) {
@@ -391,6 +422,7 @@ function buildCardTabContent(ctx) {
   const tabContent = el('div', 'card-tab-content');
   if (ctx.activeTab === 'cast') tabContent.append(...renderCastTab(ctx));
   else if (ctx.activeTab === 'seasons') tabContent.append(...renderSeasonsTab(ctx));
+  else if (ctx.activeTab === 'details') tabContent.append(...renderDetailsTab(ctx));
   else if (ctx.activeTab === 'studios') tabContent.append(...renderStudiosTab(ctx));
   else if (ctx.activeTab === 'similar') tabContent.append(...renderSimilarTab(ctx));
   else if (ctx.activeTab === 'notes') tabContent.append(...renderNotesTab(ctx));

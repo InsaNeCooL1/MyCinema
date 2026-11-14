@@ -277,7 +277,7 @@
           newEps = [];
           d.seasons.forEach(season => {
             if (season.season_number !== 0) {
-              const cnt = season.episodes ? season.episodes.length : season.episode_count;
+              const cnt = (season.episodes && season.episodes.length) ? season.episodes.length : (season.episode_count || 0);
               for (let i = 1; i <= cnt; i++) newEps.push(season.season_number + '-' + i);
             }
           });
@@ -358,12 +358,16 @@
       wrap.append(srcBar);
     }
 
-    const text = el('div', 'overview-text', activeText);
+    const text = el('div', 'overview-text' + (ctx.overviewExpanded ? ' expanded' : ''), activeText);
     wrap.append(text);
 
     if (activeText.length > 180) {
       const readBtn = el('button', 'btn-read', ctx.overviewExpanded ? 'Згорнути' : 'Читати далі');
-      readBtn.onclick = () => { ctx.overviewExpanded = !ctx.overviewExpanded; renderCard(); };
+      readBtn.onclick = () => {
+        ctx.overviewExpanded = !ctx.overviewExpanded;
+        text.classList.toggle('expanded', ctx.overviewExpanded);
+        readBtn.textContent = ctx.overviewExpanded ? 'Згорнути' : 'Читати далі';
+      };
       wrap.append(readBtn);
     }
     return wrap;

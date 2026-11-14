@@ -76,7 +76,7 @@ const THEMES = {
   navy:  { name: 'Navy',  bg0:'#08070a', bg1:'#0f0e13', bg2:'#16141b', bg3:'#201d28', bg4:'#2a2635', sidebar:'#06050a', query:'#040308', text:'#f2eee9', textSecondary:'#cfc8c0', textMuted:'#8d877f', textDim:'#575349' },
   black: { name: 'Black', bg0:'#000000', bg1:'#0a0a0a', bg2:'#141414', bg3:'#1e1e1e', bg4:'#2a2a2a', sidebar:'#050505', query:'#000000', text:'#f0f0f0', textSecondary:'#c0c0c0', textMuted:'#888', textDim:'#444' },
   plum:  { name: 'Plum',  bg0:'#0c0512', bg1:'#150a20', bg2:'#1f0e2f', bg3:'#301848', bg4:'#422458', sidebar:'#0a0410', query:'#070310', text:'#f0e8f5', textSecondary:'#d8cfe6', textMuted:'#9a8fb5', textDim:'#5a4f7a' },
-  forest:{ name: 'Forest',light: false, bg0:'#030b06', bg1:'#0a1510', bg2:'#0f2018', bg3:'#183020', bg4:'#22432f', sidebar:'#050d08', query:'#020705', text:'#e8f2ec', textSecondary:'#cfe6d8', textMuted:'#8fb5a0', textDim:'#4f7a5a' },
+  forest:{ name: 'Forest', bg0:'#030b06', bg1:'#0a1510', bg2:'#0f2018', bg3:'#183020', bg4:'#22432f', sidebar:'#050d08', query:'#020705', text:'#e8f2ec', textSecondary:'#cfe6d8', textMuted:'#8fb5a0', textDim:'#4f7a5a' },
   mocha: { name: 'Mocha', bg0:'#0b0805', bg1:'#150f0a', bg2:'#1f1710', bg3:'#2f2618', bg4:'#403522', sidebar:'#0a0705', query:'#060403', text:'#f2ebe0', textSecondary:'#e6d8c7', textMuted:'#b5a08f', textDim:'#7a5f4a' },
   /* FIX-THEMES-2 — Ocean, Wine */
   ocean: { name: 'Ocean', bg0:'#050a14', bg1:'#0a1320', bg2:'#0f1c2e', bg3:'#182a42', bg4:'#223a56', sidebar:'#040810', query:'#03060c', text:'#e6eef8', textSecondary:'#c5d5e8', textMuted:'#7a8fa8', textDim:'#4a5a70' },
@@ -94,22 +94,4 @@ const ACCENTS = {
   rose:   { name: 'Rose',   accent:'#ff6b9d', hover:'#ff85ad', fg:'#2a0520' }
 };
 
-/* FIX-MOOD-WEIGHT-30 */
 
-/* FIX-I18N */
-const I18N = {
-  ua: {
-    'nav.home': 'Головна', 'nav.lists': 'Списки', 'nav.notes': 'Нотатки',
-    'nav.overview': 'Огляд', 'nav.game': 'Цар гори', 'nav.more': 'Ще',
-    'nav.watching': 'Дивлюсь', 'nav.watched': 'Переглянуто', 'nav.planned': 'Планую',
-    'nav.dropped': 'Закинуто', 'nav.favorites': 'Улюблене',
-    'nav.top': 'Мій топ', 'nav.calendar': 'Календар', 'nav.stats': 'Обсерваторія'
-  },
-  en: {
-    'nav.home': 'Home', 'nav.lists': 'Lists', 'nav.notes': 'Notes',
-    'nav.overview': 'Overview', 'nav.game': 'King of the Hill', 'nav.more': 'More',
-    'nav.watching': 'Watching', 'nav.watched': 'Watched', 'nav.planned': 'Planned',
-    'nav.dropped': 'Dropped', 'nav.favorites': 'Favorites',
-    'nav.top': 'My Top', 'nav.calendar': 'Calendar', 'nav.stats': 'Observatory'
-  }
-};

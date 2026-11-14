@@ -15,17 +15,7 @@ function pushCardState() {
   else st.ctx = { type: 'media', id: ctx.item.id, media_type: ctx.item.type, key: ctx.item.key };
   history.pushState(st, '', hashFor(ctx));
 }
-let _pendingNoteFlush = null;
-function flushPendingNotes() {
-  if (typeof _pendingNoteFlush === 'function') {
-    const fn = _pendingNoteFlush;
-    _pendingNoteFlush = null;
-    fn();
-  }
-}
-
 function saveCardScroll() {
-  flushPendingNotes();
   const s = card.querySelector('.card-scroll');
   const top = cardStack[cardStack.length - 1];
   if (s && top) top.scroll = s.scrollTop;
@@ -133,15 +123,18 @@ async function loadMediaCardData(ctx) {
     if (meta.genres) { ctx.genres = meta.genres; r.genres = meta.genres; }
     if (meta.cast) ctx.cast = meta.cast;
     /* FIX-RELEASE-CARD-SAVE */
+    let releaseDirty = false;
     if (r.type === 'movie') {
       const _dd = extractDigitalDate(d);
       r.digitalReleaseDate = _dd;
-      if (lib[r.key]) lib[r.key].digitalReleaseDate = _dd;
+      if (lib[r.key] && lib[r.key].digitalReleaseDate !== _dd) { lib[r.key].digitalReleaseDate = _dd; releaseDirty = true; }
     }
     const _provUA = extractProvidersUA(d);
     r.streamingUA = _provUA;
-    if (lib[r.key]) lib[r.key].streamingUA = _provUA;
-    if (window.currentUser) _dirtyItems.add(r.key);
+    if (lib[r.key] && JSON.stringify(lib[r.key].streamingUA || []) !== JSON.stringify(_provUA)) {
+      lib[r.key].streamingUA = _provUA;
+      releaseDirty = true;
+    }
     if ('franchiseKey' in meta) {
       ctx.franchiseKey = meta.franchiseKey;
       r.franchiseKey = meta.franchiseKey;
@@ -151,7 +144,7 @@ async function loadMediaCardData(ctx) {
       r.collection = meta.collection;
     }
     if (lib[r.key]) {
-      let dirty = false;
+      let dirty = releaseDirty;
       if (meta.genres && !lib[r.key].genres?.length) { lib[r.key].genres = meta.genres; dirty = true; }
       if (meta.cast && !lib[r.key].cast?.length) { lib[r.key].cast = meta.cast; dirty = true; }
       if (meta.runtime && !lib[r.key].runtime) { lib[r.key].runtime = meta.runtime; dirty = true; }
@@ -196,7 +189,7 @@ async function loadMediaCardData(ctx) {
 
     // [ASYNC-WIKI] Завантажуємо у фоні, оновлюємо картку коли прийде
     if (d.external_ids?.wikidata_id && typeof fetchWikiMediaDescription === 'function') {
-      fetchWikiMediaDescription(d.external_ids.wikidata_id).then(wiki => {
+      wikiPromise.then(wiki => {
         if (wiki?.text) {
           ctx.wikiOverview = wiki.text;
           ctx.wikiUrl = wiki.url || null;
@@ -208,7 +201,6 @@ async function loadMediaCardData(ctx) {
 }
 
 function closeCard() {
-  flushPendingNotes();
   const iframe = card.querySelector('.card-hero-video');
   if (iframe) iframe.src = 'about:blank';
 
@@ -248,8 +240,7 @@ window.addEventListener('popstate', async (e) => {
   }
   while (cardStack.length > depth) cardStack.pop();
   if (depth === 0) {
-    flushPendingNotes();
-    overlay.classList.remove('open');
+      overlay.classList.remove('open');
     /* FIX-POPSTATE-FLUSH */
     var _didFlush = (typeof _flushPendingSetTab === 'function') ? _flushPendingSetTab() : false;
     if (!_didFlush) refresh();
@@ -262,12 +253,11 @@ function routeFromHash() {
   if (!m) return;
   history.replaceState({}, '', location.pathname + location.search);
   const id = parseInt(m[2]);
-  if (m[1] === 'person') openPerson(id, {});
+  if (m[1] === 'person') openPerson(id);
   else openCard({ key: m[1] + '-' + id, id, type: m[1], title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 });
 }
 
 function renderCard(restore) {
-  flushPendingNotes();
   const ctx = cardStack[cardStack.length - 1];
   if (!ctx) { overlay.classList.remove('open'); refresh(); return; }
 
@@ -278,6 +268,14 @@ function renderCard(restore) {
   const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
   card.classList.toggle('is-person', ctx.type === 'person');
   card.innerHTML = '';
+  if (settings.posterBg && ctx.type === 'media') {
+    const bgPath = ctx.item?.poster || ctx.details?.poster_path;
+    if (bgPath) {
+      const pbg = el('div', 'card-poster-bg');
+      pbg.style.backgroundImage = `url("${TMDB_IMG}w780${bgPath}")`;
+      card.append(pbg);
+    }
+  }
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
   card.append(scroll);

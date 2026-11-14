@@ -189,7 +189,7 @@ if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.is
 }
 /* FIX-DEEPLINK */
 var _initialHash = /^#\/(movie|tv|person)\/\d+$/.test(location.hash) ? location.hash : '';
-history.pushState({ mc: 0 }, '', location.pathname + location.search + _initialHash);
+history.replaceState({ mc: 0 }, '', location.pathname + location.search + _initialHash);
 refresh();
 routeFromHash();
 
@@ -319,7 +319,7 @@ document.getElementById('auth-modal')?.addEventListener('click', (e) => {
 /* FIX-RADIO-ROLE — a11y for rating lights */
 (function initRadioRoles() {
   function apply() {
-    var groups = document.querySelectorAll('.rating-lights');
+    var groups = document.querySelectorAll('.score-lights');
     for (var g = 0; g < groups.length; g++) {
       var rg = groups[g];
       if (rg.getAttribute('role') !== 'radiogroup') rg.setAttribute('role', 'radiogroup');
@@ -342,7 +342,7 @@ document.getElementById('auth-modal')?.addEventListener('click', (e) => {
     var light = e.target.closest && e.target.closest('.light');
     if (!light) return;
     var rg = light.parentElement;
-    if (!rg || !rg.classList.contains('rating-lights')) return;
+    if (!rg || !rg.classList.contains('score-lights')) return;
     setTimeout(function() {
       var all = rg.querySelectorAll('.light');
       for (var i = 0; i < all.length; i++) {

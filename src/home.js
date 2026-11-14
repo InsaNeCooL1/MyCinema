@@ -787,14 +787,14 @@ function writeGeneralCache(g) {
     localStorage.setItem(GEN_CACHE, JSON.stringify({ ts: Date.now(), data: g }));
   } catch {}
 }
-/* FIX-RECS-CACHE-V2 */
+/* FIX-RECS-CACHE-V3 */
 function readRecsCache(sig, critical) {
   try {
     const c = JSON.parse(localStorage.getItem(RECS_CACHE));
     if (!c) return null;
     const age = Date.now() - c.ts;
     if (age >= RECS_TTL) return null;
-    if (critical && c.critical === critical) return c.data;
+    if (critical && c.critical !== critical) return null;
     if (c.sig === sig) return c.data;
   } catch {}
   return null;

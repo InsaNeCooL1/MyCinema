@@ -142,7 +142,7 @@ function showAutocomplete(rawResults, query) {
     info.append(el("div", "ac-title", p.name));
     info.append(el("div", "ac-meta ac-type-person", "Актор/Акторка"));
     row.append(info);
-    row.addEventListener("click", () => { addToHistory(query); hideAutocomplete(); openPerson(p.id, p); });
+    row.addEventListener("click", () => { addToHistory(query); hideAutocomplete(); openPerson(p.id); });
     autocomplete.append(row);
   }
   

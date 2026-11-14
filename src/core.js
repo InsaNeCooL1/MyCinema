@@ -574,6 +574,8 @@ function applyCloudAppearance(app) {
     if (typeof renderSettingsSwatches === 'function') renderSettingsSwatches();
     const pbgEl = document.getElementById('poster-bg-toggle');
     if (pbgEl) pbgEl.checked = settings.posterBg;
+    const sbEl = document.getElementById('status-badge-toggle');
+    if (sbEl) sbEl.checked = settings.showStatusBadges !== false;
     const snowEl = document.getElementById('snow-toggle');
     if (snowEl) snowEl.checked = snowOn;
   }

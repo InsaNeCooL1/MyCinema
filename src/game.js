@@ -43,7 +43,8 @@ async function renderGame() {
     bt.addEventListener('click', () => startGame('tv', state.gameSource));
     c.append(bm, bt);
 
-    const hist = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]');
+    let hist = [];
+    try { const raw = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]'); if (Array.isArray(raw)) hist = raw; } catch {}
     if (hist.length > 0) {
       const hd = el('div', 'game-history');
       hd.append(el('h3', '', '🏆 Список переможців'));
@@ -168,7 +169,7 @@ async function startGame(type, source) {
     const challenger = items.shift();
     state.game = {
       active: true, type, source: 'library',
-      round: 0, totalRounds: Math.min(20, Math.max(1, items.length - 1)), /* FIX-TOTAL-ROUNDS */
+      round: 0, totalRounds: Math.min(20, Math.max(1, items.length + 1)), /* FIX-TOTAL-ROUNDS-V2 */
       champion, challenger, history: [], finished: false,
       pool: items, seen: new Set([champion.key, challenger.key]),
       usedPages: new Set(), loadingNext: false, loadError: false
@@ -260,7 +261,9 @@ function makeGameChoice(choice) {
 function finishGame() {
   state.game.finished = true;
   state.game.active = false;
-  const hist = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]');
+  /* SAFE-KOTH-HIST-WRITE */
+  let hist = [];
+  try { const raw = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]'); if (Array.isArray(raw)) hist = raw; } catch {}
   hist.push({ date: new Date().toISOString(), wins: state.game.history.filter(h => h.result !== 'skip').length, total: state.game.totalRounds, type: state.game.type, champion: state.game.champion });
   localStorage.setItem('kingOfTheHillHistory', JSON.stringify(hist));
   renderGame();

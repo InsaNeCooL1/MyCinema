@@ -304,7 +304,7 @@ function removeFromLibrary(key) {
   const saved = lib[key];
   const hasR = saved.ratings && Object.values(saved.ratings).some(v => v > 0);
   const hasSR = saved.seasonRatings && Object.keys(saved.seasonRatings).length > 0;
-  const hasNotes = saved.notes && saved.notes.trim();
+  const hasNotes = (saved.notes && saved.notes.trim()) || (saved.notesHistory && saved.notesHistory.length > 0);
   const hasElo = saved.eloGames && saved.eloGames > 0;
   const hasFav = saved.favorite === true;
   const hasEps = saved.watchedEpisodes && saved.watchedEpisodes.length > 0;
