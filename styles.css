@@ -3886,3 +3886,14 @@ span.temp-red {
   color: #ff2255 !important;
   box-shadow: 0 0 12px rgba(255, 34, 85, 0.6), inset 0 0 4px rgba(255, 34, 85, 0.2) !important;
 }
+
+/* FIX-UAKINO-GRADIENT-CSS */
+.mobile-actions .btn-uakino .uakino-grad-text {
+  background: linear-gradient(135deg, var(--text) 20%, var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: Verdana, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}

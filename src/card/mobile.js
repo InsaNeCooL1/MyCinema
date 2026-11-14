@@ -286,7 +286,8 @@
     wrap.append(watchBtn);
 
     const cleanTitle = String(d.title || d.name || r.title || '').replace(/[^a-zA-Zа-яА-ЯіІїЇєЄґҐ0-9\s]/g, ' ').trim();
-    const uakinoBtn = el('button', 'btn-uakino', 'UA KINO');
+    const uakinoBtn = el('button', 'btn-uakino');
+    uakinoBtn.innerHTML = '<span class="uakino-grad-text">UA KINO</span>'; /* FIX-UAKINO-GRADIENT-JS */
     uakinoBtn.onclick = () => window.open('https://uakino.best/index.php?do=search&subaction=search&story=' + encodeURIComponent(cleanTitle), '_blank');
     wrap.append(uakinoBtn);
 
