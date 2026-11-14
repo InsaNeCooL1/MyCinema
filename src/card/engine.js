@@ -2,6 +2,10 @@
 
 'use strict';
 
+function makeMediaCtx(item) {
+  return { type: 'media', item, activeTab: item.type === 'tv' ? 'seasons' : 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' };
+}
+
 function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`; }
 function pushCardState() {
   const ctx = cardStack[cardStack.length - 1];
@@ -30,7 +34,7 @@ function saveCardScroll() {
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
   overlay.classList.add("open");
-  const ctx = { type: 'media', item: r, activeTab: r.type === 'tv' ? 'seasons' : 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' }; /* FIX-DEFAULT-TAB */ /* FIX-OVERSRC-1 */
+  const ctx = makeMediaCtx(r);
   cardStack = [ctx];
   pushCardState();
   renderLoading();
@@ -43,7 +47,7 @@ async function openMediaFromStack(item) {
   /* FIX-OMFS */
   overlay.classList.add("open");
   saveCardScroll();
-  const ctx = { type: 'media', item, activeTab: item.type === 'tv' ? 'seasons' : 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' }; /* FIX-DEFAULT-TAB */
+  const ctx = makeMediaCtx(item);
   cardStack.push(ctx);
   pushCardState();
   renderLoading();
@@ -157,7 +161,7 @@ async function loadMediaCardData(ctx) {
       if ('franchiseKey' in meta && lib[r.key].franchiseKey === undefined) { lib[r.key].franchiseKey = meta.franchiseKey; dirty = true; }
       if (dirty) { _dirtyItems.add(r.key); save(); } /* SYNC-FIX-META-MOVIE */
     }
-        if (r.type === "tv" && d.seasons) {
+        if (r.type === 'tv' && d.seasons) {
       // [LAZY-SEASONS] Не вантажимо всі серії одразу
       ctx.details.seasons = d.seasons.map(s => ({ ...s, episodes: [], episodesLoaded: false }));
       const totalSeasons = d.seasons.filter(s => s.season_number !== 0).length;
@@ -215,7 +219,7 @@ function closeCard() {
 async function loadMediaForForward(s) {
   overlay.classList.add("open");
   const item = { key: s.key, id: s.id, type: s.media_type, title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 };
-  const ctx = { type: 'media', item, activeTab: item.type === 'tv' ? 'seasons' : 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' }; /* FIX-DEFAULT-TAB */ /* FIX-LMFF */
+  const ctx = makeMediaCtx(item);
   cardStack.push(ctx);
   renderLoading();
   await loadMediaCardData(ctx);
@@ -328,7 +332,7 @@ function updateCore(r, patch) {
   const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
   const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
   const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
-  const hasNotes = lib[r.key].notes && lib[r.key].notes.trim();
+  const hasNotes = (lib[r.key].notes && lib[r.key].notes.trim()) || (lib[r.key].notesHistory && lib[r.key].notesHistory.length > 0);
   const hasElo = lib[r.key].eloGames && lib[r.key].eloGames > 0;
   const hasFav = lib[r.key].favorite === true;
   const hasTasteFlags = lib[r.key].excludeFromProfile !== undefined || lib[r.key].antiSeed === true;

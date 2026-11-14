@@ -130,7 +130,7 @@ function renderLibrary() {
   });
   sortSel.addEventListener('change', () => {
     state.librarySort = sortSel.value;
-    try { localStorage.setItem('mycinema.librarySort', sortSel.value); } catch (e) {} /* FIX-SORT-SAVE */
+    try { localStorage.setItem('mycinema.librarySort', sortSel.value); } catch (e) {}
     renderLibraryItems();
   });
   sortRow.append(sortSel);
@@ -143,30 +143,66 @@ function renderLibrary() {
 }
 
 function renderNotesList() {
-  const items = Object.values(lib).filter(x => x.notes && x.notes.trim()).sort((a, b) => (b.updated || 0) - (a.updated || 0));
   box.style.padding = '0 16px 16px';
   box.replaceChildren();
-  if (!items.length) {
-    box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Ще немає нотаток. Відкрий тайтл і перейди на вкладку «📝 Нотатки»</div>';
+
+  const allNotes = [];
+  
+  // Збираємо всі нотатки з усіх тайтлів
+  Object.values(lib).forEach(item => {
+    if (item.notesHistory && Array.isArray(item.notesHistory) && item.notesHistory.length > 0) {
+      item.notesHistory.forEach(n => {
+        allNotes.push({ item, text: n.text, ts: n.ts });
+      });
+    }
+    // Підтримка старого формату (якщо є просто текст)
+    if (item.notes && item.notes.trim() && !item.notesHistory) {
+      allNotes.push({ item, text: item.notes, ts: item.updated || Date.now() });
+    }
+  });
+
+  // Сортуємо від найновіших до найстаріших
+  allNotes.sort((a, b) => b.ts - a.ts);
+
+  if (!allNotes.length) {
+    box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Тут поки немає нотаток. Відкрий тайтл і натисни «Додати нотатку».</div>';
     return;
   }
-  items.forEach(item => box.append(createNoteCard(item)));
+
+  // Рендеримо список
+  allNotes.forEach(n => {
+    const c = el('div', 'note-feed-card');
+    
+    // Ліва частина
+    const content = el('div', 'note-feed-content');
+    const header = el('div', 'note-feed-header');
+    
+    const d = new Date(n.ts);
+    const dateStr = d.toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    
+    header.append(el('div', 'note-feed-date', dateStr));
+    header.append(el('div', 'note-feed-title', n.item.title));
+    
+    content.append(header);
+    content.append(el('div', 'note-feed-text', n.text));
+    c.append(content);
+    
+    // Права частина - Постер
+    const p = el('img', 'note-feed-poster');
+    if (n.item.poster) {
+      p.src = TMDB_IMG + 'w185' + n.item.poster;
+      p.loading = 'lazy';
+    } else {
+      p.classList.add('poster-empty');
+    }
+    c.append(p);
+    
+    c.addEventListener('click', () => openCard(n.item));
+    box.append(c);
+  });
 }
 
 // ========== LIST ITEMS HELPERS ==========
-function createNoteCard(item) {
-  const c = el('div', 'note-card');
-  c.append(posterEl(item, 'note-poster'));
-  const body = el('div', 'note-body');
-  body.append(el('div', 'note-title', item.title));
-  const meta = (item.type === 'tv' ? 'Серіал' : 'Фільм') + (item.year ? ' · ' + item.year : '');
-  body.append(el('div', 'note-meta', meta));
-  body.append(el('div', 'note-text', item.notes));
-  c.append(body);
-  c.addEventListener('click', () => openCard(item));
-  return c;
-}
-
 function createListItem(r, showNumber, number) {
   const item = el("div", "item" + (showNumber ? " has-number" : ""));
   if (showNumber) item.append(el("div", "top-number", String(number)));
@@ -284,9 +320,7 @@ function removeFromLibrary(key) {
   }
   refresh();
   const ctx = cardStack[cardStack.length - 1];
-  if (ctx && ctx.type === 'media' && ctx.item.key === key) {
-    /* FIX-REMOVE-CLOSE */ if (!lib[key] && typeof closeCard === 'function') { history.back(); } else { renderCard(); }
-  }
+  if (ctx && ctx.type === 'media' && ctx.item.key === key) renderCard();
   showSyncToast('🗑️ Прибрано');
 }
 
@@ -539,7 +573,7 @@ async function doFetchFilter(append) {
       resultsList.append(el('div', 'avail-empty', hasMore ? 'На цій сторінці немає збігів під фільтри. Натисни «Показати ще».' : 'Нічого не знайдено'));
     }
   } catch (e) {
-    if (reqId === filterReqId) resultsList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger);">Помилка: ${escapeHtml(e.message)}</div>`; /* FIX-FILTER-ERR-ESC */
+    if (reqId === filterReqId) resultsList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger);">Помилка: ${escapeHtml(e.message)}</div>`;
   } finally {
     if (reqId === filterReqId) filterLoading = false;
   }

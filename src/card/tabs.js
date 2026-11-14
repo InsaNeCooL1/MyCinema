@@ -1,10 +1,3 @@
-/* FIX-CARD-TABS
-   ─────────────────────────────────────────────────────────────
-   Таби картки (Актори, Деталі, Схоже, Сезони, Нотатки) +
-   рейтингові блоки + обробники оновлення оцінок.
-   Спільні для mobile та desktop.
-   ───────────────────────────────────────────────────────────── */
-
 function renderDetailsTab(ctx) {
   const d = ctx.details;
   const wrap = el('div', 'details-grid');
@@ -36,59 +29,51 @@ function renderDetailsTab(ctx) {
 function renderNotesTab(ctx) {
   const r = ctx.item;
   const s = lib[r.key] || {};
-  const wrap = el('div');
-  wrap.append(el('div', 'notes-hint', 'Автоматично зберігаються'));
-  const textarea = document.createElement('textarea');
-  textarea.className = 'notes-textarea';
-  textarea.placeholder = 'Свої думки, враження, цитати...';
-  textarea.value = s.notes || '';
-  let notesTimer = null;
+  const hist = s.notesHistory || [];
+  
+  /* Міграція старого тексту, якщо він є, а масиву ще нема */
+  if (s.notes && s.notes.trim() && !hist.some(n => n.text === s.notes)) {
+    hist.unshift({ text: s.notes, ts: s.updated || Date.now() });
+  }
 
-  const commitNote = () => {
-    clearTimeout(notesTimer);
-    notesTimer = null;
-    if (_pendingNoteFlush === commitNote) _pendingNoteFlush = null;
-    const val = textarea.value;
-    const cur = lib[r.key] || { ...r, status: null, watchedEpisodes: [] };
-    if (val.trim()) {
-      if (cur.notes === val) return;
-      const next = { ...cur, notes: val, updated: Date.now() };
-      if (!next.createdAt) next.createdAt = Date.now();
-      attachCtxMeta(next, ctx);
-      _dirtyItems.add(r.key); /* SYNC-FIX-NOTES-SET */
-      lib[r.key] = next;
-    } else if (lib[r.key]) {
-      if (!lib[r.key].notes) return;
-      _dirtyItems.add(r.key); /* SYNC-FIX-NOTES-DEL */
-      delete lib[r.key].notes;
-      const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
-      const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
-      const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
-      const hasFav = lib[r.key].favorite === true;
-      const hasElo = lib[r.key].eloGames && lib[r.key].eloGames > 0;
-      const hasTasteFlags = lib[r.key].excludeFromProfile !== undefined || lib[r.key].antiSeed === true;
-      if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasFav && !hasElo && !hasTasteFlags) removeLibItem(r.key);
-    } else {
-      return;
-    }
-    save();
-    const st = document.getElementById('notes-status');
-    if (st) st.textContent = val.trim() ? ('Оновлено: ' + new Date().toLocaleString('uk-UA')) : '';
-    const notesBtn = card.querySelector('.status-section-row .status-btn-text[title="Нотатки"]');
-    if (notesBtn) notesBtn.classList.toggle('active', !!val.trim());
+  const wrap = el('div', 'notes-tab-wrap');
+  
+  // Кнопка додавання нової нотатки
+  const addBtn = el('button', 'btn-add-note', '+ Додати нотатку');
+  addBtn.onclick = () => { 
+    if (typeof window.openQuickNoteModal === 'function') window.openQuickNoteModal(ctx); 
   };
+  wrap.append(addBtn);
 
-  textarea.addEventListener('input', () => {
-    clearTimeout(notesTimer);
-    _pendingNoteFlush = commitNote;
-    notesTimer = setTimeout(commitNote, 800);
+  if (!hist.length) {
+    wrap.append(el('div', 'avail-empty', 'Тут поки немає записів. Натисни «Додати нотатку», щоб зафіксувати думку.'));
+    return [wrap];
+  }
+
+  const list = el('div', 'notes-list');
+  hist.forEach(n => {
+    const item = el('div', 'note-item');
+    const date = new Date(n.ts).toLocaleString('uk-UA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    
+    const top = el('div', 'note-top');
+    top.append(el('div', 'note-date', date));
+    
+    const delBtn = el('button', 'note-del-btn', '✕');
+    delBtn.title = 'Видалити запис';
+    delBtn.onclick = () => {
+      if (confirm('Видалити цю нотатку?')) {
+        const newHist = hist.filter(x => x.ts !== n.ts);
+        update(r, { notesHistory: newHist });
+      }
+    };
+    top.append(delBtn);
+    
+    item.append(top);
+    item.append(el('div', 'note-content', n.text));
+    list.append(item);
   });
-  textarea.addEventListener('blur', commitNote);
-
-  wrap.append(textarea);
-  const status = el('div', 'notes-hint'); status.id = 'notes-status';
-  if (s.notes) status.textContent = 'Оновлено: ' + new Date(s.updated || Date.now()).toLocaleString('uk-UA');
-  wrap.append(status);
+  
+  wrap.append(list);
   return [wrap];
 }
 
@@ -129,8 +114,6 @@ function renderSimilarTab(ctx) {
   return [grid];
 }
 
-
-/* FIX-EP-REACTIONS */
 function renderEpisodeReactions(r, selNum, epNum, epKey, ctx) {
   const s = lib[r.key] || {};
   const reactions = s.epReactions || {};
@@ -191,7 +174,6 @@ function renderSeasonsTab(ctx) {
   const sel = seasons.find(x => x.season_number === selNum) || seasons[0];
   const wrap = el('div');
   
-  // [LAZY-SEASONS] Завантажуємо серії, якщо їх ще немає
   if (sel && !sel.episodesLoaded && !ctx.seasonState.loadingSeason) {
     ctx.seasonState.loadingSeason = true;
     tmdbFetch(`/tv/${r.id}/season/${selNum}?language=uk-UA`).then(data => {
@@ -217,7 +199,6 @@ function renderSeasonsTab(ctx) {
     tab.addEventListener('click', () => {
       if (ctx.seasonState.selectedSeason === season.season_number) return;
       ctx.seasonState.selectedSeason = season.season_number;
-      /* FIX-SEASON-SCROLL */
       if (typeof saveCardScroll === 'function') saveCardScroll();
       renderCard(true);
     });
@@ -226,20 +207,20 @@ function renderSeasonsTab(ctx) {
   wrap.append(tabsBar);
 
   const seasonRatings = (s.seasonRatings || {})[selNum] || {};
-  
-  // Блок оцінки сезону (новий UI, як у фільмів)
   const scoreWrap = el('div', 'mobile-score');
   scoreWrap.style.marginBottom = '20px';
   
   const header = el('div', 'score-header');
   header.append(el('div', 'score-title', 'Моя оцінка (Сезон ' + selNum + ')'));
-  
   const clearBtn = el('button', 'btn-clear-ratings', 'Очистити');
   clearBtn.onclick = () => {
     if (Object.keys(seasonRatings).length > 0) {
       const sr = { ...(s.seasonRatings || {}) };
       delete sr[selNum];
-      update(r, { seasonRatings: sr });
+      const hasAnyRatings = Object.keys(sr).some(k => Object.keys(sr[k] || {}).length > 0);
+      let newStatus = s.status;
+      if (!hasAnyRatings && s.status === 'watching') newStatus = null;
+      update(r, { seasonRatings: sr, status: newStatus });
     }
   };
   header.append(clearBtn);
@@ -248,7 +229,6 @@ function renderSeasonsTab(ctx) {
   RATING_CRITERIA.forEach(crit => {
     const row = el('div', 'score-row');
     row.append(el('span', 'score-label', crit.label));
-    
     const bottomRow = el('div', 'score-bottom-row');
     const lights = el('div', 'score-lights');
     const val = seasonRatings[crit.key] || 0;
@@ -258,16 +238,11 @@ function renderSeasonsTab(ctx) {
       light.onclick = () => {
         const newSR = { ...(s.seasonRatings || {}) };
         const curSR = { ...(newSR[selNum] || {}) };
-        if (val === i) delete curSR[crit.key];
-        else curSR[crit.key] = i;
-        
-        if (Object.keys(curSR).length > 0) newSR[selNum] = curSR;
-        else delete newSR[selNum];
-        
+        if (val === i) delete curSR[crit.key]; else curSR[crit.key] = i;
+        if (Object.keys(curSR).length > 0) newSR[selNum] = curSR; else delete newSR[selNum];
         let newStatus = s.status;
         const avg = computeAverage(curSR);
         if (avg > 0 && newStatus !== 'watched') newStatus = 'watching';
-        
         update(r, { seasonRatings: newSR, status: newStatus });
       };
       lights.append(light);
@@ -281,7 +256,6 @@ function renderSeasonsTab(ctx) {
   const avg = computeAverage(seasonRatings);
   const totalRow = el('div', 'score-total');
   totalRow.append(el('span', 'score-total-label', 'Загальна'));
-  
   let avgCls = 'score-total-val';
   if (avg > 0) {
     const v100 = avg * 10;
@@ -290,10 +264,8 @@ function renderSeasonsTab(ctx) {
     else if (v100 >= 55) avgCls += ' temp-orange';
     else avgCls += ' temp-red';
   }
-  
   totalRow.append(el('span', avgCls, avg > 0 ? fmtNum(avg) : '—'));
   scoreWrap.append(totalRow);
-
   wrap.append(scoreWrap);
 
   if (!sel.episodesLoaded) {
@@ -313,25 +285,25 @@ function renderSeasonsTab(ctx) {
     const epKey = selNum + '-' + epNum;
     const isWatched = statusIsWatched || watchedSet.has(epKey);
     const isExpanded = !!ctx.seasonState.expandedEps[epKey];
+    
     const epCard = el('div', 'episode-card' + (isWatched ? ' watched' : ''));
-      const posterWrap = el('div', 'episode-poster-wrap');
-      if (ep.still_path) {
-        const img = el('img'); img.src = TMDB_IMG + 'w300' + ep.still_path; img.loading = 'lazy'; img.alt = '';
-        posterWrap.append(img);
-      } else posterWrap.append(el('div', 'episode-poster-empty', String(epNum)));
+    const posterWrap = el('div', 'episode-poster-wrap');
+    if (ep.still_path) {
+      const img = el('img'); img.src = TMDB_IMG + 'w300' + ep.still_path; img.loading = 'lazy'; img.alt = '';
+      posterWrap.append(img);
+    } else {
+      posterWrap.append(el('div', 'episode-poster-empty', String(epNum)));
+    }
+    epCard.append(posterWrap);
       
-      epCard.append(posterWrap);
-      
-      const body = el('div', 'episode-body');
-      body.append(el('div', 'episode-num', 'S' + selNum + 'E' + epNum));
-      const titleRow = el('div', 'episode-title-row');
-      titleRow.append(el('div', 'episode-title', ep.name || ('Серія ' + epNum)));
-      
-      /* FIX-EP-REACTIONS-INJECT */
-      titleRow.append(renderEpisodeReactions(r, selNum, epNum, epKey, ctx));
-      
-      titleRow.append(el('span', 'episode-expand-icon', isExpanded ? '▴' : '▾'));
+    const body = el('div', 'episode-body');
+    body.append(el('div', 'episode-num', 'S' + selNum + 'E' + epNum));
+    const titleRow = el('div', 'episode-title-row');
+    titleRow.append(el('div', 'episode-title', ep.name || ('Серія ' + epNum)));
+    titleRow.append(renderEpisodeReactions(r, selNum, epNum, epKey, ctx));
+    titleRow.append(el('span', 'episode-expand-icon', isExpanded ? '▴' : '▾'));
     body.append(titleRow);
+    
     const descEl = el('div', 'episode-desc' + (isExpanded ? ' expanded' : ''));
     descEl.textContent = ep.overview || 'Опис відсутній';
     body.append(descEl);
@@ -355,148 +327,8 @@ function renderSeasonsTab(ctx) {
   return [wrap];
 }
 
-function toggleEpisodeWatched(r, seasonNum, epNum, ctx) {
-  const s = lib[r.key] || {};
-  let wEps = s.watchedEpisodes || [];
-  if (s.status === 'watched' && ctx?.details?.seasons) {
-    const all = [];
-    ctx.details.seasons.forEach(season => {
-      if (season.season_number === 0) return;
-      const cnt = (season.episodes?.length) || season.episode_count || 0;
-      for (let i = 1; i <= cnt; i++) all.push(season.season_number + '-' + i);
-    });
-    const wSet = new Set(wEps);
-    all.forEach(k => wSet.add(k));
-    wEps = [...wSet];
-  }
-  const epKey = seasonNum + '-' + epNum;
-  if (wEps.includes(epKey)) wEps = wEps.filter(k => k !== epKey);
-  else wEps = [...wEps, epKey];
-  
-  let totalAllEps = 0;
-  if (ctx?.details?.seasons) {
-    totalAllEps = ctx.details.seasons.filter(x => x.season_number !== 0).reduce((sum, x) => sum + (x.episodes?.length || x.episode_count || 0), 0);
-  }
-  let newStatus = s.status;
-  if (wEps.length === 0) newStatus = s.status === 'watching' ? 'planned' : s.status;
-  else if (totalAllEps > 0 && wEps.length >= totalAllEps) newStatus = 'watched';
-  else newStatus = 'watching';
-  
-  const patch = { watchedEpisodes: wEps, status: newStatus };
-  update(r, patch);
-}
-
-function renderRatingBlock(crit, value, r) {
-  const block = el("div", "rating-block");
-  block.dataset.crit = crit.key;
-  const header = el("div", "rating-block-header");
-  header.append(el("span", "rating-block-label", crit.label));
-  header.append(el("span", "rating-block-value" + (value ? "" : " empty"), value ? String(value) : "—"));
-  block.append(header);
-  const lights = el("div", "rating-lights");
-  for (let i = 1; i <= 10; i++) {
-    const light = el("span", "light" + (i <= value ? " on" : ""));
-    light.addEventListener("click", () => setCriterion(r, crit.key, value === i ? 0 : i));
-    lights.append(light);
-  }
-  block.append(lights);
-  return block;
-}
-
-function renderAverageBlock(avg, filled) {
-  const block = el("div", "rating-block average");
-  const header = el("div", "rating-block-header");
-  header.append(el("span", "rating-block-label", "Підсумок"));
-  let text = avg > 0 ? fmtNum(avg) : "—";
-  if (filled > 0 && filled < 5) text += ` (${filled}/5)`;
-  header.append(el("span", "rating-block-value " + (avg > 0 ? ratingClass(avg) : 'empty'), text));
-  block.append(header);
-  const lights = el("div", "rating-lights");
-  const full = Math.floor(avg);
-  const frac = avg - full;
-  for (let i = 1; i <= 10; i++) {
-    const light = el("span", "light readonly");
-    if (i <= full) light.classList.add("on");
-    else if (i === full + 1 && frac > 0.01) {
-      light.classList.add("partial");
-      light.style.setProperty("--fill", (frac * 100).toFixed(0) + "%");
-    }
-    lights.append(light);
-  }
-  block.append(lights);
-  return block;
-}
-
-function renderSeasonRatingBlock(r, seasonNum, crit, value) {
-  const block = el("div", "rating-block");
-  block.dataset.season = seasonNum;
-  block.dataset.crit = crit.key;
-  const header = el("div", "rating-block-header");
-  header.append(el("span", "rating-block-label", crit.label));
-  header.append(el("span", "rating-block-value" + (value ? "" : " empty"), value ? String(value) : "—"));
-  block.append(header);
-  const lights = el("div", "rating-lights");
-  for (let i = 1; i <= 10; i++) {
-    const light = el("span", "light" + (i <= value ? " on" : ""));
-    light.addEventListener("click", () => setSeasonCriterion(r, seasonNum, crit.key, value === i ? 0 : i));
-    lights.append(light);
-  }
-  block.append(lights);
-  return block;
-}
-
-function renderTvRatingSummaryDOM(ratingWrap, s, ctx) {
-  ratingWrap.replaceChildren();
-  const ir = computeItemRating(s);
-  ratingWrap.append(el("div", "label", "Моя оцінка"));
-  if (ir.avg > 0) {
-    const block = el("div", "ratings-block");
-    const infoEl = el("div");
-    infoEl.style.padding = "8px 0"; infoEl.style.fontSize = "15px"; infoEl.style.color = "var(--text-secondary)";
-    const suffix = ir.complete ? '' : ` <span style="color:var(--warning)">(${ir.rated}/${ir.total} сезонів)</span>`;
-    infoEl.innerHTML = `${fmtNum(ir.avg)}/10${suffix}`;
-    block.append(infoEl);
-    block.append(renderAverageBlock(ir.avg, 5));
-    ratingWrap.append(block);
-  }
-  const row = el("div", "row"); row.style.marginTop = "8px";
-  const btn = el("button", "btn", ir.avg > 0 ? "⭐ Змінити оцінки" : "⭐ Оцінити сезони");
-  btn.addEventListener('click', () => { ctx.activeTab = 'seasons'; renderCard(); });
-  row.append(btn);
-  ratingWrap.append(row);
-}
-
-function renderSeasonAverageBlock(sr) {
-  const avg = computeAverage(sr);
-  const filled = RATING_CRITERIA.filter(c => sr[c.key] > 0).length;
-  const block = el("div", "rating-block average season-average");
-  const header = el("div", "rating-block-header");
-  header.append(el("span", "rating-block-label", "Середня оцінка сезону"));
-  let vt = avg > 0 ? fmtNum(avg) : "—";
-  if (filled > 0 && filled < 5) vt += ` (${filled}/5)`;
-  header.append(el("span", "rating-block-value " + (avg > 0 ? ratingClass(avg) : 'empty'), vt));
-  block.append(header);
-  const lights = el("div", "rating-lights");
-  const full = Math.floor(avg);
-  const frac = avg - full;
-  for (let i = 1; i <= 10; i++) {
-    const light = el("span", "light readonly");
-    if (i <= full) light.classList.add("on");
-    else if (i === full + 1 && frac > 0.01) {
-      light.classList.add("partial");
-      light.style.setProperty("--fill", (frac * 100).toFixed(0) + "%");
-    }
-    lights.append(light);
-  }
-  block.append(lights);
-  return block;
-}
-
-/* FIX-TABS-FUNCS — відновлені функції для малювання табів */
 function buildCardTabs(ctx) {
   const r = ctx.item;
-
-  /* FIX-TV-TABS-SCORE — зміна порядку табів */
   let tabsList;
   if (r.type === 'tv') {
     tabsList = [{ id: 'seasons', label: 'Сезони' }, { id: 'cast', label: 'Актори' }, { id: 'details', label: 'Детально' }];
