@@ -2,16 +2,37 @@
 
 'use strict';
 
+const DESKTOP_MQ = window.matchMedia('(min-width: 900px) and (min-height: 600px)');
+function isDesktopLayout() {
+  return DESKTOP_MQ.matches;
+}
+
+(function bindCardLayoutSwitch() {
+  const onLayoutChange = () => {
+    document.querySelectorAll('.account-menu').forEach(m => m.remove());
+    if (typeof overlay !== 'undefined' && overlay.classList.contains('open') && cardStack.length) {
+      saveCardScroll();
+      renderCard(true);
+    }
+  };
+  if (typeof DESKTOP_MQ.addEventListener === 'function') {
+    DESKTOP_MQ.addEventListener('change', onLayoutChange);
+  } else if (typeof DESKTOP_MQ.addListener === 'function') {
+    DESKTOP_MQ.addListener(onLayoutChange);
+  }
+})();
+
 function makeMediaCtx(item) {
   return { type: 'media', item, activeTab: item.type === 'tv' ? 'seasons' : 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' };
 }
 
-function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`; }
+function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : (ctx.type === 'company' ? `#/company/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`); }
 function pushCardState() {
   const ctx = cardStack[cardStack.length - 1];
   if (!ctx) return;
   const st = { mc: cardStack.length };
   if (ctx.type === 'person') st.ctx = { type: 'person', id: ctx.id };
+  else if (ctx.type === 'company') st.ctx = { type: 'company', id: ctx.id };
   else st.ctx = { type: 'media', id: ctx.item.id, media_type: ctx.item.type, key: ctx.item.key };
   history.pushState(st, '', hashFor(ctx));
 }
@@ -86,7 +107,7 @@ function cardBar() {
 
 function renderLoading() {
   const top = cardStack[cardStack.length - 1];
-  card.classList.toggle('is-person', top?.type === 'person');
+  card.classList.toggle('is-person', top?.type === 'person' || top?.type === 'company');
   card.innerHTML = '';
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
@@ -122,6 +143,7 @@ async function loadMediaCardData(ctx) {
     if (meta.platforms) r.platforms = meta.platforms;
     if (meta.genres) { ctx.genres = meta.genres; r.genres = meta.genres; }
     if (meta.cast) ctx.cast = meta.cast;
+    if (meta.countries !== undefined) { ctx.countries = meta.countries; r.countries = meta.countries; }
     /* FIX-RELEASE-CARD-SAVE */
     let releaseDirty = false;
     if (r.type === 'movie') {
@@ -147,6 +169,7 @@ async function loadMediaCardData(ctx) {
       let dirty = releaseDirty;
       if (meta.genres && !lib[r.key].genres?.length) { lib[r.key].genres = meta.genres; dirty = true; }
       if (meta.cast && !lib[r.key].cast?.length) { lib[r.key].cast = meta.cast; dirty = true; }
+      if (lib[r.key].countries === undefined && meta.countries !== undefined) { lib[r.key].countries = meta.countries; dirty = true; }
       if (meta.runtime && !lib[r.key].runtime) { lib[r.key].runtime = meta.runtime; dirty = true; }
       if (meta.episode_count && lib[r.key].episode_count !== meta.episode_count) { lib[r.key].episode_count = meta.episode_count; dirty = true; }
       if (meta.platforms && (!lib[r.key].platforms || !lib[r.key].platforms.length)) { lib[r.key].platforms = meta.platforms; dirty = true; }
@@ -158,10 +181,14 @@ async function loadMediaCardData(ctx) {
       // [LAZY-SEASONS] Не вантажимо всі серії одразу
       ctx.details.seasons = d.seasons.map(s => ({ ...s, episodes: [], episodesLoaded: false }));
       const totalSeasons = d.seasons.filter(s => s.season_number !== 0).length;
-      /* FIX-REFINED-REMOVED */ r.totalSeasons = totalSeasons;
+      const seasonCounts = {};
+      d.seasons.forEach(s => { if (s.season_number > 0 && s.episode_count > 0) seasonCounts[s.season_number] = s.episode_count; });
+      r.totalSeasons = totalSeasons;
+      r.seasonCounts = seasonCounts;
       if (lib[r.key]) {
         let tvDirty = false;
         if (lib[r.key].totalSeasons !== totalSeasons) { lib[r.key].totalSeasons = totalSeasons; tvDirty = true; }
+        if (JSON.stringify(lib[r.key].seasonCounts || {}) !== JSON.stringify(seasonCounts)) { lib[r.key].seasonCounts = seasonCounts; tvDirty = true; }
         if (r.runtime && !lib[r.key].runtime) { lib[r.key].runtime = r.runtime; tvDirty = true; }
         if (tvDirty) { _dirtyItems.add(r.key); save(); } /* SYNC-FIX-META-TV */
       }
@@ -229,12 +256,13 @@ window.addEventListener('popstate', async (e) => {
   if (depth > cardStack.length) {
     const s = e.state;
     if (!s || !s.ctx || depth - cardStack.length > 1) {
-      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id : '#/' + s.ctx.media_type + '/' + s.ctx.id) : '';
+      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id : (s.ctx.type === 'company' ? '#/company/' + s.ctx.id : '#/' + s.ctx.media_type + '/' + s.ctx.id)) : '';
       location.hash = h;
       location.reload();
       return;
     }
     if (s.ctx.type === 'person') await loadPersonForForward(s.ctx.id);
+    else if (s.ctx.type === 'company') await loadCompanyForForward(s.ctx.id);
     else if (s.ctx.type === 'media') await loadMediaForForward(s.ctx);
     return;
   }
@@ -249,11 +277,12 @@ window.addEventListener('popstate', async (e) => {
 });
 
 function routeFromHash() {
-  const m = location.hash.match(/^#\/(movie|tv|person)\/(\d+)$/);
+  const m = location.hash.match(/^#\/(movie|tv|person|company)\/(\d+)$/);
   if (!m) return;
   history.replaceState({}, '', location.pathname + location.search);
   const id = parseInt(m[2]);
   if (m[1] === 'person') openPerson(id);
+  else if (m[1] === 'company') openCompany(id);
   else openCard({ key: m[1] + '-' + id, id, type: m[1], title: '', year: '', poster: null, backdrop: null, overview: '', tmdbRating: 0, votes: 0, popularity: 0 });
 }
 
@@ -266,7 +295,7 @@ function renderCard(restore) {
 
   const prevScroll = card.querySelector('.card-scroll');
   const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
-  card.classList.toggle('is-person', ctx.type === 'person');
+  card.classList.toggle('is-person', ctx.type === 'person' || ctx.type === 'company');
   card.innerHTML = '';
   if (settings.posterBg && ctx.type === 'media') {
     const bgPath = ctx.item?.poster || ctx.details?.poster_path;
@@ -282,8 +311,9 @@ function renderCard(restore) {
   if (!ctx.details && !ctx.error) scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
   else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(ctx.error)}</div>`; /* FIX-CARD-ERR-ESC */
   else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
+  else if (ctx.type === 'company') renderCompanyCard(ctx, scroll);
   else {
-    const _isDesktop = window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
+    const _isDesktop = isDesktopLayout();
     if (_isDesktop && typeof renderDesktopCard === 'function') {
       renderDesktopCard(ctx, scroll);
     } else if (!_isDesktop && typeof renderMobileCard === 'function') {
@@ -292,7 +322,10 @@ function renderCard(restore) {
       scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--danger);">UI картки не завантажено</div>';
     }
   }
-  if (savedScroll > 0) scroll.scrollTop = savedScroll;
+  if (savedScroll > 0) {
+    scroll.scrollTop = savedScroll;
+    requestAnimationFrame(() => { if (scroll.isConnected) scroll.scrollTop = savedScroll; });
+  }
 }
 
 /* FIX-CARD-EMPTY-BASE
@@ -307,12 +340,16 @@ function attachCtxMeta(entry, ctx) {
   if (!entry || !ctx || ctx.type !== 'media' || ctx.item?.key !== entry.key) return;
   if (ctx.genres?.length && !entry.genres?.length) entry.genres = ctx.genres;
   if (ctx.cast?.length && !entry.cast?.length) entry.cast = ctx.cast;
+  if (entry.countries === undefined && ctx.countries !== undefined) entry.countries = ctx.countries;
   if (entry.type === 'tv' && !entry.totalSeasons && ctx.details?.seasons) {
     entry.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
   }
   // [FIX-BUG-6] Переносимо episode_count одразу, щоб прогрес-бар не був без знаменника
   if (entry.type === 'tv' && !entry.episode_count && ctx.details?.number_of_episodes) {
     entry.episode_count = ctx.details.number_of_episodes;
+  }
+  if (entry.type === 'tv' && ctx.item?.seasonCounts && !entry.seasonCounts) {
+    entry.seasonCounts = ctx.item.seasonCounts;
   }
   if (entry.type === 'movie' && entry.collection === undefined && ctx.collection !== undefined) {
     entry.collection = ctx.collection;

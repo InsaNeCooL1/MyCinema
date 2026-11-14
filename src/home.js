@@ -877,9 +877,319 @@ function buildTasteCard(taste) {
   return card;
 }
 
+// ============ TEMPERATURE AVATAR (Last 10 rated projects + Mood) ============
+const AVATAR_MOOD_RULES = {
+  fun:        { label: 'Розвага', weights: { 35: 1.0, 12: 0.9, 16: 0.85, 10751: 0.9, 10762: 0.8 } },
+  intense:    { label: 'Напруга', weights: { 53: 1.1, 28: 0.95, 80: 0.9, 10768: 1.0, 9648: 0.7 } },
+  dark:       { label: 'Похмуре', weights: { 27: 1.35, 80: 0.95, 53: 0.85 } },
+  epic:       { label: 'Епічне',  weights: { 878: 1.15, 14: 1.1, 10765: 1.15, 10752: 1.05, 36: 0.8 } },
+  chill:      { label: 'Спокій',  weights: { 10749: 1.2, 10402: 1.1, 35: 0.75, 16: 0.75 } },
+  thoughtful: { label: 'Роздуми', weights: { 99: 1.35, 18: 0.58, 9648: 0.85 } }
+};
+
+/* AVATAR-V2-BASELINE */
+function getLastRatedProjects(limit) {
+  const entries = [];
+  Object.values(lib).forEach(item => {
+    if (!item || !item.key) return;
+    if (item.type === 'movie') {
+      const avg = computeAverage(item.ratings);
+      if (avg > 0) {
+        entries.push({
+          key: item.key,
+          item,
+          title: item.title || '',
+          avg,
+          genres: item.genres || [],
+          ts: item.ratingUpdated || item.updated || item.createdAt || 0
+        });
+      }
+    } else if (item.type === 'tv') {
+      const sr = item.seasonRatings || {};
+      const srTs = item.seasonRatingTs || {};
+      Object.entries(sr).forEach(([sNum, ratings]) => {
+        const avg = computeAverage(ratings);
+        if (avg > 0) {
+          const baseTs = item.updated || item.createdAt || 0;
+          entries.push({
+            key: `${item.key}-s${sNum}`,
+            item,
+            title: `${item.title} (С${sNum})`,
+            avg,
+            genres: item.genres || [],
+            ts: srTs[sNum] || (baseTs + Number(sNum))
+          });
+        }
+      });
+    }
+  });
+  entries.sort((a, b) => b.ts - a.ts);
+  return (limit && limit > 0) ? entries.slice(0, limit) : entries;
+}
+
+function computeTempAvatarData() {
+  const all = getLastRatedProjects(0);
+  if (!all.length) {
+    return { empty: true, count: 0, avg: 0, baseline: 0, delta: 0, hasPureHistory: false, tempLevel: 'mild', mood: 'thoughtful', title: 'Ще спить', subtitle: 'Оціни хоча б пару фільмів або сезонів', projects: [] };
+  }
+
+  const projects = all.slice(0, 10);
+  const history = all.slice(10);
+  const avg = projects.reduce((s, p) => s + p.avg, 0) / projects.length;
+
+  // Базове середнє = усі оцінки ДО останніх 10 проєктів (щоб останні 10 не зсували власну базу)
+  const fallbackBase = 7.2;
+  let baseline = fallbackBase;
+  const hasPureHistory = history.length >= 3;
+  if (hasPureHistory) {
+    baseline = history.reduce((s, p) => s + p.avg, 0) / history.length;
+  } else if (history.length > 0) {
+    const hSum = history.reduce((s, p) => s + p.avg, 0);
+    baseline = (hSum + (3 - history.length) * fallbackBase) / 3;
+  }
+
+  const delta = avg - baseline;
+  // Пороги: > +0.6 золото (hot) | ±0.6 стабільний кайф (warm) | -0.6..-1.8 прохолодно (mild) | < -1.8 розчарування (cold)
+  const tempLevel = delta > 0.6 ? 'hot' : (delta >= -0.6 ? 'warm' : (delta >= -1.8 ? 'mild' : 'cold'));
+
+  const moodScores = {};
+  for (const k of Object.keys(AVATAR_MOOD_RULES)) moodScores[k] = 0;
+
+  projects.forEach((p, idx) => {
+    const recencyW = 1 - idx * 0.05;
+    const enjoymentW = delta >= -1.8 ? Math.max(0.35, (p.avg - 3.5) / 6.5) : 1.0;
+    const w = recencyW * enjoymentW;
+    for (const [mKey, rule] of Object.entries(AVATAR_MOOD_RULES)) {
+      let bestG = 0;
+      (p.genres || []).forEach(gid => {
+        if (rule.weights[gid] && rule.weights[gid] > bestG) bestG = rule.weights[gid];
+      });
+      if (bestG > 0) moodScores[mKey] += w * bestG;
+    }
+  });
+
+  const sortedMoods = Object.entries(moodScores).sort((a, b) => b[1] - a[1]);
+  const mood = sortedMoods[0][1] > 0 ? sortedMoods[0][0] : 'thoughtful';
+
+  const PERSONA = {
+    fun: {
+      hot:  ['Золотий фан', 'Останні комедії й пригоди перевершили навіть твою високу планку'],
+      warm: ['Стабільний позитив', 'Легкі тайтли тримають настрій рівно у твоєму тонусі'],
+      mild: ['Усмішка без захвату', 'Розважальне кіно трохи не дотягує до твоєї бази'],
+      cold: ['Жарти не зайшли', 'Останні комедії чи пригоди відчутно нижче твого смаку']
+    },
+    intense: {
+      hot:  ['Драйв на максимумі', 'Напружені трилери й екшен зайшли помітно вище середнього'],
+      warm: ['Стабільний адреналін', 'Гострі сюжети впевнено тримають твій звичний рівень'],
+      mild: ['Стриманий пульс', 'Екшен дивився без звичного азарту — оцінки трохи просіли'],
+      cold: ['Холодний скептик', 'Останні трилери й бойовики не зачепили й розчарували']
+    },
+    dark: {
+      hot:  ['Похмурий шедевр', 'Темна атмосфера й жорсткі історії влучили краще за все'],
+      warm: ['Нуарний кайф', 'Похмурі стрічки стабільно тримають твій улюблений рівень'],
+      mild: ['Сірі сутінки', 'Темного вистачило, але без вау-ефекту'],
+      cold: ['Передоз мороку', 'Похмурі новинки пішли в мінус проти твоєї бази']
+    },
+    epic: {
+      hot:  ['Золотий космос', 'Фантастика, масштаб і епік зараз на твоєму піку'],
+      warm: ['На стабільній орбіті', 'Великі світи й пригоди стабільно тримають планку'],
+      mild: ['Півкроку до масштабу', 'Спецефекти норм, але очікував більшого'],
+      cold: ['Пафос не спрацював', 'Гучний масштаб не врятував від низьких оцінок']
+    },
+    chill: {
+      hot:  ['Золотий дзен', 'Теплі й атмосферні історії подарували справжнє задоволення'],
+      warm: ['Затишний кайф', 'Рівний, приємний ритм переглядів на твоєму рівні'],
+      mild: ['Легка втома', 'Спокійне кіно трохи пішло в мінус — хочеться чогось свіжого'],
+      cold: ['Заснув на титрах', 'Останній чіл виявився надто прісним для тебе']
+    },
+    thoughtful: {
+      hot:  ['Естетичний захват', 'Глибокі драми й сенси влучили вище твоєї планки'],
+      warm: ['Вдумливий баланс', 'Сильні історії стабільно підтримують твій рівень'],
+      mild: ['Аналітичний скепсис', 'Цікаві задумом, але оцінки трохи нижчі за твою базу'],
+      cold: ['Суворий критик', 'Останні драми не переконали — планка впала вниз']
+    }
+  };
+
+  const [title, subtitle] = PERSONA[mood]?.[tempLevel] || ['Кіно-настрій', ''];
+  return { empty: false, count: projects.length, historyCount: history.length, hasPureHistory, avg, baseline, delta, tempLevel, mood, moodLabel: AVATAR_MOOD_RULES[mood].label, title, subtitle, projects };
+}
+
+function buildTempAvatarSVG(data, size = 68) {
+  const palettes = {
+    hot:  { bg1: '#ffd166', bg2: '#ff7b5c', stroke: '#fff3c4', glow: 'rgba(255,209,102,0.52)' },
+    warm: { bg1: '#ffb86c', bg2: '#9de5c3', stroke: '#f2eee9', glow: 'rgba(255,184,108,0.28)' },
+    mild: { bg1: '#c5a3ff', bg2: '#6b6485', stroke: '#e5dcff', glow: 'rgba(197,163,255,0.20)' },
+    cold: { bg1: '#60a5fa', bg2: '#334155', stroke: '#bfdbfe', glow: 'rgba(96,165,250,0.34)' }
+  };
+  const pal = palettes[data.tempLevel || 'mild'];
+  const uid = 'ta' + Math.random().toString(36).slice(2, 7);
+  const ink = data.tempLevel === 'cold' ? '#0f172a' : (data.mood === 'dark' ? '#140f1d' : '#1a1207');
+  const lvl = data.tempLevel;
+
+  let eyes = '';
+  let mouth = '';
+  let extra = '';
+
+  if (data.empty) {
+    eyes = `<path d="M22 31 Q26 34 30 31 M42 31 Q46 34 50 31" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    mouth = `<line x1="31" y1="46" x2="41" y2="46" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/>`;
+  } else if (data.mood === 'fun') {
+    if (lvl === 'hot') {
+      eyes = `<path d="M20 34 Q26 25 32 34 M40 34 Q46 25 52 34" stroke="${ink}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+      mouth = `<path d="M22 40 Q36 56 50 40 Z" fill="${ink}"/>`;
+      extra = `<circle cx="18" cy="40" r="3.6" fill="#ff5c5c" opacity="0.55"/><circle cx="54" cy="40" r="3.6" fill="#ff5c5c" opacity="0.55"/><circle cx="56" cy="16" r="2.2" fill="#fff" opacity="0.9"/>`;
+    } else if (lvl === 'warm') {
+      eyes = `<circle cx="26" cy="32" r="3.4" fill="${ink}"/><circle cx="46" cy="32" r="3.4" fill="${ink}"/><circle cx="27" cy="30.8" r="1.1" fill="#fff"/><circle cx="47" cy="30.8" r="1.1" fill="#fff"/>`;
+      mouth = `<path d="M25 42 Q36 51 47 42" stroke="${ink}" stroke-width="2.8" fill="none" stroke-linecap="round"/>`;
+      extra = `<circle cx="19" cy="40" r="3.2" fill="#ff7b5c" opacity="0.4"/>`;
+    } else if (lvl === 'mild') {
+      eyes = `<circle cx="28" cy="33" r="2.9" fill="${ink}"/><circle cx="48" cy="33" r="2.9" fill="${ink}"/><path d="M21 27 Q26 25 31 27" stroke="${ink}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+      mouth = `<path d="M27 45 Q36 47 45 43" stroke="${ink}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+    } else {
+      eyes = `<path d="M21 29 L30 32 M51 29 L42 32" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/><circle cx="26" cy="35" r="2.7" fill="${ink}"/><circle cx="46" cy="35" r="2.7" fill="${ink}"/>`;
+      mouth = `<path d="M27 49 Q36 42 45 49" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+      extra = `<circle cx="19" cy="41" r="2.8" fill="#93c5fd" opacity="0.45"/><path d="M16 14 L18 19 L23 19 L19 22 L20 27 L16 24 L12 27 L13 22 L9 19 L14 19 Z" fill="#e0f2fe" opacity="0.8"/>`;
+    }
+  } else if (data.mood === 'intense') {
+    if (lvl === 'hot') {
+      eyes = `<rect x="17" y="27" width="16" height="10" rx="3" fill="${ink}"/><rect x="39" y="27" width="16" height="10" rx="3" fill="${ink}"/><line x1="33" y1="31" x2="39" y2="31" stroke="${ink}" stroke-width="2.6"/>`;
+      mouth = `<path d="M25 44 Q37 53 49 41" stroke="${ink}" stroke-width="2.9" fill="none" stroke-linecap="round"/>`;
+      extra = `<polygon points="57,10 51,21 56,21 53,30 62,18 57,18" fill="#fff3c4" opacity="0.95"/>`;
+    } else if (lvl === 'warm') {
+      eyes = `<rect x="18" y="28" width="15" height="9" rx="3" fill="${ink}"/><rect x="39" y="28" width="15" height="9" rx="3" fill="${ink}"/><line x1="33" y1="31" x2="39" y2="31" stroke="${ink}" stroke-width="2.4"/>`;
+      mouth = `<path d="M27 45 Q37 49 46 43" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+      extra = `<polygon points="56,12 52,20 56,20 54,26 60,18 56,18" fill="#fef3c7" opacity="0.75"/>`;
+    } else if (lvl === 'mild') {
+      eyes = `<rect x="18" y="29" width="15" height="7" rx="2" fill="rgba(26,18,7,0.22)" stroke="${ink}" stroke-width="2"/><rect x="39" y="29" width="15" height="7" rx="2" fill="rgba(26,18,7,0.22)" stroke="${ink}" stroke-width="2"/><line x1="33" y1="32" x2="39" y2="32" stroke="${ink}" stroke-width="2"/><circle cx="26" cy="32.5" r="2" fill="${ink}"/><circle cx="46" cy="32.5" r="2" fill="${ink}"/>`;
+      mouth = `<line x1="28" y1="46" x2="44" y2="45" stroke="${ink}" stroke-width="2.5" stroke-linecap="round"/>`;
+    } else {
+      eyes = `<g transform="rotate(-6 36 33)"><rect x="18" y="29" width="15" height="8" rx="2" fill="${ink}"/><rect x="39" y="29" width="15" height="8" rx="2" fill="${ink}"/><line x1="33" y1="32" x2="39" y2="32" stroke="${ink}" stroke-width="2.2"/></g><path d="M21 25 L30 27 M51 25 L42 27" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>`;
+      mouth = `<path d="M27 48 Q36 43 45 48" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+      extra = `<path d="M16 14 L18 19 L23 19 L19 22 L20 27 L16 24 L12 27 L13 22 L9 19 L14 19 Z" fill="#e0f2fe" opacity="0.8"/>`;
+    }
+  } else if (data.mood === 'dark') {
+    if (lvl === 'hot') {
+      eyes = `<path d="M20 30 L31 33 M52 30 L41 33" stroke="${ink}" stroke-width="2.5" stroke-linecap="round"/><circle cx="26" cy="34.5" r="2.9" fill="${ink}"/><circle cx="46" cy="34.5" r="2.9" fill="${ink}"/>`;
+      mouth = `<path d="M25 45 Q37 51 48 42" stroke="${ink}" stroke-width="2.8" fill="none" stroke-linecap="round"/>`;
+      extra = `<path d="M55 11 A6.5 6.5 0 1 0 62 20 A4.8 4.8 0 1 1 55 11 Z" fill="#fff3c4" opacity="0.92"/>`;
+    } else if (lvl === 'warm') {
+      eyes = `<path d="M21 31 L30 33 M51 31 L42 33" stroke="${ink}" stroke-width="2.3" stroke-linecap="round"/><circle cx="26" cy="35" r="2.7" fill="${ink}"/><circle cx="46" cy="35" r="2.7" fill="${ink}"/>`;
+      mouth = `<path d="M27 45 Q36 49 46 44" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+      extra = `<path d="M55 12 A5.5 5.5 0 1 0 61 19 A4.2 4.2 0 1 1 55 12 Z" fill="#fef3c7" opacity="0.72"/>`;
+    } else if (lvl === 'mild') {
+      eyes = `<line x1="21" y1="32" x2="31" y2="32" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/><line x1="41" y1="32" x2="51" y2="32" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/><circle cx="26" cy="35" r="2.3" fill="${ink}"/><circle cx="46" cy="35" r="2.3" fill="${ink}"/>`;
+      mouth = `<line x1="29" y1="46" x2="43" y2="46" stroke="${ink}" stroke-width="2.5" stroke-linecap="round"/>`;
+      extra = `<path d="M55 13 A5 5 0 1 0 60 19 A3.8 3.8 0 1 1 55 13 Z" fill="#e5dcff" opacity="0.5"/>`;
+    } else {
+      eyes = `<path d="M21 28 L31 32 M51 28 L41 32" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/><circle cx="26" cy="35" r="2.8" fill="${ink}"/><circle cx="46" cy="35" r="2.8" fill="${ink}"/><path d="M22 39 Q26 41 30 39 M42 39 Q46 41 50 39" stroke="${ink}" stroke-width="1.4" fill="none" opacity="0.55"/>`;
+      mouth = `<path d="M27 49 Q36 44 45 49" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+      extra = `<path d="M16 14 L18 19 L23 19 L19 22 L20 27 L16 24 L12 27 L13 22 L9 19 L14 19 Z" fill="#e0f2fe" opacity="0.75"/>`;
+    }
+  } else if (data.mood === 'thoughtful') {
+    const glasses = `<circle cx="26" cy="33" r="6.5" fill="none" stroke="${ink}" stroke-width="2.2"/><circle cx="46" cy="33" r="6.5" fill="none" stroke="${ink}" stroke-width="2.2"/><line x1="32.5" y1="33" x2="39.5" y2="33" stroke="${ink}" stroke-width="2.2"/>`;
+    if (lvl === 'hot') {
+      eyes = glasses + `<circle cx="26" cy="33" r="2.6" fill="${ink}"/><circle cx="46" cy="33" r="2.6" fill="${ink}"/><circle cx="23" cy="30" r="1.2" fill="#fff" opacity="0.85"/>`;
+      mouth = `<path d="M25 44 Q36 53 47 44" stroke="${ink}" stroke-width="2.7" fill="none" stroke-linecap="round"/>`;
+    } else if (lvl === 'warm') {
+      eyes = glasses + `<circle cx="26" cy="33" r="2.4" fill="${ink}"/><circle cx="46" cy="33" r="2.4" fill="${ink}"/>`;
+      mouth = `<path d="M27 45 Q36 50 45 45" stroke="${ink}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+    } else if (lvl === 'mild') {
+      eyes = glasses + `<circle cx="26" cy="33" r="2.3" fill="${ink}"/><circle cx="46" cy="33" r="2.3" fill="${ink}"/><path d="M20 24 Q26 21 31 24" stroke="${ink}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+      mouth = `<line x1="29" y1="46" x2="43" y2="46" stroke="${ink}" stroke-width="2.5" stroke-linecap="round"/>`;
+    } else {
+      eyes = glasses + `<path d="M20 24 L30 27 M52 24 L42 27" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/><circle cx="26" cy="34" r="2.3" fill="${ink}"/><circle cx="46" cy="34" r="2.3" fill="${ink}"/>`;
+      mouth = `<path d="M28 49 Q36 44 44 49" stroke="${ink}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+      extra = `<path d="M16 14 L18 19 L23 19 L19 22 L20 27 L16 24 L12 27 L13 22 L9 19 L14 19 Z" fill="#e0f2fe" opacity="0.75"/>`;
+    }
+  } else if (data.mood === 'chill') {
+    if (lvl === 'hot') {
+      eyes = `<path d="M20 34 Q26 27 32 34 M40 34 Q46 27 52 34" stroke="${ink}" stroke-width="2.8" fill="none" stroke-linecap="round"/>`;
+      mouth = `<path d="M26 43 Q36 52 46 43" stroke="${ink}" stroke-width="2.7" fill="none" stroke-linecap="round"/>`;
+      extra = `<path d="M14 55 Q20 52 26 55 M46 55 Q52 52 58 55" stroke="#fff" stroke-width="2" fill="none" opacity="0.65" stroke-linecap="round"/>`;
+    } else if (lvl === 'warm') {
+      eyes = `<path d="M21 34 Q26 30 31 34 M41 34 Q46 30 51 34" stroke="${ink}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+      mouth = `<path d="M28 44 Q36 49 44 44" stroke="${ink}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+      extra = `<path d="M14 55 Q20 52 26 55" stroke="#fff" stroke-width="2" fill="none" opacity="0.45" stroke-linecap="round"/>`;
+    } else if (lvl === 'mild') {
+      eyes = `<line x1="21" y1="33" x2="31" y2="33" stroke="${ink}" stroke-width="2.5" stroke-linecap="round"/><line x1="41" y1="33" x2="51" y2="33" stroke="${ink}" stroke-width="2.5" stroke-linecap="round"/>`;
+      mouth = `<path d="M30 45 Q36 47 42 45" stroke="${ink}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    } else {
+      eyes = `<path d="M21 29 L30 32 M51 29 L42 32" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/><line x1="22" y1="35" x2="30" y2="35" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/><line x1="42" y1="35" x2="50" y2="35" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/>`;
+      mouth = `<circle cx="36" cy="46" r="3.6" fill="none" stroke="${ink}" stroke-width="2.5"/>`;
+      extra = `<path d="M16 14 L18 19 L23 19 L19 22 L20 27 L16 24 L12 27 L13 22 L9 19 L14 19 Z" fill="#e0f2fe" opacity="0.8"/>`;
+    }
+  } else {
+    // epic
+    if (lvl === 'hot') {
+      eyes = `<polygon points="26,26 28,31.5 34,31.5 29.5,35 31,40.5 26,37 21,40.5 22.5,35 18,31.5 24,31.5" fill="${ink}"/><polygon points="46,26 48,31.5 54,31.5 49.5,35 51,40.5 46,37 41,40.5 42.5,35 38,31.5 44,31.5" fill="${ink}"/>`;
+      mouth = `<path d="M24 43 Q36 54 48 43" stroke="${ink}" stroke-width="2.8" fill="none" stroke-linecap="round"/>`;
+      extra = `<circle cx="14" cy="17" r="2.6" fill="#fff" opacity="0.9"/><circle cx="58" cy="15" r="2.2" fill="#fff" opacity="0.9"/>`;
+    } else if (lvl === 'warm') {
+      eyes = `<circle cx="26" cy="33" r="3.3" fill="${ink}"/><circle cx="46" cy="33" r="3.3" fill="${ink}"/><polygon points="26,29 27,32 30,33 27,34 26,37 25,34 22,33 25,32" fill="#fff" opacity="0.65"/>`;
+      mouth = `<path d="M26 43 Q36 51 46 43" stroke="${ink}" stroke-width="2.7" fill="none" stroke-linecap="round"/>`;
+      extra = `<circle cx="57" cy="17" r="2" fill="#fff" opacity="0.75"/>`;
+    } else if (lvl === 'mild') {
+      eyes = `<circle cx="26" cy="33" r="2.9" fill="${ink}"/><circle cx="46" cy="33" r="2.9" fill="${ink}"/>`;
+      mouth = `<path d="M28 45 Q36 47 44 45" stroke="${ink}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+      extra = `<polygon points="56,14 57.5,17.5 61,18 58.2,20.2 59,23.5 56,21.5 53,23.5 53.8,20.2 51,18 54.5,17.5" fill="#e5dcff" opacity="0.7"/>`;
+    } else {
+      eyes = `<path d="M22 31 L30 36 M30 31 L22 36 M42 31 L50 36 M50 31 L42 36" stroke="${ink}" stroke-width="2.3" stroke-linecap="round"/>`;
+      mouth = `<path d="M27 48 Q36 43 45 48" stroke="${ink}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+      extra = `<path d="M16 14 L18 19 L23 19 L19 22 L20 27 L16 24 L12 27 L13 22 L9 19 L14 19 Z" fill="#e0f2fe" opacity="0.75"/>`;
+    }
+  }
+
+  return `<svg viewBox="0 0 72 72" width="${size}" height="${size}" style="display:block;flex-shrink:0;filter:drop-shadow(0 4px 12px ${pal.glow})">
+    <defs><linearGradient id="${uid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${pal.bg1}"/><stop offset="100%" stop-color="${pal.bg2}"/></linearGradient></defs>
+    <circle cx="36" cy="36" r="30" fill="url(#${uid})" stroke="${pal.stroke}" stroke-opacity="0.45" stroke-width="2"/>
+    ${eyes}${mouth}${extra}
+  </svg>`;
+}
+
+function buildTempAvatarCard(data) {
+  const card = el('div', 'temp-avatar-card');
+  const top = el('div', 'temp-avatar-top');
+  const face = el('div', 'temp-avatar-face');
+  face.innerHTML = buildTempAvatarSVG(data, 64);
+  top.append(face);
+
+  const info = el('div', 'temp-avatar-info');
+  const head = el('div', 'temp-avatar-head');
+  head.append(el('span', 'temp-avatar-title', data.title));
+  if (!data.empty) {
+    const sign = data.delta >= 0 ? '+' : '−';
+    const dStr = `${sign}${fmtNum(Math.abs(data.delta))}`;
+    head.append(el('span', 'temp-avatar-badge ' + data.tempLevel, `${fmtNum(data.avg)}/10 (${dStr}) · ${data.moodLabel}`));
+  }
+  info.append(head);
+  info.append(el('div', 'temp-avatar-sub', data.subtitle));
+  const metaText = data.empty
+    ? 'Потрібно мінімум 1 оцінка'
+    : (data.hasPureHistory
+        ? `База ${fmtNum(data.baseline)} (до останніх 10) · останні ${data.count} проєктів`
+        : `База ${fmtNum(data.baseline)} · останні ${data.count} проєктів (фільми + сезони)`);
+  info.append(el('div', 'temp-avatar-meta', metaText));
+  top.append(info);
+  card.append(top);
+
+  if (data.projects && data.projects.length) {
+    const chips = el('div', 'temp-avatar-chips');
+    data.projects.forEach(p => {
+      const chip = el('button', 'temp-proj-chip');
+      chip.type = 'button';
+      chip.textContent = `${p.title} · ${fmtNum(p.avg)}`;
+      chip.addEventListener('click', () => openCard(p.item));
+      chips.append(chip);
+    });
+    card.append(chips);
+  }
+  return card;
+}
+
 function renderTasteSummary(taste) {
   const container = el('div', 'taste-summary-container' + (state.home.tasteExpanded ? ' is-expanded' : ''));
   const hasTaste = taste && taste.count >= 3;
+  const avatarData = computeTempAvatarData();
 
   let summaryVal = '—';
   if (hasTaste) {
@@ -888,8 +1198,11 @@ function renderTasteSummary(taste) {
   }
 
   const btn = el('button', 'taste-summary');
-  btn.append(el('span', 'taste-summary-icon', '🧬'));
-  btn.append(el('span', 'taste-summary-label', 'Твій смак у цифрах'));
+  const iconWrap = el('span', 'taste-summary-avatar');
+  iconWrap.innerHTML = buildTempAvatarSVG(avatarData, 32);
+  btn.append(iconWrap);
+  const labelText = avatarData.empty ? 'Твій смак у цифрах' : `Твій смак · ${avatarData.title}`;
+  btn.append(el('span', 'taste-summary-label', labelText));
   btn.append(el('span', 'taste-summary-value', summaryVal));
   const chev = el('span', 'taste-summary-chevron', '▾');
   btn.append(chev);
@@ -897,6 +1210,7 @@ function renderTasteSummary(taste) {
 
   const panel = el('div', 'taste-panel');
   panel.style.display = state.home.tasteExpanded ? 'block' : 'none';
+  panel.append(buildTempAvatarCard(avatarData));
 
   if (hasTaste) {
     panel.append(buildTasteCard(taste));
@@ -917,9 +1231,7 @@ function renderTasteSummary(taste) {
   return container;
 }
 
-function renderMoodSelector() {
-  const sec = el('section', 'mood-section');
-  sec.append(el('div', 'mood-title', '🎬 Настрій сьогодні'));
+function renderMoodPills() {
   const pills = el('div', 'mood-pills');
   const allPill = el('button', 'mood-pill' + (!state.home.mood ? ' active' : ''), '✨ Будь-який');
   allPill.addEventListener('click', () => { state.home.mood = null; state.home.sig = null; refresh(); });
@@ -934,8 +1246,7 @@ function renderMoodSelector() {
     });
     pills.append(p);
   }
-  sec.append(pills);
-  return sec;
+  return pills;
 }
 
 // ============ LOAD & RENDER ============
@@ -1067,8 +1378,7 @@ async function loadHome() {
   if (state.home.loading === sig) return;
 
   state.home.loading = sig;
-  box.style.padding = '0';
-  box.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Підбираю рекомендації під твій смак...</div>';
+  renderHomeSkeleton();
   try {
     const data = await buildSmartRecommendations(seeds, state.home.mood, state.home.mode);
     if (state.home.loading !== sig) return; // [LOADHOME-RACE-FIX] застарілий запит
@@ -1082,6 +1392,31 @@ async function loadHome() {
     box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(e.message)}</div>`; /* FIX-HOME-ERR-ESC */
   }
   finally { if (state.home.loading === sig) state.home.loading = false; }
+}
+
+function renderHomeSkeleton() {
+  box.style.padding = '0';
+  box.replaceChildren();
+
+  /* SKELETON-NO-MOOD-TOP */
+  const tasteWrap = el('div', 'taste-summary-container');
+  tasteWrap.append(el('div', 'skeleton-bar skeleton-summary'));
+  box.append(tasteWrap);
+
+  const wrap = el('div', 'home-wrap');
+  const sec = el('div', 'home-section');
+  sec.append(el('div', 'skeleton-bar skeleton-title-lg'));
+  const grid = el('div', 'home-grid');
+  for (let i = 0; i < 14; i++) {
+    const sk = el('div', 'rec-card skeleton-card');
+    sk.append(el('div', 'skeleton-poster'));
+    sk.append(el('div', 'skeleton-bar skeleton-line-1'));
+    sk.append(el('div', 'skeleton-bar skeleton-line-2'));
+    grid.append(sk);
+  }
+  sec.append(grid);
+  wrap.append(sec);
+  box.append(wrap);
 }
 
 function recCard(item, allowDismiss) {
@@ -1183,7 +1518,6 @@ function renderHomeContent(taste) {
   box.replaceChildren(); box.style.padding = '0';
 
   box.append(renderTasteSummary(taste || computeTasteVector()));
-  box.append(renderMoodSelector());
 
   const cwSection = buildContinueWatchingSection();
   if (cwSection) box.append(cwSection);
@@ -1199,13 +1533,14 @@ function renderHomeContent(taste) {
   const recs = state.home.recs;
 
   // === БЛОК РЕКОМЕНДАЦІЙ ===
-  if (recs && recs.items && recs.items.length) {
+  if (recs && recs.seeds > 0) {
     const sec = el('section', 'home-section');
     const head = el('div', 'section-head');
     head.append(el('h2', 'section-title', '✨ Для тебе')); /* FIX-HOME-NO-SUB-FORYOU */
     sec.append(head);
 
-    // Перемикач режимів видачі
+    // Єдиний блок режимів видачі та настрою під «Для тебе»
+    const controlsBar = el('div', 'recs-controls-bar');
     const modesBar = el('div', 'recs-mode-pills');
     const modeDefs = [
       { id: 'balance', label: '✨ Баланс' },
@@ -1224,7 +1559,8 @@ function renderHomeContent(taste) {
       });
       modesBar.append(mb);
     });
-    sec.append(modesBar);
+    controlsBar.append(modesBar, renderMoodPills());
+    sec.append(controlsBar);
 
     const type = state.home.tab;
     const allItems = recs.items.filter(x => x.type === type && !(typeof isDismissed === 'function' && isDismissed(x.key)));
@@ -1452,6 +1788,34 @@ function buildFactOfDayCard() {
   return card;
 }
 
+const _nextEpSeasonCache = new Map();
+
+function computeNextEpisode(item) {
+  const eps = item.watchedEpisodes || [];
+  if (!eps.length) return null;
+  const parsed = eps.map(k => {
+    const parts = String(k).split('-').map(Number);
+    return (parts[0] > 0 && parts[1] > 0) ? { s: parts[0], e: parts[1] } : null;
+  }).filter(Boolean).sort((a, b) => a.s - b.s || a.e - b.e);
+  if (!parsed.length) return null;
+
+  const last = parsed[parsed.length - 1];
+  const sc = item.seasonCounts || {};
+  const curMax = sc[last.s] || 0;
+  let nextS = last.s;
+  let nextE = last.e + 1;
+
+  if (curMax > 0 && nextE > curMax) {
+    const nextSeasonNum = last.s + 1;
+    if (item.totalSeasons && nextSeasonNum > item.totalSeasons) {
+      return { finished: true, s: last.s, e: last.e };
+    }
+    nextS = nextSeasonNum;
+    nextE = 1;
+  }
+  return { finished: false, s: nextS, e: nextE, code: `S${nextS}E${String(nextE).padStart(2, '0')}` };
+}
+
 function buildContinueWatchingSection() {
   const watching = Object.values(lib).filter(x => x.type === 'tv' && x.status === 'watching' && x.watchedEpisodes && x.watchedEpisodes.length > 0).sort((a, b) => b.updated - a.updated).slice(0, 6);
   if (!watching.length) return null;
@@ -1460,17 +1824,63 @@ function buildContinueWatchingSection() {
   head.append(el('h2', 'section-title', '⏯️ Продовжити'));
   sec.append(head);
   const grid = el('div', 'home-grid');
+  const todayIso = new Date().toISOString().slice(0, 10);
+
   watching.forEach(item => {
     const c = el('div', 'rec-card');
     const p = el('img', 'rec-poster');
     if (item.poster) p.src = TMDB_IMG + 'w342' + item.poster;
     c.append(p, el('div', 'row-title', item.title));
+
     const eps = item.watchedEpisodes || [];
-    if (eps.length) {
-      const last = eps[eps.length - 1];
-      const tot = item.episode_count || 0;
-      const pct = tot > 0 ? Math.min(100, Math.round((eps.length / tot) * 100)) : 0;
-      c.append(el('div', 'rec-why', 'на ' + last.replace('-', '×') + (tot > 0 ? ` · ${pct}%` : '')));
+    const tot = item.episode_count || 0;
+    const pct = tot > 0 ? Math.min(100, Math.round((eps.length / tot) * 100)) : 0;
+    const next = computeNextEpisode(item);
+
+    if (next) {
+      const baseText = next.finished
+        ? 'Усі серії переглянуто'
+        : `Далі: ${next.code}` + (tot > 0 ? ` · ${pct}%` : '');
+      const labelEl = el('div', 'rec-why', baseText);
+      c.append(labelEl);
+
+      if (!next.finished && item.id) {
+        const cacheKey = `${item.id}:${next.s}`;
+        const applySeasonData = (episodes) => {
+          if (!episodes || !labelEl.isConnected) return;
+          if (!item.seasonCounts?.[next.s] && episodes.length && lib[item.key]) {
+            lib[item.key].seasonCounts = { ...(lib[item.key].seasonCounts || {}), [next.s]: episodes.length };
+          }
+          const epObj = episodes.find(ep => ep.episode_number === next.e);
+          if (epObj) {
+            if (epObj.air_date && epObj.air_date > todayIso) {
+              const dt = new Date(epObj.air_date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+              labelEl.textContent = `Чекаємо ${next.code} · ${dt}`;
+            } else if (epObj.name) {
+              labelEl.textContent = `Далі: ${next.code} · ${epObj.name}`;
+            }
+          } else if (episodes.length > 0 && next.e > episodes.length) {
+            const nextS = next.s + 1;
+            const hasMoreSeasons = !item.totalSeasons || nextS <= item.totalSeasons;
+            labelEl.textContent = hasMoreSeasons
+              ? `Далі: S${nextS}E01` + (tot > 0 ? ` · ${pct}%` : '')
+              : 'Сезон завершено';
+          }
+        };
+
+        if (_nextEpSeasonCache.has(cacheKey)) {
+          applySeasonData(_nextEpSeasonCache.get(cacheKey));
+        } else {
+          tmdbFetch(`/tv/${item.id}/season/${next.s}?language=uk-UA`)
+            .then(d => {
+              const epsArr = d.episodes || [];
+              _nextEpSeasonCache.set(cacheKey, epsArr);
+              applySeasonData(epsArr);
+            })
+            .catch(() => {});
+        }
+      }
+
       if (tot > 0) {
         const prog = el('div', 'item-progress');
         const fill = el('div', 'item-progress-fill');

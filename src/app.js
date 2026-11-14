@@ -188,7 +188,7 @@ if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.is
   initColdSplash();
 }
 /* FIX-DEEPLINK */
-var _initialHash = /^#\/(movie|tv|person)\/\d+$/.test(location.hash) ? location.hash : '';
+var _initialHash = /^#\/(movie|tv|person|company)\/\d+$/.test(location.hash) ? location.hash : '';
 history.replaceState({ mc: 0 }, '', location.pathname + location.search + _initialHash);
 refresh();
 routeFromHash();

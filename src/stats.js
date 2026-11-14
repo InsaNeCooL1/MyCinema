@@ -14,6 +14,7 @@ function renderStatistics() {
     { id: 'taste', label: '🧬 Смак' },
     { id: 'series', label: '📺 Серіали' },
     { id: 'franchises', label: '🎞️ Франшизи' },
+    { id: 'countries', label: '🌍 Країни' },
     { id: 'streaming', label: '📡 Стрімінги' },
     { id: 'elo', label: '🏆 Elo' },
     { id: 'actors', label: '🎭 Актори' },
@@ -31,6 +32,7 @@ function renderStatistics() {
   if (state.stats.tab === 'taste') content.append(...renderTasteTab());
   else if (state.stats.tab === 'series') content.append(...renderSeriesTab());
   else if (state.stats.tab === 'franchises') content.append(...renderFranchisesTab());
+  else if (state.stats.tab === 'countries') content.append(...renderCountriesTab());
   else if (state.stats.tab === 'streaming') content.append(...renderStreamingTab());
   else if (state.stats.tab === 'elo') content.append(...renderEloTab());
   else if (state.stats.tab === 'actors') content.append(...renderActorsTab());
@@ -48,6 +50,7 @@ function getMissingMetaItems() {
     if (!isActive) return false;
     if (!x.cast?.length) return true;
     if (x.type === 'movie' && !x.runtime) return true;
+    if (x.countries === undefined) return true;
     return false;
   });
 }
@@ -63,7 +66,7 @@ function buildMetaLoaderBanner() {
     lt.id = 'meta-loader-progress-text';
     loader.append(lt);
   } else {
-    loader.append(el('div', 'cast-loader-text', `Для ${missing.length} з ${items.length} тайтлів ще немає повних метаданих (час, стрімінги або актори)`));
+    loader.append(el('div', 'cast-loader-text', `Для ${missing.length} з ${items.length} тайтлів ще немає повних метаданих (час, стрімінги, країни або актори)`));
     const btn = el('button', 'cast-loader-btn', '📥 Завантажити метадані з TMDB');
     btn.addEventListener('click', async () => {
       state.stats.castLoading = true;
@@ -92,6 +95,7 @@ async function fetchAllMissingMeta() {
         let changed = false;
         if (meta.cast && !lib[item.key].cast?.length) { lib[item.key].cast = meta.cast; changed = true; }
         if (meta.genres && !lib[item.key].genres?.length) { lib[item.key].genres = meta.genres; changed = true; }
+        if (lib[item.key].countries === undefined && Array.isArray(meta.countries)) { lib[item.key].countries = meta.countries; changed = true; }
         if (meta.runtime && !lib[item.key].runtime) { lib[item.key].runtime = meta.runtime; changed = true; }
         if (meta.episode_count && !lib[item.key].episode_count) { lib[item.key].episode_count = meta.episode_count; changed = true; }
         if (meta.totalSeasons && !lib[item.key].totalSeasons) { lib[item.key].totalSeasons = meta.totalSeasons; changed = true; }
@@ -144,6 +148,10 @@ function renderTasteTab() {
   const taste = computeTasteVector();
   if (!taste || taste.count < 3) return [el('div', 'avail-empty', 'Потрібно мінімум 3 оцінки, щоб побачити аналіз')];
   const wrap = el('div');
+
+  if (typeof computeTempAvatarData === 'function' && typeof buildTempAvatarCard === 'function') {
+    wrap.append(buildTempAvatarCard(computeTempAvatarData()));
+  }
 
   wrap.append(buildTasteCard(taste));
 
@@ -720,6 +728,300 @@ function renderFranchisesTab() {
   });
 
   wrap.append(list);
+  return [wrap];
+}
+
+const COUNTRY_DICT = {
+  US: { name: 'США', adjPl: 'американські', region: 'na' },
+  GB: { name: 'Велика Британія', adjPl: 'британські', region: 'europe' },
+  UA: { name: 'Україна', adjPl: 'українські', region: 'europe' },
+  FR: { name: 'Франція', adjPl: 'французькі', region: 'europe' },
+  DE: { name: 'Німеччина', adjPl: 'німецькі', region: 'europe' },
+  JP: { name: 'Японія', adjPl: 'японські', region: 'asia' },
+  KR: { name: 'Південна Корея', adjPl: 'південнокорейські', region: 'asia' },
+  IT: { name: 'Італія', adjPl: 'італійські', region: 'europe' },
+  ES: { name: 'Іспанія', adjPl: 'іспанські', region: 'europe' },
+  CA: { name: 'Канада', adjPl: 'канадські', region: 'na' },
+  AU: { name: 'Австралія', adjPl: 'австралійські', region: 'oceania' },
+  SE: { name: 'Швеція', adjPl: 'шведські', region: 'europe' },
+  DK: { name: 'Данія', adjPl: 'данські', region: 'europe' },
+  NO: { name: 'Норвегія', adjPl: 'норвезькі', region: 'europe' },
+  FI: { name: 'Фінляндія', adjPl: 'фінські', region: 'europe' },
+  IS: { name: 'Ісландія', adjPl: 'ісландські', region: 'europe' },
+  PL: { name: 'Польща', adjPl: 'польські', region: 'europe' },
+  CZ: { name: 'Чехія', adjPl: 'чеські', region: 'europe' },
+  NL: { name: 'Нідерланди', adjPl: 'нідерландські', region: 'europe' },
+  BE: { name: 'Бельгія', adjPl: 'бельгійські', region: 'europe' },
+  AT: { name: 'Австрія', adjPl: 'австрійські', region: 'europe' },
+  CH: { name: 'Швейцарія', adjPl: 'швейцарські', region: 'europe' },
+  IE: { name: 'Ірландія', adjPl: 'ірландські', region: 'europe' },
+  PT: { name: 'Португалія', adjPl: 'португальські', region: 'europe' },
+  GR: { name: 'Греція', adjPl: 'грецькі', region: 'europe' },
+  HU: { name: 'Угорщина', adjPl: 'угорські', region: 'europe' },
+  RO: { name: 'Румунія', adjPl: 'румунські', region: 'europe' },
+  IN: { name: 'Індія', adjPl: 'індійські', region: 'asia' },
+  CN: { name: 'Китай', adjPl: 'китайські', region: 'asia' },
+  HK: { name: 'Гонконг', adjPl: 'гонконзькі', region: 'asia' },
+  TW: { name: 'Тайвань', adjPl: 'тайванські', region: 'asia' },
+  TH: { name: 'Таїланд', adjPl: 'таїландські', region: 'asia' },
+  MX: { name: 'Мексика', adjPl: 'мексиканські', region: 'latam' },
+  BR: { name: 'Бразилія', adjPl: 'бразильські', region: 'latam' },
+  AR: { name: 'Аргентина', adjPl: 'аргентинські', region: 'latam' },
+  NZ: { name: 'Нова Зеландія', adjPl: 'новозеландські', region: 'oceania' },
+  TR: { name: 'Туреччина', adjPl: 'турецькі', region: 'other' },
+  IL: { name: 'Ізраїль', adjPl: 'ізраїльські', region: 'other' }
+};
+
+const GENRE_NOUN_PL = {
+  18: 'драми', 35: 'комедії', 53: 'трилери', 80: 'кримінальні історії',
+  28: 'бойовики', 12: 'пригоди', 16: 'анімаційні проєкти', 878: 'фантастичні стрічки',
+  14: 'фентезі-проєкти', 27: 'горори', 9648: 'детективи', 10749: 'романтичні історії',
+  99: 'документальні проєкти', 10752: 'воєнні драми', 10768: 'політичні драми',
+  36: 'історичні стрічки', 10751: 'сімейні стрічки', 37: 'вестерни', 10765: 'фантастику й фентезі'
+};
+
+let _regionDisplayNames = null;
+function getCountryMeta(code) {
+  const iso = String(code || '').toUpperCase();
+  const flag = /^[A-Z]{2}$/.test(iso)
+    ? String.fromCodePoint(...iso.split('').map(ch => 127397 + ch.charCodeAt(0)))
+    : '🌐';
+  if (COUNTRY_DICT[iso]) return { code: iso, flag, ...COUNTRY_DICT[iso] };
+  let name = iso;
+  try {
+    if (!_regionDisplayNames && typeof Intl !== 'undefined' && Intl.DisplayNames) {
+      _regionDisplayNames = new Intl.DisplayNames(['uk'], { type: 'region' });
+    }
+    if (_regionDisplayNames) name = _regionDisplayNames.of(iso) || iso;
+  } catch {}
+  return { code: iso, flag, name, adjPl: null, region: 'other' };
+}
+
+function buildCountryInsightNode(labelTxt, parts) {
+  const ins = el('div', 'insight-card');
+  ins.append(el('div', 'insight-label', labelTxt));
+  const txt = el('div', 'insight-text');
+  parts.forEach(p => {
+    if (typeof p === 'string') txt.append(document.createTextNode(p));
+    else if (p && p.strong) {
+      const b = el('strong');
+      b.textContent = p.strong;
+      txt.append(b);
+    }
+  });
+  ins.append(txt);
+  return ins;
+}
+
+function describeCountrySubset(items) {
+  const mCnt = items.filter(x => x.type === 'movie').length;
+  const tCnt = items.filter(x => x.type === 'tv').length;
+  const gMap = {};
+  items.forEach(x => (x.genres || []).forEach(gid => {
+    if (GENRE_NOUN_PL[gid]) gMap[gid] = (gMap[gid] || 0) + 1;
+  }));
+  const topG = Object.entries(gMap).sort((a, b) => b[1] - a[1])[0];
+  if (tCnt >= 2 && tCnt >= mCnt * 1.5) return 'серіали';
+  if (mCnt >= 2 && mCnt >= tCnt * 1.5) return 'фільми';
+  if (topG && topG[1] >= 2) return GENRE_NOUN_PL[topG[0]];
+  return tCnt > mCnt ? 'серіали' : (mCnt > tCnt ? 'фільми' : 'тайтли');
+}
+
+function renderCountriesTab() {
+  const wrap = el('div');
+  const loader = buildMetaLoaderBanner();
+  if (loader) wrap.append(loader);
+
+  const items = Object.values(lib).filter(x => hasWatched(x) && Array.isArray(x.countries) && x.countries.length > 0);
+  if (!items.length) {
+    wrap.append(el('div', 'avail-empty', 'Поки немає даних про країни виробництва. Натисни «Завантажити метадані з TMDB» вище або відкрий кілька карток.'));
+    return [wrap];
+  }
+
+  const cMap = new Map();
+  let nonUsCount = 0;
+
+  items.forEach(item => {
+    const avg = computeItemRating(item).avg;
+    const isUsOnly = item.countries.length === 1 && item.countries[0] === 'US';
+    if (!isUsOnly) nonUsCount++;
+
+    item.countries.forEach(code => {
+      const meta = getCountryMeta(code);
+      if (!cMap.has(meta.code)) {
+        cMap.set(meta.code, {
+          ...meta,
+          items: [],
+          watched: 0,
+          movies: 0,
+          tv: 0,
+          ratedSum: 0,
+          ratedCnt: 0
+        });
+      }
+      const st = cMap.get(meta.code);
+      st.items.push(item);
+      st.watched++;
+      if (item.type === 'movie') st.movies++;
+      else st.tv++;
+      if (avg > 0) { st.ratedSum += avg; st.ratedCnt++; }
+    });
+  });
+
+  const list = [...cMap.values()].map(c => ({
+    ...c,
+    avg: c.ratedCnt > 0 ? c.ratedSum / c.ratedCnt : 0
+  })).sort((a, b) => b.watched - a.watched || b.avg - a.avg || a.name.localeCompare(b.name, 'uk'));
+
+  const topCountry = list[0];
+  const minForBest = items.length >= 15 ? 3 : 2;
+  const bestByAvg = [...list]
+    .filter(c => c.ratedCnt >= minForBest)
+    .sort((a, b) => b.avg - a.avg || b.watched - a.watched)[0];
+  const nonUsPct = Math.round((nonUsCount / items.length) * 100);
+
+  const sg = el('div', 'stats-grid');
+  const addS = (l, v) => { const s = el('div', 'stat-card'); s.append(el('div', 'stat-value', String(v)), el('div', 'stat-label', l)); sg.append(s); };
+  addS('Країн відкрито', list.length);
+  addS('Головна країна', `${topCountry.flag} ${Math.round((topCountry.watched / items.length) * 100)}%`);
+  addS('Не-американське', `${nonUsPct}%`);
+  addS('Найвища оцінка', bestByAvg ? `${bestByAvg.flag} ${fmtNum(bestByAvg.avg)}` : '—');
+  wrap.append(sg);
+
+  // Інсайти (останній тренд + улюблена країна)
+  const recentItems = [...items]
+    .sort((a, b) => (b.statusDate || b.updated || b.createdAt || 0) - (a.statusDate || a.updated || a.createdAt || 0))
+    .slice(0, 12);
+
+  if (recentItems.length >= 4) {
+    const recCountryBuckets = new Map();
+    const recRegionBuckets = { europe: [], asia: [], latam: [] };
+
+    recentItems.forEach(it => {
+      it.countries.forEach(code => {
+        const m = getCountryMeta(code);
+        if (m.code !== 'US') {
+          if (!recCountryBuckets.has(m.code)) recCountryBuckets.set(m.code, { meta: m, items: [] });
+          recCountryBuckets.get(m.code).items.push(it);
+        }
+        if (recRegionBuckets[m.region] && !recRegionBuckets[m.region].includes(it)) {
+          recRegionBuckets[m.region].push(it);
+        }
+      });
+    });
+
+    const topRecCountry = [...recCountryBuckets.values()].sort((a, b) => b.items.length - a.items.length)[0];
+    const topRecRegion = Object.entries(recRegionBuckets).sort((a, b) => b[1].length - a[1].length)[0];
+
+    if (topRecCountry && topRecCountry.items.length >= 2 && topRecCountry.meta.adjPl) {
+      const sub = describeCountrySubset(topRecCountry.items);
+      const rAvgList = topRecCountry.items.map(x => computeItemRating(x).avg).filter(v => v > 0);
+      const rAvg = rAvgList.length ? rAvgList.reduce((a, b) => a + b, 0) / rAvgList.length : 0;
+      const phrase = `${topRecCountry.meta.adjPl} ${sub}`;
+      const parts = ['Останнім часом тобі особливо заходять ', { strong: phrase }, ` (${topRecCountry.items.length} із останніх ${recentItems.length}`];
+      if (rAvg > 0) parts.push(`, сер. ⭐ `, { strong: fmtNum(rAvg) });
+      parts.push(').');
+      wrap.append(buildCountryInsightNode('🧭 Нещодавній маршрут', parts));
+    } else if (topRecRegion && topRecRegion[1].length >= 3) {
+      const regAdj = { europe: 'європейські', asia: 'азійські', latam: 'латиноамериканські' }[topRecRegion[0]];
+      const sub = describeCountrySubset(topRecRegion[1]);
+      const rAvgList = topRecRegion[1].map(x => computeItemRating(x).avg).filter(v => v > 0);
+      const rAvg = rAvgList.length ? rAvgList.reduce((a, b) => a + b, 0) / rAvgList.length : 0;
+      const parts = ['Ти останнім часом полюбляєш ', { strong: `${regAdj} ${sub}` }, ` — уже ${topRecRegion[1].length} із останніх ${recentItems.length}`];
+      if (rAvg > 0) parts.push(` (сер. ⭐ `, { strong: fmtNum(rAvg) }, ')');
+      parts.push('.');
+      wrap.append(buildCountryInsightNode('🧭 Нещодавній маршрут', parts));
+    }
+  }
+
+  if (bestByAvg && bestByAvg.code !== topCountry.code) {
+    wrap.append(buildCountryInsightNode('🏆 Фаворит якості', [
+      'Найчастіше ти дивишся ', { strong: `${topCountry.flag} ${topCountry.name}` }, ` (${topCountry.watched}), але найвищу середню оцінку отримує `,
+      { strong: `${bestByAvg.flag} ${bestByAvg.name}` }, ' — ', { strong: `${fmtNum(bestByAvg.avg)}/10` }, '.'
+    ]));
+  }
+
+  if (!state.stats.openCountries) state.stats.openCountries = {};
+
+  wrap.append(el('h3', 'label', `Усі країни (${list.length})`));
+  const maxWatched = list[0].watched;
+  const rowsWrap = el('div', 'franchise-list');
+
+  list.forEach((c, idx) => {
+    const isOpen = !!state.stats.openCountries[c.code];
+    const cardWrap = el('div', 'franchise-card' + (isOpen ? ' open' : ''));
+
+    const row = el('div', 'franchise-head');
+    row.append(el('div', 'actor-rank-num', String(idx + 1)));
+    row.append(el('div', 'country-flag-box', c.flag));
+
+    const body = el('div', 'franchise-body');
+    const top = el('div', 'series-prog-top');
+    top.append(el('span', 'elo-title', c.name));
+    const rightTxt = c.avg > 0 ? `⭐ ${fmtNum(c.avg)}` : String(c.watched);
+    const valCls = 'series-prog-val' + (c.avg > 0 ? ' ' + ratingClass(c.avg) : '');
+    top.append(el('span', valCls, rightTxt));
+    body.append(top);
+
+    body.append(el('div', 'elo-games', `${c.watched} ${plural(c.watched, 'тайтл', 'тайтли', 'тайтлів')} · ${c.movies} ф. · ${c.tv} с.`));
+
+    const bar = el('div', 'item-progress');
+    const fill = el('div', 'item-progress-fill');
+    fill.style.width = Math.round((c.watched / maxWatched) * 100) + '%';
+    bar.append(fill);
+    body.append(bar);
+
+    row.append(body);
+    row.append(el('span', 'franchise-chev', isOpen ? '▴' : '▾'));
+
+    const partsBox = el('div', 'franchise-parts');
+    partsBox.style.display = isOpen ? 'flex' : 'none';
+
+    const renderParts = () => {
+      partsBox.replaceChildren();
+      c.items
+        .slice()
+        .sort((a, b) => computeItemRating(b).avg - computeItemRating(a).avg || (b.updated || 0) - (a.updated || 0))
+        .forEach(it => {
+          const pr = el('div', 'franchise-part-row');
+          if (it.poster) {
+            const pp = el('img', 'franchise-part-poster');
+            pp.src = TMDB_IMG + 'w92' + it.poster;
+            pp.loading = 'lazy';
+            pr.append(pp);
+          } else {
+            pr.append(el('div', 'franchise-part-poster poster-empty'));
+          }
+          const pi = el('div', 'elo-info');
+          pi.append(el('div', 'elo-title', it.title || ''));
+          const stLabel = it.status === 'watched' ? '✅' : (it.status === 'watching' ? '▶️' : (it.status === 'dropped' ? '🕸️' : ''));
+          const metaStr = [it.type === 'tv' ? 'Серіал' : 'Фільм', it.year, stLabel].filter(Boolean).join(' · ');
+          pi.append(el('div', 'elo-games', metaStr));
+          pr.append(pi);
+
+          const sAvg = computeItemRating(it).avg;
+          if (sAvg > 0) pr.append(el('span', 'badge rated ' + ratingClass(sAvg), fmtNum(sAvg)));
+          pr.addEventListener('click', (e) => { e.stopPropagation(); openCard(it); });
+          partsBox.append(pr);
+        });
+    };
+
+    if (isOpen) renderParts();
+
+    row.addEventListener('click', () => {
+      const next = !state.stats.openCountries[c.code];
+      state.stats.openCountries[c.code] = next;
+      cardWrap.classList.toggle('open', next);
+      row.querySelector('.franchise-chev').textContent = next ? '▴' : '▾';
+      if (next && !partsBox.childElementCount) renderParts();
+      partsBox.style.display = next ? 'flex' : 'none';
+    });
+
+    cardWrap.append(row, partsBox);
+    rowsWrap.append(cardWrap);
+  });
+
+  wrap.append(rowsWrap);
   return [wrap];
 }
 

@@ -421,7 +421,7 @@
             let newStatus = s.status;
             const avg = computeAverage(newR);
             if (avg > 0) newStatus = 'watched'; else if (avg === 0 && s.status === 'watched') newStatus = null;
-            update(r, { ratings: newR, status: newStatus });
+            update(r, { ratings: newR, status: newStatus, ratingUpdated: Date.now() });
           };
           lights.append(light);
         }

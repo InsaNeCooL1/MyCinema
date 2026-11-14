@@ -181,6 +181,18 @@ function openReactionModal(r, epKey, current) {
   };
 }
 
+function rerenderCardTabsInPlace(ctx) {
+  const wrap = card.querySelector('.mobile-tabs-wrap');
+  const scroll = card.querySelector('.card-scroll');
+  if (!wrap) { renderCard(true); return; }
+  const savedTop = scroll ? scroll.scrollTop : 0;
+  wrap.replaceChildren(buildCardTabs(ctx), buildCardTabContent(ctx));
+  if (scroll) {
+    scroll.scrollTop = savedTop;
+    requestAnimationFrame(() => { if (scroll.isConnected) scroll.scrollTop = savedTop; });
+  }
+}
+
 function renderSeasonsTab(ctx) {
   const d = ctx.details;
   const r = ctx.item;
@@ -201,11 +213,15 @@ function renderSeasonsTab(ctx) {
       sel.episodes = data.episodes || [];
       sel.episodesLoaded = true;
       ctx.seasonState.loadingSeason = false;
-      if (cardStack[cardStack.length - 1] === ctx) renderCard(true);
+      if (cardStack[cardStack.length - 1] === ctx) {
+        if (ctx.activeTab === 'seasons') rerenderCardTabsInPlace(ctx);
+      }
     }).catch(() => {
       sel.episodesLoaded = true;
       ctx.seasonState.loadingSeason = false;
-      if (cardStack[cardStack.length - 1] === ctx) renderCard(true);
+      if (cardStack[cardStack.length - 1] === ctx) {
+        if (ctx.activeTab === 'seasons') rerenderCardTabsInPlace(ctx);
+      }
     });
   }
 
@@ -220,8 +236,7 @@ function renderSeasonsTab(ctx) {
     tab.addEventListener('click', () => {
       if (ctx.seasonState.selectedSeason === season.season_number) return;
       ctx.seasonState.selectedSeason = season.season_number;
-      if (typeof saveCardScroll === 'function') saveCardScroll();
-      renderCard(true);
+      rerenderCardTabsInPlace(ctx); // season
     });
     tabsBar.append(tab);
   });
@@ -264,7 +279,9 @@ function renderSeasonsTab(ctx) {
         let newStatus = s.status;
         const avg = computeAverage(curSR);
         if (avg > 0 && newStatus !== 'watched') newStatus = 'watching';
-        update(r, { seasonRatings: newSR, status: newStatus });
+        const newTs = { ...(s.seasonRatingTs || {}) };
+        if (Object.keys(curSR).length > 0) newTs[selNum] = Date.now(); else delete newTs[selNum];
+        update(r, { seasonRatings: newSR, status: newStatus, seasonRatingTs: newTs });
       };
       lights.append(light);
     }
@@ -383,8 +400,19 @@ function renderStudiosTab(ctx) {
   
   const wrap = el('div', 'studios-grid');
   companies.forEach(c => {
-    const btn = el('button', 'studio-chip', c.name);
-    btn.onclick = () => alert('Розробка сторінки студії: ' + c.name);
+    const btn = el('button', 'studio-chip');
+    btn.type = 'button';
+    if (c.logo_path) {
+      const logo = el('img', 'studio-chip-logo');
+      logo.src = TMDB_IMG + 'w92' + c.logo_path;
+      logo.alt = '';
+      logo.loading = 'lazy';
+      btn.append(logo);
+    }
+    btn.append(el('span', '', c.name));
+    btn.onclick = () => {
+      if (typeof openCompany === 'function') openCompany(c.id);
+    };
     wrap.append(btn);
   });
   return [wrap];
@@ -392,7 +420,7 @@ function renderStudiosTab(ctx) {
 
 function buildCardTabs(ctx) {
   const r = ctx.item;
-  const isDesktop = window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
+  const isDesktop = typeof isDesktopLayout === 'function' ? isDesktopLayout() : window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
   let tabsList;
   if (r.type === 'tv') {
     tabsList = [{ id: 'seasons', label: 'Сезони' }, { id: 'cast', label: 'Актори' }];
@@ -409,9 +437,10 @@ function buildCardTabs(ctx) {
   const tabs = el('div', 'card-tabs');
   for (const t of tabsList) {
     const btn = el('button', 'card-tab' + (ctx.activeTab === t.id ? ' active' : ''), t.label);
-    btn.addEventListener('click', () => { 
-      ctx.activeTab = t.id; 
-      renderCard(); 
+    btn.addEventListener('click', () => {
+      if (ctx.activeTab === t.id) return;
+      ctx.activeTab = t.id;
+      rerenderCardTabsInPlace(ctx); // tab
     });
     tabs.append(btn);
   }

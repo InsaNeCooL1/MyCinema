@@ -782,6 +782,14 @@ function extractItemMeta(d, type) {
   if (d.credits?.cast?.length) {
     meta.cast = d.credits.cast.slice(0, CAST_LIMIT).map(a => ({ id: a.id, name: a.name, profile_path: a.profile_path }));
   }
+  const countrySet = new Set();
+  if (Array.isArray(d.production_countries)) {
+    d.production_countries.forEach(c => { if (c && c.iso_3166_1) countrySet.add(c.iso_3166_1.toUpperCase()); });
+  }
+  if (!countrySet.size && Array.isArray(d.origin_country)) {
+    d.origin_country.forEach(code => { if (typeof code === 'string' && code) countrySet.add(code.toUpperCase()); });
+  }
+  meta.countries = [...countrySet];
 
   if (type === 'movie') {
     if (d.runtime > 0) meta.runtime = d.runtime;
