@@ -887,7 +887,21 @@ function renderActorsTab() {
   if (state.stats.actorTab === 'rating' && display.length > 0) {
     const hint = el('div');
     hint.style.cssText = 'padding:10px 14px;background:rgba(var(--accent-rgb),.06);border-left:3px solid var(--accent);border-radius:8px;font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:12px';
-    hint.innerHTML = `Критерій <strong style="color:var(--accent)">«Персонажі і каст»</strong> відносно твоєї середньої (<strong style="color:var(--accent)">${fmtNum(globalCastAvg)}</strong>): головні ролі (0–3), бонус за хіти, % штраф нижче (-10% на -0,85; -20% на -1,5), база ${ACTOR_REF_PROJECTS} проєктів і згортання повторів франшиз (вкл. MCU).`;
+    // [FIX-P2-3] Безпечна побудова без innerHTML
+    hint.replaceChildren();
+    var _hb1 = document.createElement('strong');
+    _hb1.style.color = 'var(--accent)';
+    _hb1.textContent = '«Персонажі і каст»';
+    var _hb2 = document.createElement('strong');
+    _hb2.style.color = 'var(--accent)';
+    _hb2.textContent = fmtNum(globalCastAvg);
+    hint.append(
+      document.createTextNode('Критерій '),
+      _hb1,
+      document.createTextNode(' відносно твоєї середньої ('),
+      _hb2,
+      document.createTextNode('): головні ролі (0–3), бонус за хіти, % штраф нижче (-10% на -0,85; -20% на -1,5), база ' + ACTOR_REF_PROJECTS + ' проєктів і згортання повторів франшиз (вкл. MCU).')
+    );
     content.append(hint);
   }
 

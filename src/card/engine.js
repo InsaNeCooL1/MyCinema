@@ -141,7 +141,7 @@ async function loadMediaCardData(ctx) {
     const _provUA = extractProvidersUA(d);
     r.streamingUA = _provUA;
     if (lib[r.key]) lib[r.key].streamingUA = _provUA;
-    _dirtyItems.add(r.key);
+    if (window.currentUser) _dirtyItems.add(r.key);
     if ('franchiseKey' in meta) {
       ctx.franchiseKey = meta.franchiseKey;
       r.franchiseKey = meta.franchiseKey;
@@ -188,7 +188,7 @@ async function loadMediaCardData(ctx) {
         .then(omdbData => {
           if (omdbData.Response === "True") {
             ctx.omdb = omdbData;
-            if (cardStack[cardStack.length - 1] === ctx) { saveCardScroll(); renderCard(true); } /* FIX-OMDB-SCROLL */
+            if (cardStack[cardStack.length - 1] === ctx && !ctx.playingTrailer) { saveCardScroll(); renderCard(true); } /* FIX-OMDB-SCROLL */
           }
         })
         .catch(e => console.warn('[MyCinema/OMDb] fetch fail:', e));
@@ -200,7 +200,7 @@ async function loadMediaCardData(ctx) {
         if (wiki?.text) {
           ctx.wikiOverview = wiki.text;
           ctx.wikiUrl = wiki.url || null;
-          if (cardStack[cardStack.length - 1] === ctx) { saveCardScroll(); renderCard(true); } /* FIX-WIKI-SCROLL */
+          if (cardStack[cardStack.length - 1] === ctx && !ctx.playingTrailer) { saveCardScroll(); renderCard(true); } /* FIX-WIKI-SCROLL */
         }
       });
     }
@@ -311,6 +311,10 @@ function attachCtxMeta(entry, ctx) {
   if (ctx.cast?.length && !entry.cast?.length) entry.cast = ctx.cast;
   if (entry.type === 'tv' && !entry.totalSeasons && ctx.details?.seasons) {
     entry.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
+  }
+  // [FIX-BUG-6] Переносимо episode_count одразу, щоб прогрес-бар не був без знаменника
+  if (entry.type === 'tv' && !entry.episode_count && ctx.details?.number_of_episodes) {
+    entry.episode_count = ctx.details.number_of_episodes;
   }
   if (entry.type === 'movie' && entry.collection === undefined && ctx.collection !== undefined) {
     entry.collection = ctx.collection;

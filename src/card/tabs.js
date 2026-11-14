@@ -11,17 +11,20 @@ function renderDetailsTab(ctx) {
   };
 
   const directors = (d.credits?.crew || []).filter(c => c.job === 'Director').map(c => c.name).join(', ');
-  const producers = (d.credits?.crew || []).filter(c => c.job === 'Producer').slice(0, 5).map(c => c.name).join(', ');
   const countries = (d.production_countries || []).map(c => c.name).join(', ');
+
+  let dateStr = d.release_date || d.first_air_date;
+  if (dateStr) {
+    const dt = new Date(dateStr);
+    if (!isNaN(dt)) dateStr = dt.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
 
   addItem('Франшиза', d.belongs_to_collection?.name || null);
   addItem('Бюджет', d.budget ? '$' + d.budget.toLocaleString('en-US') : null);
   addItem('Збори', d.revenue ? '$' + d.revenue.toLocaleString('en-US') : null);
-  addItem('Дата виходу', d.release_date || d.first_air_date);
+  addItem('Дата виходу', dateStr);
   addItem('Країна', countries);
   addItem('Режисер', directors);
-  addItem('Продюсери', producers);
-  if (d.vote_count) addItem('Голосів TMDB', d.vote_count.toLocaleString('en-US'));
 
   return [wrap];
 }
@@ -135,6 +138,8 @@ function renderEpisodeReactions(r, selNum, epNum, epKey, ctx) {
       if (wEps.length === 0 && s.status === 'watching') newStatus = 'planned';
       
       update(r, { epReactions: newReactions, watchedEpisodes: wEps, status: newStatus });
+      _dirtyItems.add(r.key);
+      saveNow();
     };
     wrap.append(btn);
   } else {
@@ -152,6 +157,8 @@ function renderEpisodeReactions(r, selNum, epNum, epKey, ctx) {
         if (newStatus !== 'watched') newStatus = 'watching';
         
         update(r, { epReactions: newReactions, watchedEpisodes: wEps, status: newStatus });
+      _dirtyItems.add(r.key);
+      saveNow();
       };
       wrap.append(btn);
     });
@@ -327,14 +334,29 @@ function renderSeasonsTab(ctx) {
   return [wrap];
 }
 
+
+function renderStudiosTab(ctx) {
+  const companies = (ctx.details.production_companies || []).filter(c => c.name);
+  if (!companies.length) return [el('div', 'avail-empty', 'Немає даних про студії')];
+  
+  const wrap = el('div', 'studios-grid');
+  companies.forEach(c => {
+    const btn = el('button', 'studio-chip', c.name);
+    btn.onclick = () => alert('Розробка сторінки студії: ' + c.name);
+    wrap.append(btn);
+  });
+  return [wrap];
+}
+
 function buildCardTabs(ctx) {
   const r = ctx.item;
   let tabsList;
   if (r.type === 'tv') {
-    tabsList = [{ id: 'seasons', label: 'Сезони' }, { id: 'cast', label: 'Актори' }, { id: 'details', label: 'Детально' }];
+    tabsList = [{ id: 'seasons', label: 'Сезони' }, { id: 'cast', label: 'Актори' }];
   } else {
-    tabsList = [{ id: 'cast', label: 'Актори' }, { id: 'details', label: 'Детально' }];
+    tabsList = [{ id: 'cast', label: 'Актори' }];
   }
+  tabsList.push({ id: 'studios', label: 'Студії' });
   if (ctx.similar && ctx.similar.length > 0) tabsList.push({ id: 'similar', label: 'Схоже' });
   tabsList.push({ id: 'notes', label: 'Нотатки' });
 
@@ -355,8 +377,8 @@ function buildCardTabs(ctx) {
 function buildCardTabContent(ctx) {
   const tabContent = el('div', 'card-tab-content');
   if (ctx.activeTab === 'cast') tabContent.append(...renderCastTab(ctx));
-  else if (ctx.activeTab === 'details') tabContent.append(...renderDetailsTab(ctx));
   else if (ctx.activeTab === 'seasons') tabContent.append(...renderSeasonsTab(ctx));
+  else if (ctx.activeTab === 'studios') tabContent.append(...renderStudiosTab(ctx));
   else if (ctx.activeTab === 'similar') tabContent.append(...renderSimilarTab(ctx));
   else if (ctx.activeTab === 'notes') tabContent.append(...renderNotesTab(ctx));
   return tabContent;
