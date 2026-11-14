@@ -48,9 +48,9 @@ const STREAMING_PROVIDERS = [
 
 // ============ RATING CRITERIA ============
 const RATING_CRITERIA = [
-  { key: 'plot', label: 'Сюжет' }, { key: 'cast', label: 'Персонажі і каст' },
-  { key: 'style', label: 'Стилістика і картинка' }, { key: 'emotions', label: 'Емоції' },
-  { key: 'overall', label: 'Загальне враження' }
+  { key: 'plot', label: 'Сюжет' }, { key: 'cast', label: 'Персонажі' },
+  { key: 'style', label: 'Візуал' }, { key: 'emotions', label: 'Емоції' },
+  { key: 'overall', label: 'Враження' }
 ];
 
 // ============ GENRES ============

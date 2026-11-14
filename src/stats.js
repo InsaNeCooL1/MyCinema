@@ -879,7 +879,7 @@ function renderActorsTab() {
   }
 
   if (!display.length) {
-    content.append(el('div', 'avail-empty', state.stats.actorTab === 'rating' ? 'Немає проєктів з оцінкою «Персонажі і каст»' : 'Немає переглянутих проєктів з акторами'));
+    content.append(el('div', 'avail-empty', state.stats.actorTab === 'rating' ? 'Немає проєктів з оцінкою «Персонажі»' : 'Немає переглянутих проєктів з акторами'));
     wrap.append(content);
     return [wrap];
   }
