@@ -122,49 +122,62 @@ function renderEpisodeReactions(r, selNum, epNum, epKey, ctx) {
   const reactions = s.epReactions || {};
   const current = reactions[epKey] || null;
   
-  const wrap = el('div', 'ep-reactions');
-  
+  const btn = el('button', 'ep-reaction-trigger' + (current ? ' has-reaction' : ''));
   if (current) {
-    const btn = el('button', 'ep-reaction-selected', current);
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      const newReactions = { ...reactions };
-      delete newReactions[epKey];
-      
-      let wEps = s.watchedEpisodes || [];
-      wEps = wEps.filter(k => k !== epKey);
-      
-      let newStatus = s.status;
-      if (wEps.length === 0 && s.status === 'watching') newStatus = 'planned';
-      
-      update(r, { epReactions: newReactions, watchedEpisodes: wEps, status: newStatus });
-      _dirtyItems.add(r.key);
-      saveNow();
-    };
-    wrap.append(btn);
+    btn.textContent = current;
   } else {
-    const emojis = ['😴', '🥲', '😍', '😐', '🙂'];
-    emojis.forEach(em => {
-      const btn = el('button', 'ep-reaction-opt', em);
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        const newReactions = { ...reactions, [epKey]: em };
-        
-        let wEps = s.watchedEpisodes || [];
-        if (!wEps.includes(epKey)) wEps.push(epKey);
-        
-        let newStatus = s.status;
-        if (newStatus !== 'watched') newStatus = 'watching';
-        
-        update(r, { epReactions: newReactions, watchedEpisodes: wEps, status: newStatus });
-      _dirtyItems.add(r.key);
-      saveNow();
-      };
-      wrap.append(btn);
-    });
+    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>';
   }
+
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    openReactionModal(r, epKey, current);
+  };
+
+  return btn;
+}
+
+function openReactionModal(r, epKey, current) {
+  document.querySelectorAll('.reaction-modal-overlay').forEach(x => x.remove());
+
+  const overlay = el('div', 'reaction-modal-overlay');
+  const content = el('div', 'reaction-modal-content');
+  const row = el('div', 'reaction-emoji-row');
+
+  const emojis = ['😴', '🥲', '😍', '😐', '🙂'];
   
-  return wrap;
+  emojis.forEach(em => {
+    const emBtn = el('button', 'reaction-emoji-btn' + (current === em ? ' active' : ''), em);
+    emBtn.onclick = (e) => {
+      e.stopPropagation();
+      const s = lib[r.key] || {};
+      const newReactions = { ...(s.epReactions || {}) };
+      let wEps = s.watchedEpisodes || [];
+      let newStatus = s.status;
+
+      if (current === em) {
+        delete newReactions[epKey];
+        wEps = wEps.filter(k => k !== epKey);
+        if (wEps.length === 0 && s.status === 'watching') newStatus = 'planned';
+      } else {
+        newReactions[epKey] = em;
+        if (!wEps.includes(epKey)) wEps.push(epKey);
+        if (newStatus !== 'watched') newStatus = 'watching';
+      }
+
+      update(r, { epReactions: newReactions, watchedEpisodes: wEps, status: newStatus });
+      overlay.remove();
+    };
+    row.append(emBtn);
+  });
+
+  content.append(row);
+  overlay.append(content);
+  document.body.append(overlay);
+
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
 }
 
 function renderSeasonsTab(ctx) {
