@@ -91,6 +91,7 @@
     /* FIX-AGE-RIGHT */
     const d = ctx.details;
     const r = ctx.item;
+    const s = lib[r.key] || {}; /* FIX-TITLE-CRASH-FIXED — додано для кнопки Дивлюсь */
     const wrap = el('div', 'mobile-title');
     
     // 1. Головна назва
@@ -227,6 +228,17 @@
     }
 
     if (ratingsWrap.children.length > 0) metaRow2.append(ratingsWrap);
+
+    /* FIX-TITLE-WATCH-BTN */
+    if (r.type === 'tv') {
+      const isWatching = s.status === 'watching';
+      const watchBtn = el('button', 'title-watch-btn' + (isWatching ? ' active' : ''), 'Дивлюсь');
+      watchBtn.onclick = () => {
+        update(r, { status: isWatching ? null : 'watching' });
+      };
+      metaRow2.append(watchBtn);
+    }
+
     if (metaRow2.children.length > 0) wrap.append(metaRow2);
 
     return wrap;
@@ -335,7 +347,7 @@
     };
 
     const others = r.type === 'tv' 
-      ? [['watching', 'Дивлюсь', ICONS.watching], ['planned', 'Планую', ICONS.planned], ['dropped', 'Закинуто', ICONS.dropped]]
+      ? [['planned', 'Планую', ICONS.planned], ['dropped', 'Закинуто', ICONS.dropped]]
       : [['planned', 'Планую', ICONS.planned], ['dropped', 'Закинуто', ICONS.dropped]];
 
     others.forEach(([val, text, iconSvg]) => {

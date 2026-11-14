@@ -282,7 +282,7 @@ input#q::placeholder { color: var(--text-dim); }
 .card-hero-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; pointer-events: none; }
 .card-hero-play svg { width: 72px; height: 72px; filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.8)); transition: transform 0.2s; opacity: 0.9; }
 .card-hero:hover .card-hero-play svg { transform: scale(1.1); opacity: 1; }
-.hero-rating-badge { position: absolute; bottom: 16px; right: 16px; width: 54px; height: 54px; border-radius: 50%; background: rgba(8, 7, 10, 0.85); border: 3px solid var(--accent); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 800; font-size: 18px; color: var(--accent); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); z-index: 2; }
+.hero-rating-badge { position: absolute; bottom: 16px; right: 16px; width: 54px; height: 54px; border-radius: 50%; background: rgba(0, 0, 0, 0.65); /* FIX-HERO-BADGE-BG */ border: 3px solid var(--accent); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 800; font-size: 18px; color: var(--accent); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); z-index: 2; }
 
 .card-title-wrap { display: flex; flex-direction: column; gap: 6px; }
 .title-logo { max-width: 100%; max-height: 140px; object-fit: contain; object-position: left center; margin-bottom: 8px; filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.6)); }
@@ -2719,7 +2719,7 @@ input#q::-webkit-search-cancel-button {
   width: 55px; /* 48px + 15% */
   height: 55px;
   border-radius: 50%;
-  background: rgba(8, 7, 10, 0.85);
+  background: rgba(0, 0, 0, 0.65); /* FIX-HERO-BADGE-BG */
   border: 3px solid #ff2255; /* дефолтний червоний */
   display: flex;
   align-items: center;
@@ -3833,4 +3833,56 @@ span.temp-red {
 }
 .ep-reaction-selected:hover {
   transform: scale(1.1);
+}
+
+/* FIX-TITLE-WATCH-BTN */
+.title-meta-row .title-watch-btn {
+  margin-left: auto;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: .2s;
+}
+.title-meta-row .title-watch-btn.active {
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.4);
+}
+
+/* FIX-HERO-BADGE-OPAQUE-V2 — баланс між прозорістю та читабельністю */
+.mobile-hero .hero-badge {
+  background: rgba(8, 7, 10, 0.75) !important; /* 75% непрозорості */
+  backdrop-filter: blur(10px) !important; /* Сильніше розмиття */
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* FIX-HERO-BADGE-GLOW-RETURN — повертаємо неонове світіння для кружечка */
+.mobile-hero .hero-badge.temp-green {
+  border-color: #00ff88 !important;
+  color: #00ff88 !important;
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.6), inset 0 0 4px rgba(0, 255, 136, 0.2) !important;
+}
+.mobile-hero .hero-badge.temp-yellow {
+  border-color: #ffe600 !important;
+  color: #ffe600 !important;
+  box-shadow: 0 0 12px rgba(255, 230, 0, 0.6), inset 0 0 4px rgba(255, 230, 0, 0.2) !important;
+}
+.mobile-hero .hero-badge.temp-orange {
+  border-color: #ff8800 !important;
+  color: #ff8800 !important;
+  box-shadow: 0 0 12px rgba(255, 136, 0, 0.6), inset 0 0 4px rgba(255, 136, 0, 0.2) !important;
+}
+.mobile-hero .hero-badge.temp-red {
+  border-color: #ff2255 !important;
+  color: #ff2255 !important;
+  box-shadow: 0 0 12px rgba(255, 34, 85, 0.6), inset 0 0 4px rgba(255, 34, 85, 0.2) !important;
 }

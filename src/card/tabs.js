@@ -217,7 +217,9 @@ function renderSeasonsTab(ctx) {
     tab.addEventListener('click', () => {
       if (ctx.seasonState.selectedSeason === season.season_number) return;
       ctx.seasonState.selectedSeason = season.season_number;
-      renderCard();
+      /* FIX-SEASON-SCROLL */
+      if (typeof saveCardScroll === 'function') saveCardScroll();
+      renderCard(true);
     });
     tabsBar.append(tab);
   });
