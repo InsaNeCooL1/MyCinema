@@ -189,6 +189,10 @@ function initColdSplash() {
 
 if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
   initColdSplash();
+} else if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('[SW]', e));
+  });
 }
 /* FIX-DEEPLINK */
 var _initialHash = /^#\/(movie|tv|person|company)\/\d+$/.test(location.hash) ? location.hash : '';

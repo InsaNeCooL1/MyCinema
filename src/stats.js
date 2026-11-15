@@ -6,7 +6,14 @@ function renderStatistics() {
   const wrap = el('div', 'home-wrap');
   const head = el('div', 'section-head');
   head.style.marginTop = '20px';
+  head.style.alignItems = 'center';
   head.append(el('h1', 'section-title', '📊 Обсерваторія'));
+  const shareBtn = el('button', 'obs-share-btn', '📤 Поділитися');
+  shareBtn.type = 'button';
+  shareBtn.addEventListener('click', () => {
+    if (typeof openObservatoryShare === 'function') openObservatoryShare(state.stats.tab);
+  });
+  head.append(shareBtn);
   wrap.append(head);
 
   const tabs = el('div', 'card-tabs');

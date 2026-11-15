@@ -2853,6 +2853,7 @@ html.mc-kbd .card-tab:focus-visible {
 .skeleton-poster { width: 100%; aspect-ratio: 2/3; border-radius: 12px; }
 .skeleton-line-1 { width: 88%; height: 12px; margin-top: 8px; }
 .skeleton-line-2 { width: 52%; height: 10px; margin-top: 6px; }
+.skeleton-line-3 { width: 72%; height: 10px; margin-top: 5px; }
 
 .taste-summary-avatar {
   display: inline-flex;
@@ -3021,4 +3022,97 @@ html.mc-kbd .card-tab:focus-visible {
   .item:hover, .taste-summary:hover, .game-card:hover, .actor-tile:hover, .similar-card:hover {
     transform: none !important;
   }
+}
+
+
+/* FIX-OBS-SHARE-CSS */
+.obs-share-btn {
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), .18), rgba(var(--accent-rgb), .06));
+  border: 1px solid rgba(var(--accent-rgb), .35);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  transition: .2s;
+  flex-shrink: 0;
+}
+.obs-share-btn:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.share-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .86);
+  backdrop-filter: blur(8px);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.share-modal-box {
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .8);
+}
+.share-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.share-modal-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-family: var(--serif);
+}
+.share-fmt-bar {
+  display: flex;
+  gap: 8px;
+}
+.share-fmt-bar .recs-mode-pill {
+  flex: 1;
+  text-align: center;
+}
+.share-preview-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--bg-0);
+  border-radius: var(--r-md);
+  padding: 10px;
+  overflow: hidden;
+  min-height: 220px;
+}
+.share-preview-img {
+  max-height: 52vh;
+  width: auto;
+  max-width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .6);
+  user-select: auto;
+  -webkit-user-select: auto;
+  -webkit-touch-callout: default;
+}
+.share-modal-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.share-modal-actions .auth-btn,
+.share-modal-actions .settings-btn {
+  flex: 1 1 120px;
+  margin: 0;
+  text-align: center;
+  justify-content: center;
 }

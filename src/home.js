@@ -775,7 +775,12 @@ async function buildSmartRecommendations(seeds, mood, mode) {
 }
 
 function readGeneralCache() {
-  try { const c = JSON.parse(localStorage.getItem(GEN_CACHE)); if (c && Date.now() - c.ts < GEN_TTL) return c.data; } catch {}
+  try {
+    const c = JSON.parse(localStorage.getItem(GEN_CACHE));
+    if (!c || !c.data) return null;
+    if (Date.now() - c.ts < GEN_TTL) return c.data;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return c.data;
+  } catch {}
   return null;
 }
 function writeGeneralCache(g) {
@@ -793,9 +798,10 @@ function readRecsCache(sig, critical) {
     const c = JSON.parse(localStorage.getItem(RECS_CACHE));
     if (!c) return null;
     const age = Date.now() - c.ts;
-    if (age >= RECS_TTL) return null;
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false; /* offline-recs-ttl-bypass */
+    if (age >= RECS_TTL && !offline) return null;
     if (critical && c.critical !== critical) return null;
-    if (c.sig === sig) return c.data;
+    if (c.sig === sig || offline) return c.data;
   } catch {}
   return null;
 }
@@ -1378,7 +1384,7 @@ async function loadHome() {
   if (state.home.loading === sig) return;
 
   state.home.loading = sig;
-  renderHomeSkeleton();
+  renderHomeSkeleton(taste);
   try {
     const data = await buildSmartRecommendations(seeds, state.home.mood, state.home.mode);
     if (state.home.loading !== sig) return; // [LOADHOME-RACE-FIX] застарілий запит
@@ -1389,29 +1395,68 @@ async function loadHome() {
     renderHomeContent(taste);
   } catch (e) {
     if (state.home.loading !== sig) return;
-    box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(e.message)}</div>`; /* FIX-HOME-ERR-ESC */
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      state.home.recs = { items: [], seeds: seeds.length, mood: state.home.mood, mode: state.home.mode };
+      renderHomeContent(taste);
+      showSyncToast('📴 Офлайн-режим');
+    } else {
+      box.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(e.message)}</div>`; /* FIX-HOME-ERR-ESC */
+    }
   }
   finally { if (state.home.loading === sig) state.home.loading = false; }
 }
 
-function renderHomeSkeleton() {
+function buildRecsControlsBar() {
+  const controlsBar = el('div', 'recs-controls-bar');
+  const modesBar = el('div', 'recs-mode-pills');
+  const modeDefs = [
+    { id: 'balance', label: '✨ Баланс' },
+    { id: 'gems', label: '💎 Перлини' },
+    { id: 'fresh', label: '🆕 Свіже' }
+  ];
+  modeDefs.forEach(m => {
+    const mb = el('button', 'recs-mode-pill' + ((state.home.mode || 'balance') === m.id ? ' active' : ''), m.label);
+    mb.type = 'button';
+    mb.addEventListener('click', () => {
+      if ((state.home.mode || 'balance') === m.id) return;
+      state.home.mode = m.id;
+      try { localStorage.setItem('mycinema.home.mode', m.id); } catch (e) {} /* FIX-MODE-SAVE */
+      state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
+      refresh();
+    });
+    modesBar.append(mb);
+  });
+  controlsBar.append(modesBar, renderMoodPills());
+  return controlsBar;
+}
+
+function renderHomeSkeleton(taste) {
   box.style.padding = '0';
   box.replaceChildren();
 
-  /* SKELETON-NO-MOOD-TOP */
-  const tasteWrap = el('div', 'taste-summary-container');
-  tasteWrap.append(el('div', 'skeleton-bar skeleton-summary'));
-  box.append(tasteWrap);
+  box.append(renderTasteSummary(taste || computeTasteVector()));
+  const cwSection = buildContinueWatchingSection();
+  if (cwSection) box.append(cwSection);
 
   const wrap = el('div', 'home-wrap');
-  const sec = el('div', 'home-section');
-  sec.append(el('div', 'skeleton-bar skeleton-title-lg'));
+  const factCard = buildFactOfDayCard();
+  if (factCard) wrap.append(factCard);
+  const plannedSec = buildPlannedByMoodSection();
+  if (plannedSec) wrap.append(plannedSec);
+
+  const sec = el('section', 'home-section');
+  const head = el('div', 'section-head');
+  head.append(el('h2', 'section-title', '✨ Для тебе'));
+  sec.append(head);
+  sec.append(buildRecsControlsBar());
+
   const grid = el('div', 'home-grid');
   for (let i = 0; i < 14; i++) {
     const sk = el('div', 'rec-card skeleton-card');
     sk.append(el('div', 'skeleton-poster'));
     sk.append(el('div', 'skeleton-bar skeleton-line-1'));
     sk.append(el('div', 'skeleton-bar skeleton-line-2'));
+    sk.append(el('div', 'skeleton-bar skeleton-line-3'));
     grid.append(sk);
   }
   sec.append(grid);

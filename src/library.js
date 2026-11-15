@@ -7,7 +7,14 @@ function renderMyTop() {
 
   const head = el('div', 'section-head');
   head.style.marginTop = '20px';
+  head.style.alignItems = 'center';
   head.append(el('h1', 'section-title', '🏆 Мій топ'));
+  const shareBtn = el('button', 'obs-share-btn', '📤 Поділитися');
+  shareBtn.type = 'button';
+  shareBtn.addEventListener('click', () => {
+    if (typeof openObservatoryShare === 'function') openObservatoryShare('mytop');
+  });
+  head.append(shareBtn);
   box.append(head);
 
   const filterBar = el('div', 'filter-bar');

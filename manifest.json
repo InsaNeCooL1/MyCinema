@@ -3,7 +3,7 @@
   "short_name": "MyCinema",
   "description": "Мій кінощоденник",
   "start_url": "./",
-  "scope": "/MyCinema/",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#05060f",
   "theme_color": "#08070a",
