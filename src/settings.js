@@ -13,6 +13,7 @@ function openSettings() {
   var _sb = document.getElementById('status-badge-toggle'); /* FIX-STATUS-TOGGLE */
   if (_sb) _sb.checked = settings.showStatusBadges !== false;
   injectSnowToggle();
+  injectKbdNavToggle();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
   document.getElementById('settings-modal').classList.add('open');
 }
@@ -77,7 +78,8 @@ function renderSettingsSwatches() {
     const s = el('div', 'theme-swatch' + (settings.themeBg === key ? ' active' : ''));
     s.style.cssText = `width:48px;height:48px;border-radius:12px;cursor:pointer;border:3px solid ${settings.themeBg === key ? 'var(--accent)' : 'transparent'};background:linear-gradient(135deg,${t.bg1} 0%,${t.bg3} 100%);position:relative;transition:transform .15s`;
     s.innerHTML = `<span style="position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:9px;font-weight:600;color:${t.text}">${t.name}</span>`;
-    s.addEventListener('click', () => { applyTheme(key, settings.themeAccent); if (typeof touchAppearance === 'function') touchAppearance(); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
+    /* NO-THEME-TOUCH */
+    s.addEventListener('click', () => { applyTheme(key, settings.themeAccent); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
     bgWrap.append(s);
   });
   
@@ -85,7 +87,7 @@ function renderSettingsSwatches() {
     const s = el('div', 'theme-swatch' + (settings.themeAccent === key ? ' active' : ''));
     s.style.cssText = `width:48px;height:48px;border-radius:12px;cursor:pointer;border:3px solid ${settings.themeAccent === key ? 'var(--accent)' : 'transparent'};background:${a.accent};position:relative;transition:transform .15s`;
     s.innerHTML = `<span style="position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:9px;font-weight:600;color:${a.fg}">${a.name}</span>`;
-    s.addEventListener('click', () => { applyTheme(settings.themeBg, key); if (typeof touchAppearance === 'function') touchAppearance(); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
+    s.addEventListener('click', () => { applyTheme(settings.themeBg, key); renderSettingsSwatches(); if (cardStack.length) renderCard(); });
     acWrap.append(s);
   });
 }
@@ -311,4 +313,53 @@ function injectDismissedReset() {
     target.appendChild(btn);
   }
   btn.textContent = `Повернути сховані рекомендації (${getCount()})`;
+}
+
+
+// ========== KEYBOARD NAV TOGGLE (local-only, no cloud sync) ==========
+function injectKbdNavToggle() {
+  const modal = document.getElementById('settings-modal');
+  if (!modal) return;
+  const existing = modal.querySelector('#kbd-nav-toggle');
+  if (existing) {
+    existing.checked = typeof isKbdNavEnabled === 'function' ? isKbdNavEnabled() : false;
+    return;
+  }
+
+  const sections = modal.querySelectorAll('.settings-section');
+  let target = null;
+  sections.forEach(function (sec) {
+    const title = sec.querySelector('.settings-section-title');
+    if (title && /Дані/i.test(title.textContent)) target = sec;
+  });
+
+  const sec = document.createElement('div');
+  sec.className = 'settings-section';
+  sec.appendChild(el('div', 'settings-section-title', 'Управління'));
+
+  const label = document.createElement('label');
+  label.className = 'settings-toggle';
+
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.id = 'kbd-nav-toggle';
+  input.checked = typeof isKbdNavEnabled === 'function' ? isKbdNavEnabled() : false;
+  input.addEventListener('change', function () {
+    if (typeof setKbdNavEnabled === 'function') setKbdNavEnabled(this.checked);
+    showSyncToast(this.checked ? '⌨️ Клавіатура увімкнена' : '👆 Сенсорне керування');
+  });
+
+  const span = document.createElement('span');
+  span.textContent = 'Керування клавіатурою (стрілки / Tab)';
+
+  label.appendChild(input);
+  label.appendChild(span);
+  sec.appendChild(label);
+
+  const hint = el('div', 'notes-hint', 'Локальне налаштування тільки для цього пристрою.');
+  hint.style.cssText = 'font-size:12px;padding:0 4px;margin-top:0;';
+  sec.appendChild(hint);
+
+  if (target && target.parentNode) target.parentNode.insertBefore(sec, target);
+  else modal.querySelector('.settings-box')?.appendChild(sec);
 }

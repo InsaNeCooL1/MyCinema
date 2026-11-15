@@ -47,6 +47,7 @@
   }
 
   document.addEventListener('keydown', (e) => {
+    if (typeof isKbdNavEnabled === 'function' && !isKbdNavEnabled()) return;
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
 
     const active = document.activeElement;

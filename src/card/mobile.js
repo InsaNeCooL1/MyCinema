@@ -79,7 +79,7 @@
       wrap.append(iframe);
       
       const stopBtn = el('button', 'btn-stop', 'Зупинити трейлер');
-      stopBtn.onclick = (e) => { e.stopPropagation(); ctx.playingTrailer = false; renderCard(); };
+      stopBtn.onclick = (e) => { e.stopPropagation(); ctx.playingTrailer = false; if (typeof refreshHeroInPlace === 'function') refreshHeroInPlace(ctx); else renderCard(); };
       wrap.append(stopBtn);
     } else {
       if (backdropPath) {
@@ -89,7 +89,7 @@
       }
       if (trailerList.length > 0) {
         const playBtn = el('button', 'btn-play', '▶ Дивитись трейлер');
-        playBtn.onclick = () => { ctx.playingTrailer = true; renderCard(); };
+        playBtn.onclick = () => { ctx.playingTrailer = true; if (typeof refreshHeroInPlace === 'function') refreshHeroInPlace(ctx); else renderCard(); };
         wrap.append(playBtn);
       }
       
@@ -331,7 +331,7 @@
       delBtn.innerHTML = ICONS.trash;
       delBtn.title = 'Видалити';
       delBtn.onclick = () => {
-        if (confirm('Видалити тайтл?')) { removeLibItem(r.key); saveNow(); refresh(); closeCard(); }
+        if (confirm('Видалити тайтл?')) { removeLibItem(r.key); saveNow(); closeCard(); }
       };
       wrap.append(delBtn);
     }
@@ -351,9 +351,9 @@
     if (hasWiki && hasTmdb) {
       const srcBar = el('div', 'overview-src');
       const wBtn = el('button', useWiki ? 'active' : '', 'Вікі');
-      wBtn.onclick = () => { ctx.overviewSource = 'wiki'; renderCard(); };
+      wBtn.onclick = () => { ctx.overviewSource = 'wiki'; if (typeof refreshCardOverviewInPlace === 'function') refreshCardOverviewInPlace(ctx); else renderCard(); };
       const tBtn = el('button', !useWiki ? 'active' : '', 'TMDB');
-      tBtn.onclick = () => { ctx.overviewSource = 'tmdb'; renderCard(); };
+      tBtn.onclick = () => { ctx.overviewSource = 'tmdb'; if (typeof refreshCardOverviewInPlace === 'function') refreshCardOverviewInPlace(ctx); else renderCard(); };
       srcBar.append(wBtn, tBtn);
       wrap.append(srcBar);
     }

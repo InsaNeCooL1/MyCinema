@@ -42,8 +42,90 @@ function saveCardScroll() {
   if (s && top) top.scroll = s.scrollTop;
 }
 
+let _libDirtySinceCardOpen = false;
+function markCardLibDirty() {
+  if (cardStack.length) _libDirtySinceCardOpen = true;
+}
+
+function refreshHeroInPlace(ctx) {
+  const cur = card.querySelector('.mobile-hero');
+  if (cur && window.MC?.createHero) {
+    cur.replaceWith(MC.createHero(ctx));
+  } else {
+    renderCard(true);
+  }
+}
+
+function refreshCardTitleInPlace(ctx) {
+  const cur = card.querySelector('.mobile-title');
+  if (cur && window.MC?.createTitle) {
+    cur.replaceWith(MC.createTitle(ctx));
+  }
+}
+
+function refreshCardOverviewInPlace(ctx) {
+  const cur = card.querySelector('.mobile-overview');
+  if (cur && window.MC?.createOverview) {
+    cur.replaceWith(MC.createOverview(ctx));
+  }
+}
+
+function refreshCardControlsInPlace(ctx) {
+  const r = ctx.item;
+  const s = lib[r.key] || {};
+
+  // 1. Hero fav + score badge без перемальовки hero-img або iframe трейлера
+  const hero = card.querySelector('.mobile-hero');
+  if (hero && !ctx.playingTrailer) {
+    const favBtn = hero.querySelector('.hero-fav-btn');
+    if (favBtn) {
+      favBtn.classList.toggle('active', !!s.favorite);
+      favBtn.innerHTML = s.favorite
+        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+    }
+    const ir = computeItemRating(s);
+    let badge = hero.querySelector('.hero-badge');
+    if (ir.avg > 0) {
+      const v100 = ir.avg * 10;
+      const tCls = v100 >= 80 ? 'temp-green' : (v100 >= 66 ? 'temp-yellow' : (v100 >= 55 ? 'temp-orange' : 'temp-red'));
+      if (!badge) {
+        badge = el('div', 'hero-badge ' + tCls, fmtNum(ir.avg));
+        hero.append(badge);
+      } else {
+        badge.className = 'hero-badge ' + tCls;
+        badge.textContent = fmtNum(ir.avg);
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
+  // 2. Кнопка «Дивлюсь» у заголовку серіалу
+  const watchBtn = card.querySelector('.title-watch-btn');
+  if (watchBtn) watchBtn.classList.toggle('active', s.status === 'watching');
+
+  // 3. Панель дій, статусів та оцінок (без картинок)
+  if (window.MC) {
+    const curAct = card.querySelector('.mobile-actions');
+    if (curAct) curAct.replaceWith(MC.createActions(ctx));
+
+    const curSt = card.querySelector('.mobile-statuses');
+    if (curSt) curSt.replaceWith(MC.createStatuses(ctx));
+
+    const curScore = Array.from(card.querySelectorAll('.mobile-score')).find(el => !el.closest('.mobile-tabs-wrap'));
+    if (curScore) curScore.replaceWith(MC.createScoreBlock(ctx));
+  }
+
+  // 4. Таби оновлюємо лише якщо активна вкладка залежить від стану (сезони або нотатки)
+  if ((ctx.activeTab === 'seasons' || ctx.activeTab === 'notes') && typeof rerenderCardTabsInPlace === 'function') {
+    rerenderCardTabsInPlace(ctx);
+  }
+}
+
 async function openCard(r) {
   if (cardStack.length) return openMediaFromStack(r);
+  _libDirtySinceCardOpen = false;
   overlay.classList.add("open");
   const ctx = makeMediaCtx(r);
   cardStack = [ctx];
@@ -208,7 +290,7 @@ async function loadMediaCardData(ctx) {
         .then(omdbData => {
           if (omdbData.Response === "True") {
             ctx.omdb = omdbData;
-            if (cardStack[cardStack.length - 1] === ctx && !ctx.playingTrailer) { saveCardScroll(); renderCard(true); } /* FIX-OMDB-SCROLL */
+            if (cardStack[cardStack.length - 1] === ctx) refreshCardTitleInPlace(ctx);
           }
         })
         .catch(e => console.warn('[MyCinema/OMDb] fetch fail:', e));
@@ -220,7 +302,7 @@ async function loadMediaCardData(ctx) {
         if (wiki?.text) {
           ctx.wikiOverview = wiki.text;
           ctx.wikiUrl = wiki.url || null;
-          if (cardStack[cardStack.length - 1] === ctx && !ctx.playingTrailer) { saveCardScroll(); renderCard(true); } /* FIX-WIKI-SCROLL */
+          if (cardStack[cardStack.length - 1] === ctx) refreshCardOverviewInPlace(ctx);
         }
       });
     }
@@ -368,6 +450,7 @@ function updateCore(r, patch) {
   attachCtxMeta(merged, ctx);
   lib[r.key] = merged;
   _dirtyItems.add(r.key); // Позначаємо для синхронізації
+  markCardLibDirty(); // updateCore
   const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
   const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
   const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;
@@ -378,6 +461,14 @@ function updateCore(r, patch) {
   if (!lib[r.key].status && !hasR && !hasSR && !hasEps && !hasNotes && !hasElo && !hasFav && !hasTasteFlags) removeLibItem(r.key);
   save();
 }
-function update(r, patch) { updateCore(r, patch); renderCard(); }
+function update(r, patch) {
+  updateCore(r, patch);
+  const ctx = cardStack[cardStack.length - 1];
+  if (ctx && ctx.type === 'media' && ctx.item?.key === r.key && card.querySelector('.mobile-hero')) {
+    refreshCardControlsInPlace(ctx);
+  } else {
+    renderCard();
+  }
+}
 function updateNoRender(r, patch) { updateCore(r, patch); }
 

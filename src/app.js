@@ -47,6 +47,9 @@ function setTab(t, opts) {
   document.body.classList.toggle('no-search', !(t === 'home' || t === 'filter'));
   syncNavActive();
   typeFilterBar.classList.toggle("hidden", !["watching", "watched", "planned", "dropped", "favorites"].includes(t));
+  box.classList.remove('tab-entering');
+  void box.offsetWidth;
+  box.classList.add('tab-entering');
   if (t === 'game') { box.style.padding = '0'; renderGame(); return; }
   if (t === 'top') { box.style.padding = '0 16px 16px'; renderMyTop(); return; }
   refresh();

@@ -448,6 +448,7 @@ function saveLocalOnly() {
 function removeLibItem(key) {
   delete lib[key];
   libTombstones[key] = Date.now();
+  if (typeof markCardLibDirty === 'function') markCardLibDirty();
 }
 
 function mergeLibraries(localItems, localDel, cloudItems, cloudDel) {
@@ -527,11 +528,10 @@ function getAppearanceTs() {
   return hasLocalPref ? 1 : 0;
 }
 
+/* THEME-SYNC-DISABLED */
 function getAppearancePayload() {
   const snowRaw = localStorage.getItem('mycinema.snowEnabled');
   return {
-    themeBg: settings.themeBg,
-    themeAccent: settings.themeAccent,
     posterBg: !!settings.posterBg,
     snowEnabled: snowRaw === null ? true : snowRaw === 'true',
     showStatusBadges: settings.showStatusBadges !== false, /* FIX-STATUS-TOGGLE */
@@ -551,13 +551,10 @@ function applyCloudAppearance(app) {
   const lTs = getAppearanceTs();
   if (cTs <= lTs) return false;
 
-  const bg = THEMES[app.themeBg] ? app.themeBg : settings.themeBg;
-  const ac = ACCENTS[app.themeAccent] ? app.themeAccent : settings.themeAccent;
   const posterBg = typeof app.posterBg === 'boolean' ? app.posterBg : settings.posterBg;
   const snowOn = typeof app.snowEnabled === 'boolean' ? app.snowEnabled : true;
   const statusBadgesOn = typeof app.showStatusBadges === 'boolean' ? app.showStatusBadges : settings.showStatusBadges; /* FIX-STATUS-TOGGLE */
 
-  applyTheme(bg, ac);
   settings.posterBg = posterBg;
   try {
     localStorage.setItem('mycinema.posterBg', posterBg ? 'true' : 'false');
@@ -694,11 +691,9 @@ async function pullFromCloud() {
   try {
     setSyncStatus('saving', 'Оновлюю...');
     const changed = await reconcileWithCloud();
+    /* NO-CLOUD-CENTER-TOAST */
     if (changed) {
       refresh();
-      showCenterToast('✅ Дані оновлено з хмари');
-    } else {
-      
     }
     setSyncStatus('saved', '✓');
   } catch (e) {
@@ -942,47 +937,92 @@ function recordEloMatch(winner, loser) {
 }
 
 
-// [SAFE-A11Y] Додає підтримку клавіатури без зміни тегів та CSS
+// [SAFE-A11Y] Локальне керування клавіатурою (без синхронізації в хмару)
+const KBD_NAV_KEY = 'mycinema.kbdNav';
+function isKbdNavEnabled() {
+  const v = localStorage.getItem(KBD_NAV_KEY);
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return window.matchMedia('(pointer: fine)').matches;
+}
+function setKbdNavEnabled(on) {
+  localStorage.setItem(KBD_NAV_KEY, on ? 'true' : 'false');
+  if (!on) {
+    document.documentElement.classList.remove('mc-kbd');
+    if (typeof window._disableSafeA11y === 'function') window._disableSafeA11y();
+  } else {
+    if (typeof window._enableSafeA11y === 'function') window._enableSafeA11y();
+  }
+}
+
 (function initSafeA11y() {
   const selectors = [
     '.item', '.rec-card', '.light', '.actor-tile', '.episode-body',
     '.elo-row', '.actor-rank-item', '.franchise-head', '.series-prog-row',
-    '.note-card', '.mood-pill', '.card-tab', '.top-number', '.episode-poster-wrap'
+    '.mood-pill', '.card-tab', '.top-number', '.episode-poster-wrap'
   ].join(', ');
+
+  let active = false;
+  let observer = null;
 
   const makeFocusable = (node) => {
     if (node.nodeType === 1 && node.matches(selectors) && !node.hasAttribute('tabindex')) {
       node.setAttribute('tabindex', '0');
       node.setAttribute('role', 'button');
+      node.dataset.mcA11y = '1';
     }
   };
 
-  // Обробляємо існуючі елементи
-  document.querySelectorAll(selectors).forEach(makeFocusable);
-
-  // Обсервер для нових елементів (картки, що підвантажуються)
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.addedNodes.length) {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === 1) {
-            if (node.matches(selectors)) makeFocusable(node);
-            node.querySelectorAll(selectors).forEach(makeFocusable);
-          }
-        });
+  const activate = () => {
+    if (active || !isKbdNavEnabled()) return;
+    active = true;
+    document.querySelectorAll(selectors).forEach(makeFocusable);
+    observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType !== 1 || node.classList.contains('ripple')) continue;
+          if (node.matches(selectors)) makeFocusable(node);
+          node.querySelectorAll(selectors).forEach(makeFocusable);
+        }
       }
     });
-  });
+    observer.observe(document.body, { childList: true, subtree: true });
+  };
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  const deactivate = () => {
+    active = false;
+    if (observer) { observer.disconnect(); observer = null; }
+    document.querySelectorAll('[data-mc-a11y="1"]').forEach(el => {
+      el.removeAttribute('tabindex');
+      el.removeAttribute('role');
+      delete el.dataset.mcA11y;
+    });
+  };
 
-  // Глобальний слухач Enter/Space
+  window._enableSafeA11y = activate;
+  window._disableSafeA11y = deactivate;
+
+  if (isKbdNavEnabled() && window.matchMedia('(pointer: fine)').matches) {
+    activate();
+  }
+
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.pointerType === 'mouse') {
+      document.documentElement.classList.remove('mc-kbd');
+    }
+  }, { passive: true });
+
   document.addEventListener('keydown', (e) => {
+    if (!isKbdNavEnabled()) return;
+    if (e.key === 'Tab' || e.key.startsWith('Arrow')) {
+      document.documentElement.classList.add('mc-kbd');
+      activate();
+    }
     if (e.key === 'Enter' || e.key === ' ') {
-      const active = document.activeElement;
-      if (active && active.matches(selectors)) {
-        e.preventDefault(); // Запобігає скролу при Space
-        active.click();
+      const focused = document.activeElement;
+      if (focused && focused.matches(selectors)) {
+        e.preventDefault();
+        focused.click();
       }
     }
   });
