@@ -92,6 +92,7 @@ if (typeof window.LS_VER === 'undefined') {
   throw new Error('Setup FAIL: config.js globals missing. LS_VER = ' + window.LS_VER);
 }
 loadScript('src/core.js');
+loadScript('src/stats.js');
 loadScript('src/settings.js');
 loadScript('src/home.js');
 
