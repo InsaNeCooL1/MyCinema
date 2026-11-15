@@ -3116,3 +3116,83 @@ html.mc-kbd .card-tab:focus-visible {
   text-align: center;
   justify-content: center;
 }
+
+/* =========================================
+   LAMPA ROOM (ISOLATED OVERLAY)
+   ========================================= */
+.lampa-room-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: #000;
+  display: none;
+  flex-direction: column;
+}
+.lampa-room-overlay.open {
+  display: flex;
+}
+.lampa-room-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px;
+  padding-top: calc(6px + env(safe-area-inset-top));
+  background: rgba(10, 9, 14, .96);
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  flex-shrink: 0;
+}
+.lampa-room-back {
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  background: rgba(var(--accent-rgb), .14);
+  border: 1px solid rgba(var(--accent-rgb), .35);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.lampa-room-back:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.lampa-room-title {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lampa-room-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.lampa-room-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lampa-room-btn:hover {
+  background: var(--bg-3);
+  color: var(--accent);
+}
+.lampa-room-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}

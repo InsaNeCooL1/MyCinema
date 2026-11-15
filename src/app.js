@@ -218,6 +218,9 @@ if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getIte
   }
   
   CapApp.addListener('backButton', () => {
+    // 0. Ізольована кімнатка Lampa
+    if (window.LampaRoom && LampaRoom.isOpen()) { LampaRoom.handleBack(); return; }
+
     // 1. Модальні вікна та оверлеї
     if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
     if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
@@ -264,6 +267,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+  if (window.LampaRoom && LampaRoom.isOpen()) { LampaRoom.close(); return; }
   if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
   if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
   if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }

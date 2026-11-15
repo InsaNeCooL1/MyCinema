@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VER = 'v2';
+const SW_VER = 'v3';
 const SHELL_CACHE = 'mycinema-shell-' + SW_VER;
 const IMG_CACHE = 'mycinema-img-' + SW_VER;
 const CDN_CACHE = 'mycinema-cdn-' + SW_VER;
@@ -104,6 +104,9 @@ self.addEventListener('fetch', (event) => {
   let url;
   try { url = new URL(req.url); } catch { return; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+  // Ізольована кімнатка Lampa — не перехоплюємо через SW MyCinema
+  if (url.origin === self.location.origin && (url.pathname.includes('/lampa/') || url.pathname.endsWith('/lampa'))) return;
 
   // Ніколи не кешуємо API / Auth / зовнішні запити даних
   if (

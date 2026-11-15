@@ -151,31 +151,40 @@ async function openMediaFromStack(item) {
 
 // ---- Lampa ----
 async function openInLampa(item) {
+  const mode = localStorage.getItem('mycinema.lampaMode') || 'room';
   const plugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExternalPlayer;
   const webUrl = `http://lampa.mx/?card=${item.id}&media=${item.type}&source=tmdb`;
 
-  // 1. Спробувати нативний застосунок Lampa (тільки в APK)
-  if (plugin && plugin.openLampa) {
+  // Якщо користувач увімкнув режим зовнішнього застосунку Lampa (APK)
+  if (mode === 'external' && plugin && plugin.openLampa) {
     try {
       const res = await plugin.openLampa({ id: item.id, type: item.type });
       if (res && res.via === 'launch-only') {
         showSyncToast('Lampa відкрита, але без картки — знайдіть тайтл вручну');
       }
-      return; // успіх
+      return;
     } catch (e) {
       const msg = String((e && e.message) || e);
-      // 2. Fallback: Lampa не встановлена або помилка — відкриваємо веб-версію
       if (msg.includes('NOT_INSTALLED')) {
-        showCenterToast('📺 Lampa не встановлена, відкриваю веб-версію...');
+        showCenterToast('📺 Зовнішня Lampa не встановлена, відкриваю кімнатку...');
       } else {
-        showCenterToast('⚠️ Не вдалося відкрити застосунок, відкриваю веб-версію...');
+        showCenterToast('⚠️ Не вдалося відкрити застосунок, відкриваю кімнатку...');
+      }
+      if (window.LampaRoom && LampaRoom.open) {
+        setTimeout(() => LampaRoom.open(item), 600);
+        return;
       }
       setTimeout(() => window.open(webUrl, '_blank'), 800);
       return;
     }
   }
 
-  // 3. Браузер (ПК / PWA): одразу веб-версія
+  // За замовчуванням: ізольована кімнатка Lampa
+  if (window.LampaRoom && LampaRoom.open) {
+    LampaRoom.open(item);
+    return;
+  }
+
   window.open(webUrl, '_blank');
 }
 

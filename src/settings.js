@@ -15,6 +15,7 @@ function openSettings() {
   injectSnowToggle();
   injectKbdNavToggle();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
+  if (typeof injectLampaSettings === 'function') injectLampaSettings();
   document.getElementById('settings-modal').classList.add('open');
 }
 
@@ -362,4 +363,57 @@ function injectKbdNavToggle() {
 
   if (target && target.parentNode) target.parentNode.insertBefore(sec, target);
   else modal.querySelector('.settings-box')?.appendChild(sec);
+}
+
+// ========== LAMPA ROOM SETTINGS ==========
+function injectLampaSettings() {
+  const modal = document.getElementById('settings-modal');
+  if (!modal) return;
+  const modeVal = localStorage.getItem('mycinema.lampaMode') || 'room';
+  const existingToggle = modal.querySelector('#lampa-room-mode-toggle');
+  if (existingToggle) {
+    existingToggle.checked = modeVal !== 'external';
+    return;
+  }
+
+  const boxEl = modal.querySelector('.settings-box');
+  if (!boxEl) return;
+
+  const sec = document.createElement('div');
+  sec.id = 'lampa-settings-sec';
+  sec.className = 'settings-section';
+  sec.appendChild(el('div', 'settings-section-title', 'Lampa · Перегляд'));
+
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.className = 'settings-btn';
+  openBtn.textContent = '🎬 Налаштування та плагіни Lampa';
+  openBtn.addEventListener('click', () => {
+    closeSettings();
+    if (window.LampaRoom && LampaRoom.openHome) LampaRoom.openHome();
+  });
+  sec.appendChild(openBtn);
+
+  const label = document.createElement('label');
+  label.className = 'settings-toggle';
+
+  const inp = document.createElement('input');
+  inp.type = 'checkbox';
+  inp.id = 'lampa-room-mode-toggle';
+  inp.checked = modeVal !== 'external';
+  inp.addEventListener('change', function () {
+    localStorage.setItem('mycinema.lampaMode', this.checked ? 'room' : 'external');
+    showSyncToast(this.checked ? '🎬 Вбудована кімнатка Lampa' : '📱 Зовнішній застосунок Lampa (APK)');
+  });
+
+  const span = document.createElement('span');
+  span.textContent = 'Відкривати у вбудованій кімнатці';
+
+  label.append(inp, span);
+  sec.appendChild(label);
+
+  const sections = modal.querySelectorAll('.settings-section');
+  const lastSec = sections[sections.length - 1];
+  if (lastSec && lastSec.parentNode) lastSec.parentNode.insertBefore(sec, lastSec);
+  else boxEl.appendChild(sec);
 }

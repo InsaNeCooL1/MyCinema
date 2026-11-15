@@ -25,6 +25,7 @@ const SRC_FILES = [
   'src/settings.js',
   'src/calendar.js',
   'src/spatial-nav.js',
+  'src/lampa-room.js',
   'src/app.js',
   'src/snow.js',
 ];
