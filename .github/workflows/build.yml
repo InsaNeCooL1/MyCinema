@@ -15,6 +15,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -33,7 +34,10 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Build bundle
+        run: npm run build
 
       - name: Prepare Web Folder
         run: |
@@ -41,7 +45,7 @@ jobs:
           cp index.html www/
           cp styles.css www/
           cp manifest.json www/ || true
-          cp -r src www/
+          cp bundle.js www/
 
       - name: Capacitor Sync
         run: npx cap sync android
