@@ -219,8 +219,7 @@ if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getIte
   
   CapApp.addListener('backButton', () => {
     // 0. Ізольована кімнатка Lampa
-    if (window.LampaRoom && LampaRoom.isOpen()) { LampaRoom.handleBack(); return; }
-
+    
     // 1. Модальні вікна та оверлеї
     if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
     if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }

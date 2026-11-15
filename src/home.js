@@ -1441,9 +1441,6 @@ function renderHomeSkeleton(taste) {
   const wrap = el('div', 'home-wrap');
   const factCard = buildFactOfDayCard();
   if (factCard) wrap.append(factCard);
-  const plannedSec = buildPlannedByMoodSection();
-  if (plannedSec) wrap.append(plannedSec);
-
   const sec = el('section', 'home-section');
   const head = el('div', 'section-head');
   head.append(el('h2', 'section-title', '✨ Для тебе'));
@@ -1461,6 +1458,10 @@ function renderHomeSkeleton(taste) {
   }
   sec.append(grid);
   wrap.append(sec);
+
+  const plannedSec = buildPlannedByMoodSection();
+  if (plannedSec) wrap.append(plannedSec);
+
   box.append(wrap);
 }
 
@@ -1572,9 +1573,6 @@ function renderHomeContent(taste) {
   const factCard = buildFactOfDayCard();
   if (factCard) wrap.append(factCard);
 
-  const plannedSec = buildPlannedByMoodSection();
-  if (plannedSec) wrap.append(plannedSec);
-
   const recs = state.home.recs;
 
   // === БЛОК РЕКОМЕНДАЦІЙ ===
@@ -1668,6 +1666,9 @@ function renderHomeContent(taste) {
     sec.append(el('div', 'home-note', 'Постав оцінку 7+ або ❤️ улюбленому фільму чи серіалу — і тут з\'являться персональні рекомендації.'));
     wrap.append(sec);
   }
+
+  const plannedSec = buildPlannedByMoodSection();
+  if (plannedSec) wrap.append(plannedSec);
 
   // Плаваючі таби (доступні і для персональних, і для загальних добірок)
   if ((recs && recs.items && recs.items.length) || state.home.general) {

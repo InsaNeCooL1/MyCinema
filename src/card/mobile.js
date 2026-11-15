@@ -243,13 +243,22 @@
     const wrap = el('div', 'mobile-actions');
 
     const watchBtn = el('button', 'btn-lampa', 'LAMPA');
-    watchBtn.onclick = () => openInLampa(r);
+    watchBtn.onclick = () => { if (window.showCenterToast) window.showCenterToast('Елемент в розробці'); else alert('Елемент в розробці'); };
     wrap.append(watchBtn);
 
-    const cleanTitle = String(d.title || d.name || r.title || '').replace(/[^a-zA-Zа-яА-ЯіІїЇєЄґҐ0-9\s]/g, ' ').trim();
+    const uaTitle = d.title || d.name || r.title || '';
+    const uaYear = (d.release_date || d.first_air_date || '').slice(0, 4) || String(r.year || '');
+    const uaType = d.media_type || r.type || (d.name ? 'tv' : 'movie');
+    const uaImdb = d.imdb_id || (d.external_ids && d.external_ids.imdb_id) || null;
     const uakinoBtn = el('button', 'btn-uakino');
     uakinoBtn.innerHTML = '<span class="uakino-grad-text">UA KINO</span>';
-    uakinoBtn.onclick = () => window.open('https://uakino.best/index.php?do=search&subaction=search&story=' + encodeURIComponent(cleanTitle), '_blank');
+    uakinoBtn.onclick = () => {
+      if (typeof window.openStreamPicker === 'function') {
+        window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb);
+      } else {
+        alert('Плеєр не завантажено. Онови сторінку (Ctrl+Shift+R).');
+      }
+    };
     wrap.append(uakinoBtn);
 
     const isWatched = s.status === 'watched';
