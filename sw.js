@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VER = 'v1';
+const SW_VER = 'v2';
 const SHELL_CACHE = 'mycinema-shell-' + SW_VER;
 const IMG_CACHE = 'mycinema-img-' + SW_VER;
 const CDN_CACHE = 'mycinema-cdn-' + SW_VER;
@@ -11,28 +11,7 @@ const SHELL_ASSETS = [
   './index.html',
   './styles.css',
   './manifest.json',
-  './src/config.js',
-  './src/core.js',
-  './src/api.js',
-  './src/ui.js',
-  './src/facts.js',
-  './src/search.js',
-  './src/home.js',
-  './src/library.js',
-  './src/share.js',
-  './src/stats.js',
-  './src/game.js',
-  './src/person.js',
-  './src/company.js',
-  './src/settings.js',
-  './src/calendar.js',
-  './src/snow.js',
-  './src/app.js',
-  './src/spatial-nav.js',
-  './src/card/engine.js',
-  './src/card/tabs.js',
-  './src/card/mobile.js',
-  './src/card/desktop.js'
+  './bundle.js',
 ];
 
 self.addEventListener('install', (event) => {

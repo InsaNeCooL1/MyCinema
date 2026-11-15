@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "node build.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -26,6 +27,7 @@
     "@capacitor/core": "^8.6.0"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "jsdom": "^31.0.1",
     "vitest": "^5.1.0"
   }
