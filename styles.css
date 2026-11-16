@@ -60,7 +60,7 @@ header {
 
 /* РОЗШИРЕНИЙ ПОШУК */
 .search-container { position: relative; flex: 1; max-width: 100%; }
-input#q { width: 100%; padding: 11px 16px; font-size: 15px; border: 0; border-radius: var(--r-sm); background: var(--bg-1); color: var(--text); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .03); transition: .2s; }
+input#q { width: 100%; padding: 11px 44px 11px 16px; font-size: 15px; border: 0; border-radius: var(--r-sm); background: var(--bg-1); color: var(--text); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .03); transition: .2s; }
 input#q:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px rgba(var(--accent-rgb), .08); }
 input#q::placeholder { color: var(--text-dim); }
 
@@ -299,10 +299,10 @@ input#q::placeholder { color: var(--text-dim); }
 .rating-tmdb { background: rgba(1,180,228,0.12); border: 1px solid rgba(1,180,228,0.3); }
 .rating-imdb { background: rgba(245,197,24,0.12); border: 1px solid rgba(245,197,24,0.3); }
 .rating-rt { background: rgba(250,50,10,0.12); border: 1px solid rgba(250,50,10,0.3); }
-span.temp-green { color: #00ff88 !important; font-weight: 800 !important; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
-span.temp-yellow { color: #ffe600 !important; font-weight: 800 !important; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
-span.temp-orange { color: #ff8800 !important; font-weight: 800 !important; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
-span.temp-red { color: #ff2255 !important; font-weight: 800 !important; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.temp-green { color: #00ff88; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.temp-yellow { color: #ffe600; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.temp-orange { color: #ff8800; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.temp-red { color: #ff2255; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 .title-watch-btn { margin-left: auto; padding: 6px 8px; border-radius: var(--r-sm); background: var(--bg-2); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-family: var(--mono); font-size: 13px; font-weight: 800; line-height: 1; cursor: pointer; transition: .2s; }
 .title-watch-btn.active { background: rgba(var(--accent-rgb),0.15); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb),0.4); }
 
@@ -613,7 +613,7 @@ body.mc-fs {
   transition: .15s; box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
 }
 .cw-next-btn:hover { background: var(--accent); color: var(--accent-fg); }
-.btn-rewatch { flex: 0 0 auto !important; min-width: 40px; padding: 0 10px !important; gap: 4px; }
+.btn-rewatch { flex: 0 0 auto; min-width: 40px; padding: 0 10px; gap: 4px; }
 .btn-rewatch.has-rw { border-color: rgba(157, 229, 195, .45); color: var(--mint); background: rgba(157, 229, 195, .1); }
 .rw-cnt { font-family: var(--mono); font-size: 12px; font-weight: 800; }
 .badge.rewatch { background: rgba(157, 229, 195, .15); color: var(--mint); font-family: var(--mono); font-weight: 800; }
@@ -720,11 +720,25 @@ html.mc-kbd .home-inline-pill:focus-visible {
 /* =========================================
    DESKTOP OVERRIDES (Shell only)
    ========================================= */
+/* Mobile card (all viewports) */
+#overlay #card {
+  max-width: 100vw;
+  width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+#overlay #card .card-scroll {
+  padding: 0 16px 28px;
+  box-sizing: border-box;
+}
+
+/* Desktop card */
 @media (min-width: 900px) {
   #overlay { padding: 24px; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); }
   #overlay:not(.open) { backdrop-filter: none; }
-  #card { max-width: min(1300px, 95vw); width: 100%; height: min(92vh, 100%); border-radius: var(--r-lg); box-shadow: 0 25px 80px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.08); }
-  .card-scroll { padding: 0 32px 40px; }
+  #card { box-shadow: 0 25px 80px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.08); }
+  #overlay #card { max-width: min(1300px, 95vw); width: 100%; height: min(92vh, 100%); border-radius: var(--r-lg); }
+  #overlay #card .card-scroll { padding: 0 28.8px 36px; }
   
   
 }
@@ -1093,30 +1107,6 @@ html.mc-kbd .home-inline-pill:focus-visible {
   flex-shrink: 0;
 }
 
-/* --- Адаптив картки (Mobile vs Desktop) --- */
-#overlay #card {
-  max-width: 100vw;
-  width: 100vw;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-#overlay #card .card-scroll {
-  padding: 0 16px 28px;
-  box-sizing: border-box;
-}
-
-@media (min-width: 900px) {
-  #overlay #card {
-    max-width: min(1300px, 95vw);
-    width: 100%;
-    height: min(92vh, 100%);
-    border-radius: var(--r-lg);
-  }
-  #overlay #card .card-scroll {
-    padding: 0 28.8px 36px;
-  }
-}
-
 /* === MCM Snow v3 (2-layer parallax, GPU-composited) ================= */
 /* Налаштування інтенсивності: додавай/прибирай рядки radial-gradient.  */
 /* Швидкість: змінюй duration в animation (менше = швидше).             */
@@ -1201,9 +1191,6 @@ html.mc-kbd .home-inline-pill:focus-visible {
 /* ========================================================= */
 /* TOP MENU GROUPS + PRIORITY+ + SEARCH FILTER V3            */
 /* ========================================================= */
-
-/* Кнопка фільтра справа в строці пошуку */
-input#q { padding-right: 44px !important; }
 
 .search-filter-btn {
   position: absolute;
@@ -1392,126 +1379,126 @@ input#q { padding-right: 44px !important; }
 /* ДЕКСТОПНІ ПЕРЕВИЗНАЧЕННЯ ДЛЯ МЕНЮ, ДРОПДАУНІВ І ЗНАЧКІВ */
 @media (min-width: 900px) and (min-height: 600px) {
   #sidebar {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow: visible !important;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
   }
 
   .sidebar-nav {
-    overflow: visible !important;
-    justify-content: center !important;
-    gap: 4px !important;
+    overflow: visible;
+    justify-content: center;
+    gap: 4px;
   }
 
   .nav-group {
-    position: relative !important;
-    flex-direction: row !important;
-    flex-shrink: 0 !important;
+    position: relative;
+    flex-direction: row;
+    flex-shrink: 0;
   }
 
   .nav-group-btn {
-    height: 38px !important;
-    padding: 0 12px !important;
-    font-size: 13px !important;
-    border-radius: 8px !important;
-    gap: 6px !important;
-    width: auto !important;
-    white-space: nowrap !important;
+    height: 38px;
+    padding: 0 12px;
+    font-size: 13px;
+    border-radius: 8px;
+    gap: 6px;
+    width: auto;
+    white-space: nowrap;
   }
   .nav-group-btn:hover {
-    background: var(--bg-1) !important;
+    background: var(--bg-1);
   }
   .nav-group.has-active > .nav-group-btn,
   .nav-group.open > .nav-group-btn {
-    background: linear-gradient(135deg, rgba(var(--accent-rgb), .15), rgba(var(--accent-rgb), .05)) !important;
-    color: var(--accent) !important;
-    font-weight: 600 !important;
-    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .2) !important;
+    background: linear-gradient(135deg, rgba(var(--accent-rgb), .15), rgba(var(--accent-rgb), .05));
+    color: var(--accent);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .2);
   }
-  .nav-caret { margin-left: 2px !important; }
+  .nav-caret { margin-left: 2px; }
 
   .nav-dropdown {
-    position: absolute !important;
-    top: calc(100% + 10px) !important;
-    left: 0 !important;
-    min-width: 195px !important;
-    padding: 6px !important;
-    background: rgba(15, 14, 19, .97) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, .08) !important;
-    border-radius: var(--r-md) !important;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, .7) !important;
-    z-index: 1200 !important;
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    min-width: 195px;
+    padding: 6px;
+    background: rgba(15, 14, 19, .97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: var(--r-md);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .7);
+    z-index: 1200;
   }
   .nav-more-menu {
-    left: auto !important;
-    right: 0 !important;
-    min-width: 210px !important;
+    left: auto;
+    right: 0;
+    min-width: 210px;
   }
   .nav-dropdown .nav-item {
-    width: 100% !important;
-    height: 36px !important;
-    justify-content: flex-start !important;
-    padding: 0 12px !important;
+    width: 100%;
+    height: 36px;
+    justify-content: flex-start;
+    padding: 0 12px;
   }
 
   /* Вкладені групи всередині "Ще ▾" показуємо охайними секціями */
   .nav-more-menu .nav-group {
-    flex-direction: column !important;
-    width: 100% !important;
+    flex-direction: column;
+    width: 100%;
   }
-  .nav-more-menu .nav-group-btn {
-    pointer-events: none !important;
-    height: auto !important;
-    padding: 8px 12px 4px !important;
-    font-size: 10.5px !important;
-    text-transform: uppercase !important;
-    letter-spacing: .8px !important;
-    color: var(--text-muted) !important;
-    background: transparent !important;
-    box-shadow: none !important;
+  #sidebar .nav-more-menu .nav-group-btn {
+    pointer-events: none;
+    height: auto;
+    padding: 8px 12px 4px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text-muted);
+    background: transparent;
+    box-shadow: none;
   }
-  .nav-more-menu .nav-group-btn .nav-caret { display: none !important; }
-  .nav-more-menu .nav-dropdown {
-    display: flex !important;
-    position: static !important;
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-    padding: 0 0 4px 6px !important;
-    min-width: 0 !important;
+  .nav-more-menu .nav-group-btn .nav-caret { display: none; }
+  #sidebar .nav-more-menu .nav-dropdown {
+    display: flex;
+    position: static;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    padding: 0 0 4px 6px;
+    min-width: 0;
   }
 
   /* Компактні значки Акаунт та Налаштування */
-  .sidebar-footer { gap: 8px !important; }
+  .sidebar-footer { gap: 8px; }
   .sidebar-footer .icon-compact-btn {
-    width: 38px !important;
-    height: 38px !important;
-    padding: 0 !important;
-    border-radius: var(--r-sm) !important;
-    flex-shrink: 0 !important;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: var(--r-sm);
+    flex-shrink: 0;
   }
   .sidebar-footer .icon-compact-btn .btn-label { display: none !important; }
   .sidebar-footer .login-btn-side.icon-compact-btn {
-    background: rgba(var(--accent-rgb), .14) !important;
-    color: var(--accent) !important;
-    border: 1px solid rgba(var(--accent-rgb), .35) !important;
+    background: rgba(var(--accent-rgb), .14);
+    color: var(--accent);
+    border: 1px solid rgba(var(--accent-rgb), .35);
   }
   .sidebar-footer .login-btn-side.icon-compact-btn:hover {
-    background: var(--accent) !important;
-    color: var(--accent-fg) !important;
+    background: var(--accent);
+    color: var(--accent-fg);
   }
   .sidebar-footer .logout-btn-side.logged-in.icon-compact-btn {
-    border: 1px solid rgba(157, 229, 195, .45) !important;
-    color: var(--mint) !important;
-    background: rgba(157, 229, 195, .1) !important;
+    border: 1px solid rgba(157, 229, 195, .45);
+    color: var(--mint);
+    background: rgba(157, 229, 195, .1);
   }
   .sidebar-footer .logout-btn-side.logged-in.icon-compact-btn:hover {
-    background: var(--danger) !important;
-    border-color: var(--danger) !important;
-    color: #fff !important;
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
   }
   .sidebar-footer .settings-compact-btn {
     border: 1px solid rgba(255, 255, 255, .12) !important;
@@ -3218,7 +3205,7 @@ html.mc-kbd .card-tab:focus-visible {
   min-width: 0;
   display: flex;
   align-items: center;
-  padding: 5px !important;
+  padding: 5px;
   border-radius: var(--r-md);
   background: linear-gradient(135deg, rgba(var(--accent-rgb), .10), rgba(var(--accent-rgb), .03));
   border: 1px solid rgba(var(--accent-rgb), .24);
@@ -3228,12 +3215,12 @@ html.mc-kbd .card-tab:focus-visible {
 }
 @media (min-width: 900px) and (min-height: 600px) {
   body #results .recs-controls-bar .mood-pills {
-    padding: 5px !important;
-    height: auto !important;
-    max-height: none !important;
+    padding: 5px;
+    height: auto;
+    max-height: none;
   }
   body #results .recs-controls-bar .mood-pill {
-    height: 32px !important;
+    height: 32px;
   }
 }
 
