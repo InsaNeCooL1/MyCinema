@@ -1634,7 +1634,8 @@ function buildActivityHeatmap() {
 }
 
 function renderDetailTab() {
-  const all = Object.values(lib);
+  /* STATS_TRACKED_ONLY */
+  const all = Object.values(lib).filter(x => typeof isTrackedInLib === 'function' ? isTrackedInLib(x) : (x.status || x.favorite || hasWatched(x)));
   if (!all.length) return [el('div', 'avail-empty', 'Бібліотека порожня')];
   const wrap = el('div');
 

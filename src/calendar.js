@@ -259,11 +259,12 @@ function renderCalendar() {
     return;
   }
 
+  /* CAL_ITEM_TS_CLEAN */
   const itemTs = (x) => {
     if (x.statusDate) return x.statusDate;
-    if (x.eloUpdated && x.updated === x.eloUpdated) return x.createdAt || 0;
-    if (x.eloGames > 0 && x.createdAt) return x.createdAt;
-    return x.updated || x.createdAt || 0;
+    if (x.createdAt) return x.createdAt;
+    if (x.eloUpdated && (!x.status || x.status === 'none')) return 0;
+    return x.updated || 0;
   };
   let allItems = Object.values(lib).filter(x => (x.status === 'watching' || x.status === 'watched') && itemTs(x) > 0);
 
@@ -488,9 +489,9 @@ function renderActivityLog() {
     ['episode', '📺 Серії'],
     ['dismiss', '🙈 Сховані з рекомендацій'],
     ['favorite', '❤️ Улюблене'],
+    /* LOG_REMOVE_ELO */
     ['rewatch', '🔁 Повторні перегляди'],
     ['note', '📝 Нотатки'],
-    ['elo', '👑 Цар гори'],
     ['remove', '🗑️ Видалення']
   ].forEach(([val, lbl]) => {
     const opt = document.createElement('option');
@@ -541,7 +542,7 @@ function renderActivityLog() {
   } else if (state.activitySort === 'type') {
     const rankOrder = {
       'status:watching': 1, 'status:planned': 2, 'status:watched': 3, 'status:dropped': 4, 'status:none': 5,
-      'rating': 6, 'episode': 7, 'rewatch': 8, 'favorite': 9, 'note': 9, 'elo': 10, 'dismiss': 11, 'remove': 12, 'import': 13
+      /* RANK_REMOVE_ELO */ 'rating': 6, 'episode': 7, 'rewatch': 8, 'favorite': 9, 'note': 9, 'dismiss': 11, 'remove': 12, 'import': 13
     };
     const getRank = (x) => rankOrder[x.cat + ':' + x.sub] || rankOrder[x.cat] || 99;
     entries = entries.slice().sort((a, b) => getRank(a) - getRank(b) || (b.ts || 0) - (a.ts || 0));

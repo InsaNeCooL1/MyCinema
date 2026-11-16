@@ -1219,8 +1219,9 @@ function getElo(item) {
 }
 
 function preserveItemTimestamps(entry) {
+  /* PRESERVE_TS_GUARD */
   if (!entry) return;
-  const fallbackTs = entry.updated || entry.createdAt || 0;
+  const fallbackTs = entry.statusDate || entry.createdAt || entry.updated || 0;
   if (entry.status && !entry.statusDate && fallbackTs > 0) {
     entry.statusDate = fallbackTs;
   }
@@ -1269,19 +1270,20 @@ function recordEloMatch(winner, loser) {
   preserveItemTimestamps(w);
   preserveItemTimestamps(l);
 
+  /* ELO_AUTONOMY_APPLIED */
   w.elo = Math.round(wElo + delta);
   _dirtyItems.add(w.key);
   w.eloGames = (w.eloGames || 0) + 1;
   w.eloUpdated = eloNow;
-  w.updated = eloNow;
+  // w.updated НЕ чіпаємо, щоб не збивати дату перегляду і сортування бібліотеки
 
   l.elo = Math.round(lElo - delta);
   _dirtyItems.add(l.key);
   l.eloGames = (l.eloGames || 0) + 1;
   l.eloUpdated = eloNow;
-  l.updated = eloNow;
+  // l.updated НЕ чіпаємо
 
-  logActivity({ cat: 'elo', sub: 'win', icon: '👑', text: `Цар гори: перемога над «${loser.title || ''}» (+${delta} Elo)`, item: winner });
+  // Перемоги Elo більше не засмічують загальний журнал дій
   save();
   return { delta, winnerElo: w.elo, loserElo: l.elo };
 }

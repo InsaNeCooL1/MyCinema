@@ -1,8 +1,12 @@
 'use strict';
 
-function tmdbFetch(path) {
-  return fetch(PROXY_URL + path)
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+/* TMDB_FETCH_TIMEOUT */
+function tmdbFetch(path, timeoutMs = 8500) {
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const tmr = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+  return fetch(PROXY_URL + path, ctrl ? { signal: ctrl.signal } : {})
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .finally(() => { if (tmr) clearTimeout(tmr); });
 }
 
 function normalizeItem(r) {

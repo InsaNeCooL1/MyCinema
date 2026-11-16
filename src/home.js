@@ -188,8 +188,9 @@ function getSeeds() {
   for (const s of fresh) {
     if (!seen.has(s.key)) { seen.add(s.key); picked.push(s); }
   }
+  /* REDUCE_SEED_OVERLOAD */
   for (const s of byResidual) {
-    if (picked.length >= 18) break;
+    if (picked.length >= 10) break; // Топ-10 сідів дають точний зріз без перевантаження мережі
     if (!seen.has(s.key)) { seen.add(s.key); picked.push(s); }
   }
   return picked;
@@ -1291,7 +1292,9 @@ async function loadHome() {
   const critical = computeCriticalSig(); /* FIX-RECS-CACHE-V2 */
 
   if (!state.home.general) { const gc = readGeneralCache(); if (gc) state.home.general = gc; }
-  if (!state.home.general) {
+  /* LAZY_GENERAL_FETCH */
+  // Не завантажуємо важкі 39 сторінок трендів/стрімінгів, якщо користувач на вкладці «Для мене»
+  if (!state.home.general && state.home.view === 'explore') {
     try {
       const todayIso = new Date().toISOString().slice(0, 10);
       const twoYearsAgoIso = `${new Date().getFullYear() - 2}-01-01`;
@@ -1639,11 +1642,16 @@ function renderHomeContent(taste) {
     try { localStorage.setItem('mycinema.home.view', 'my'); } catch {}
     renderHomeContent(taste);
   });
+  /* EXPLORE_CLICK_TRIGGER */
   trPill.addEventListener('click', () => {
     if (state.home.view === 'explore') return;
     state.home.view = 'explore';
     try { localStorage.setItem('mycinema.home.view', 'explore'); } catch {}
-    renderHomeContent(taste);
+    if (!state.home.general) {
+      loadHome();
+    } else {
+      renderHomeContent(taste);
+    }
   });
   viewBar.append(myPill, trPill);
   viewBarWrap.append(viewBar);

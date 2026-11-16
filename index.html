@@ -210,7 +210,33 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const supabaseUrl = 'https://ssvfsjnzbrgvnknixejf.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzdmZzam56YnJndm5rbml4ZWpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1OTQ3MjksImV4cCI6MjExMDE3MDcyOX0.riSxxrcFozFlSQbjdFC8ZYOccjSeFv89HV2yIVzJBeE';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage
+  }
+});
+window.supabase = supabase;
+window._isExplicitLogout = false;
+
+// Миттєве відновлення кешованого користувача до запиту по мережі
+try {
+  const _cached = JSON.parse(localStorage.getItem('mycinema.auth.user') || 'null');
+  if (_cached && _cached.uid) {
+    window.currentUser = _cached;
+    window.firebaseReady = true;
+    const _em = document.getElementById('sidebar-email');
+    if (_em) _em.textContent = _cached.email || 'Користувач';
+    const _lb = document.getElementById('sidebar-login-btn');
+    if (_lb) _lb.style.display = 'none';
+    const _ob = document.getElementById('sidebar-logout-btn');
+    if (_ob) _ob.style.display = 'block';
+    const _ab = document.getElementById('auth-banner');
+    if (_ab) _ab.classList.remove('visible');
+  }
+} catch (e) {}
 window.supabase = supabase;
 
 
@@ -223,8 +249,12 @@ window.loginUser = async () => {
   
   try { 
     /* FIX-AUTH-NO-DOUBLE */ var _lb = document.getElementById('btn-login'); _lb.disabled = true; _lb.textContent = 'Вхід...'; 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: _aData, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    /* LOGIN_STORE_CACHE */
+    if (_aData?.user) {
+      try { localStorage.setItem('mycinema.auth.user', JSON.stringify({ uid: _aData.user.id, email: _aData.user.email })); } catch (e) {}
+    }
   } catch (e) { 
     err.textContent = e.message === 'Invalid login credentials' ? "Невірний email або пароль" : "Помилка: " + e.message; 
     var _lb2 = document.getElementById('btn-login'); _lb2.disabled = false; _lb2.textContent = 'Увійти'; 
@@ -341,6 +371,11 @@ window.resetPassword = async () => {
 window.logoutUser = async () => {
   /* FIX-LOGOUT-CLEAR */
   if (!confirm('Вийти з акаунту?\n\nЛокальні дані буде очищено. Усе, що встигло зберегтися в акаунті, відновиться при наступному вході.')) return;
+  /* LOGOUT_EXPLICIT */
+  window._isExplicitLogout = true;
+  try { localStorage.removeItem('mycinema.auth.user'); } catch (e) {}
+  window._isExplicitLogout = true;
+  try { localStorage.removeItem('mycinema.auth.user'); } catch (e) {}
   try { if (typeof saveToCloud === 'function') await saveToCloud(); } catch (e) {}
   try {
     var _keys = (window.MC_LOCAL_KEYS || ['mycinema.library','mycinema.deleted','onboardingDone']);
@@ -373,23 +408,39 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     return;
   }
   
+  /* RESILIENT_AUTH_CHANGE */
   const user = session?.user;
   if (user) {
     window.currentUser = { uid: user.id, email: user.email };
-    window.firebaseReady = true; // Залишаємо назву для сумісності з іншим кодом
+    window.firebaseReady = true;
+    try { localStorage.setItem('mycinema.auth.user', JSON.stringify({ uid: user.id, email: user.email })); } catch (e) {}
     document.getElementById('auth-modal').style.display = 'none';
     document.getElementById('auth-banner').classList.remove('visible');
     document.getElementById('sidebar-email').textContent = user.email || 'Користувач';
     document.getElementById('sidebar-login-btn').style.display = 'none';
     document.getElementById('sidebar-logout-btn').style.display = 'block';
     window.dispatchEvent(new CustomEvent('firebase-ready'));
-  } else {
+  } else if (window._isExplicitLogout) {
     window.currentUser = null; window.firebaseReady = false;
-    /* FIX-SYNC-CLEAR */ try { if (typeof _dirtyItems !== 'undefined' && _dirtyItems) _dirtyItems.clear(); } catch (e) {}
+    try { localStorage.removeItem('mycinema.auth.user'); } catch (e) {}
+    try { if (typeof _dirtyItems !== 'undefined' && _dirtyItems) _dirtyItems.clear(); } catch (e) {}
     document.getElementById('auth-banner').classList.add('visible');
     document.getElementById('sidebar-email').textContent = 'Гість';
     document.getElementById('sidebar-login-btn').style.display = 'block';
     document.getElementById('sidebar-logout-btn').style.display = 'none';
+  } else {
+    // Мережевий збій або оновлення додатку — тримаємо локальну сесію
+    try {
+      const _cached = JSON.parse(localStorage.getItem('mycinema.auth.user') || 'null');
+      if (_cached && _cached.uid) {
+        window.currentUser = _cached;
+        window.firebaseReady = false;
+        document.getElementById('sidebar-email').textContent = _cached.email || 'Користувач';
+        document.getElementById('sidebar-login-btn').style.display = 'none';
+        document.getElementById('sidebar-logout-btn').style.display = 'block';
+        document.getElementById('auth-banner').classList.remove('visible');
+      }
+    } catch (e) {}
   }
 });
 </script>
