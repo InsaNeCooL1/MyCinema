@@ -24,7 +24,7 @@ function extractDigitalDate(d) {
 }
 function extractProvidersUA(d) {
   const wp = (d && d['watch/providers'] && d['watch/providers'].results) || {};
-  const ua = (wp.UA && wp.UA.flatrate) || (wp.US && wp.US.flatrate) || [];
+  const ua = (wp.UA && wp.UA.flatrate) || [];
   return ua.map(p => {
     const info = typeof normalizePlatformInfo === 'function'
       ? normalizePlatformInfo({ name: p.provider_name, logo_path: p.logo_path })
@@ -128,6 +128,13 @@ function hasWatched(item) {
   if (item.ratings && Object.values(item.ratings).some(v => v > 0)) return true;
   if (item.seasonRatings && Object.keys(item.seasonRatings).length > 0) return true;
   if (item.watchedEpisodes && item.watchedEpisodes.length > 0) return true;
+  return false;
+}
+function isTrackedInLib(keyOrItem) {
+  const item = typeof keyOrItem === 'string' ? lib[keyOrItem] : keyOrItem;
+  if (!item) return false;
+  if (item.status || item.favorite || hasWatched(item)) return true;
+  if ((item.notes && item.notes.trim()) || (item.notesHistory && item.notesHistory.length > 0)) return true;
   return false;
 }
 function tasteDecay(updated, halfLifeDays) {
@@ -450,11 +457,26 @@ const LS_DEL = 'mycinema.deleted';
 const TOMBSTONE_TTL = 90 * 24 * 60 * 60 * 1000;
 let libTombstones = (() => { try { return JSON.parse(localStorage.getItem(LS_DEL)) || {}; } catch { return {}; } })();
 
+function evictHeavyCaches() {
+  const legacy = ['mycinema.recs.v4', 'mycinema.home.general.v6', 'mycinema.metaCache.v1'];
+  const expendable = [RECS_CACHE, 'mycinema.home.general.v7', 'mycinema.metaCache.v2', 'mycinema.companyCache.v1', 'mycinema.colCache.v1', 'mycinema.releaseCache.v1'];
+  legacy.concat(expendable).forEach(k => { try { localStorage.removeItem(k); } catch {} });
+}
+
 function saveLocalOnly() {
   try {
     localStorage.setItem(LS, JSON.stringify(lib));
     localStorage.setItem(LS_DEL, JSON.stringify(libTombstones));
-  } catch (e) { console.error(e); showSyncToast('⚠ Сховище переповнене'); }
+  } catch (e) {
+    evictHeavyCaches();
+    try {
+      localStorage.setItem(LS, JSON.stringify(lib));
+      localStorage.setItem(LS_DEL, JSON.stringify(libTombstones));
+    } catch (e2) {
+      console.error(e2);
+      showSyncToast('⚠ Сховище переповнене');
+    }
+  }
 }
 
 // ============ ACTIVITY LOG ============
@@ -596,7 +618,7 @@ function getAppearancePayload() {
   const snowRaw = localStorage.getItem('mycinema.snowEnabled');
   return {
     posterBg: !!settings.posterBg,
-    snowEnabled: snowRaw === null ? true : snowRaw === 'true',
+    snowEnabled: snowRaw === null ? (typeof SnowFeature !== 'undefined' ? SnowFeature.isEnabled() : false) : snowRaw === 'true',
     showStatusBadges: settings.showStatusBadges !== false, /* FIX-STATUS-TOGGLE */
     ts: getAppearanceTs()
   };

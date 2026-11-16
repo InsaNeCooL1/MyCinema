@@ -7,7 +7,9 @@
 
   function isEnabled() {
     const v = localStorage.getItem(KEY);
-    return v === null ? true : v === 'true';  // default ON
+    if (v !== null) return v === 'true';
+    const m = new Date().getMonth();
+    return m === 11 || m === 0 || m === 1;
   }
 
   function apply() {

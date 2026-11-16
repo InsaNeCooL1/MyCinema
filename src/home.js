@@ -381,7 +381,8 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     if (!raw || !raw.poster_path) return null;
     if (isExcludedShow(raw, type)) return null;
     const key = `${type}-${raw.id}`;
-    if (lib[key] || (typeof isDismissed === 'function' && isDismissed(key))) return null;
+    const tracked = typeof isTrackedInLib === 'function' ? isTrackedInLib(key) : !!lib[key];
+    if (tracked || (typeof isDismissed === 'function' && isDismissed(key))) return null;
     /* FIX-RELEASE-ENSURE — Level 1+2 pre-filter */
     const _today = new Date().toISOString().slice(0, 10);
     const _rel = (raw.release_date || raw.first_air_date || '').slice(0, 10);
@@ -803,7 +804,7 @@ function readRecsCache(sig, critical) {
     if (critical && c.critical !== critical) return null;
     if (c.sig === sig || offline) {
       if (c.data && Array.isArray(c.data.items)) {
-        c.data = { ...c.data, items: c.data.items.filter(x => x && !lib[x.key]) };
+        c.data = { ...c.data, items: c.data.items.filter(x => x && !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key])) };
       }
       return c.data;
     }
@@ -1615,7 +1616,7 @@ function renderHomeContent(taste) {
     sec.append(controlsBar);
 
     const type = state.home.tab;
-    const allItems = recs.items.filter(x => x.type === type && !lib[x.key] && !(typeof isDismissed === 'function' && isDismissed(x.key)));
+    const allItems = recs.items.filter(x => x.type === type && !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) && !(typeof isDismissed === 'function' && isDismissed(x.key)));
     const shownCount = state.home.shown[type] || 14 /* FIX-SHOWN-14 */;
     const visibleItems = allItems.slice(0, shownCount);
 
@@ -1633,7 +1634,7 @@ function renderHomeContent(taste) {
       moreBtn.addEventListener('click', () => {
         const grid = sec.querySelector('.home-grid');
         const current = state.home.shown[type] || 14 /* FIX-SHOWN-14 */;
-        const fresh = (state.home.recs?.items || []).filter(x => x.type === type && !lib[x.key] && !(typeof isDismissed === 'function' && isDismissed(x.key)));
+        const fresh = (state.home.recs?.items || []).filter(x => x.type === type && !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) && !(typeof isDismissed === 'function' && isDismissed(x.key)));
         const nextShown = Math.min(fresh.length, current + 14) /* FIX-SHOWN-14 */;
         if (grid) fresh.slice(current, nextShown).forEach(item => grid.append(recCard(item, true)));
         state.home.shown[type] = nextShown;

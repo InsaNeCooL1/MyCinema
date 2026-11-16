@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VER = 'v3';
+const SW_VER = 'v4';
 const SHELL_CACHE = 'mycinema-shell-' + SW_VER;
 const IMG_CACHE = 'mycinema-img-' + SW_VER;
 const CDN_CACHE = 'mycinema-cdn-' + SW_VER;
@@ -104,6 +104,7 @@ self.addEventListener('fetch', (event) => {
   let url;
   try { url = new URL(req.url); } catch { return; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return;
 
   // Ізольована кімнатка Lampa — не перехоплюємо через SW MyCinema
   if (url.origin === self.location.origin && (url.pathname.includes('/lampa/') || url.pathname.endsWith('/lampa'))) return;

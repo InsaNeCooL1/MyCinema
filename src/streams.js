@@ -966,4 +966,5 @@
 
   window.openStreamPicker = openStreamPicker;
   window.closeStreamPicker = function () { closeModal(false); };
+  window._streamsUtil = { scoreCandidate: scoreCandidate, extractSnippetMeta: extractSnippetMeta, normStr: normStr };
 })();

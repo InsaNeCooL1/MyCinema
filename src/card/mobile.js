@@ -242,10 +242,7 @@
     const s = lib[r.key] || {};
     const wrap = el('div', 'mobile-actions');
 
-    const watchBtn = el('button', 'btn-lampa', 'LAMPA');
-    watchBtn.onclick = () => { if (window.showCenterToast) window.showCenterToast('Елемент в розробці'); else alert('Елемент в розробці'); };
-    wrap.append(watchBtn);
-
+    /* LAMPA-STUB-REMOVED */
     const uaTitle = d.title || d.name || r.title || '';
     const uaOrigTitle = d.original_title || d.original_name || '';
     const uaYear = (d.release_date || d.first_air_date || '').slice(0, 4) || String(r.year || '');
