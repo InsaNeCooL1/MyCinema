@@ -1,5 +1,118 @@
 'use strict';
 
+// ============ INDEXEDDB CACHE LAYER ============
+const _idbMem = new Map();
+const _IDB_NAME = 'mycinema_cache_db';
+const _IDB_STORE = 'kv';
+const _IDB_KEYS = [
+  typeof RECS_CACHE !== 'undefined' ? RECS_CACHE : 'mycinema.recs.v5',
+  'mycinema.home.general.v7',
+  'mycinema.metaCache.v2',
+  'mycinema.colCache.v1',
+  'mycinema.companyCache.v1',
+  'mycinema.releaseCache.v1'
+];
+let _idbDbPromise = null;
+
+function _openIdb() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  if (_idbDbPromise) return _idbDbPromise;
+  _idbDbPromise = new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(_IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(_IDB_STORE)) db.createObjectStore(_IDB_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+  return _idbDbPromise;
+}
+
+function mcCacheGet(key, fallback) {
+  if (typeof indexedDB === 'undefined') {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch { return fallback; }
+  }
+  if (_idbMem.has(key)) return _idbMem.get(key);
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      _idbMem.set(key, parsed);
+      return parsed;
+    }
+  } catch {}
+  return fallback;
+}
+
+function mcCacheSet(key, val) {
+  if (typeof indexedDB === 'undefined') {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+    return;
+  }
+  _idbMem.set(key, val);
+  try { localStorage.removeItem(key); } catch {}
+  _openIdb().then(db => {
+    if (!db) return;
+    try {
+      const tx = db.transaction(_IDB_STORE, 'readwrite');
+      tx.objectStore(_IDB_STORE).put(val, key);
+    } catch {}
+  });
+}
+
+function mcCacheDel(key) {
+  _idbMem.delete(key);
+  try { localStorage.removeItem(key); } catch {}
+  if (typeof indexedDB === 'undefined') return;
+  _openIdb().then(db => {
+    if (!db) return;
+    try {
+      const tx = db.transaction(_IDB_STORE, 'readwrite');
+      tx.objectStore(_IDB_STORE).delete(key);
+    } catch {}
+  });
+}
+
+window.mcCacheReady = (function initIdbCache() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve();
+  return _openIdb().then(db => {
+    if (!db) return;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(_IDB_STORE, 'readwrite');
+        const store = tx.objectStore(_IDB_STORE);
+        _IDB_KEYS.forEach(k => {
+          const req = store.get(k);
+          req.onsuccess = () => {
+            if (req.result !== undefined) {
+              if (!_idbMem.has(k)) _idbMem.set(k, req.result);
+              try { localStorage.removeItem(k); } catch {}
+            } else {
+              try {
+                const raw = localStorage.getItem(k);
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  _idbMem.set(k, parsed);
+                  store.put(parsed, k);
+                  localStorage.removeItem(k);
+                }
+              } catch {}
+            }
+          };
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch { resolve(); }
+    });
+  });
+})();
+
 // ============ SETTINGS ============
 const settings = {
   themeBg: localStorage.getItem('mycinema.theme.bg') || 'navy',
@@ -460,7 +573,8 @@ let libTombstones = (() => { try { return JSON.parse(localStorage.getItem(LS_DEL
 function evictHeavyCaches() {
   const legacy = ['mycinema.recs.v4', 'mycinema.home.general.v6', 'mycinema.metaCache.v1'];
   const expendable = [RECS_CACHE, 'mycinema.home.general.v7', 'mycinema.metaCache.v2', 'mycinema.companyCache.v1', 'mycinema.colCache.v1', 'mycinema.releaseCache.v1'];
-  legacy.concat(expendable).forEach(k => { try { localStorage.removeItem(k); } catch {} });
+  legacy.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+  expendable.forEach(k => mcCacheDel(k));
 }
 
 function saveLocalOnly() {

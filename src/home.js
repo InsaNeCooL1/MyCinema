@@ -58,10 +58,8 @@ function isExcludedFromTaste(x, avg) {
 }
 
 function readMetaCacheAll() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(META_CACHE_KEY)) || {};
-    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
-  } catch { return {}; }
+  const raw = typeof mcCacheGet === 'function' ? mcCacheGet(META_CACHE_KEY, {}) : {};
+  return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
 }
 
 function writeMetaCacheAll(cache) {
@@ -71,7 +69,7 @@ function writeMetaCacheAll(cache) {
       entries.sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
       cache = Object.fromEntries(entries.slice(0, META_CACHE_MAX));
     }
-    localStorage.setItem(META_CACHE_KEY, JSON.stringify(cache));
+    if (typeof mcCacheSet === 'function') mcCacheSet(META_CACHE_KEY, cache);
   } catch {}
 }
 
@@ -777,7 +775,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
 
 function readGeneralCache() {
   try {
-    const c = JSON.parse(localStorage.getItem(GEN_CACHE));
+    const c = typeof mcCacheGet === 'function' ? mcCacheGet(GEN_CACHE, null) : JSON.parse(localStorage.getItem(GEN_CACHE));
     if (!c || !c.data) return null;
     if (Date.now() - c.ts < GEN_TTL) return c.data;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return c.data;
@@ -790,13 +788,13 @@ function writeGeneralCache(g) {
     const hasMovies = (g.trMovies && g.trMovies.length) || (g.newMovies && g.newMovies.length) || (g.topMovies && g.topMovies.length);
     const hasTv = Array.isArray(g.tvStreams) && g.tvStreams.some(st => (st.pop && st.pop.length) || (st.fresh && st.fresh.length));
     if (!hasMovies && !hasTv) return;
-    localStorage.setItem(GEN_CACHE, JSON.stringify({ ts: Date.now(), data: g }));
+    if (typeof mcCacheSet === 'function') mcCacheSet(GEN_CACHE, { ts: Date.now(), data: g });
   } catch {}
 }
 /* FIX-RECS-CACHE-V3 */
 function readRecsCache(sig, critical) {
   try {
-    const c = JSON.parse(localStorage.getItem(RECS_CACHE));
+    const c = typeof mcCacheGet === 'function' ? mcCacheGet(RECS_CACHE, null) : JSON.parse(localStorage.getItem(RECS_CACHE));
     if (!c) return null;
     const age = Date.now() - c.ts;
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false; /* offline-recs-ttl-bypass */
@@ -811,7 +809,7 @@ function readRecsCache(sig, critical) {
   } catch {}
   return null;
 }
-function writeRecsCache(sig, critical, data) { try { localStorage.setItem(RECS_CACHE, JSON.stringify({ sig, critical, ts: Date.now(), data })); } catch {} } /* FIX-RECS-CACHE-V2 */
+function writeRecsCache(sig, critical, data) { if (typeof mcCacheSet === 'function') mcCacheSet(RECS_CACHE, { sig, critical, ts: Date.now(), data }); } /* FIX-RECS-CACHE-V2 */
 
 // ============ TASTE DNA (SVG & UI) ============
 function tasteRadarSVG(taste, size = 240) {
@@ -1646,7 +1644,7 @@ function renderHomeContent(taste) {
     /* FIX-RECS-AGE */
     let _cacheAge = '';
     try {
-      const _c = JSON.parse(localStorage.getItem(RECS_CACHE));
+      const _c = typeof mcCacheGet === 'function' ? mcCacheGet(RECS_CACHE, null) : JSON.parse(localStorage.getItem(RECS_CACHE));
       if (_c && _c.ts) {
         const _hrs = Math.floor((Date.now() - _c.ts) / 3600000);
         if (_hrs < 1) _cacheAge = ' (щойно)';
@@ -1659,7 +1657,7 @@ function renderHomeContent(taste) {
     refreshBtn.style.background = 'transparent';
     refreshBtn.style.border = '1px solid var(--bg-3)';
     refreshBtn.addEventListener('click', () => {
-      try { localStorage.removeItem(RECS_CACHE); } catch {}
+      if (typeof mcCacheDel === 'function') mcCacheDel(RECS_CACHE);
       state.home.refreshNonce = (state.home.refreshNonce || 0) + 1;
       state.home.sig = null; state.home.recs = null;
       state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;

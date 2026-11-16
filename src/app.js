@@ -206,8 +206,20 @@ try {
 } catch (e) {}
 var _initialHash = (!_isReload && /^#\/(movie|tv|person|company)\/\d+$/.test(location.hash)) ? location.hash : '';
 history.replaceState({ mc: 0 }, '', location.pathname + location.search + _initialHash);
-refresh();
-if (_initialHash) routeFromHash();
+(function startAppWithIdbCache() {
+  var booted = false;
+  function boot() {
+    if (booted) return;
+    booted = true;
+    refresh();
+    if (_initialHash) routeFromHash();
+  }
+  if (window.mcCacheReady && typeof window.mcCacheReady.then === 'function') {
+    Promise.race([window.mcCacheReady, new Promise(function (res) { setTimeout(res, 150); })]).then(boot, boot);
+  } else {
+    boot();
+  }
+})();
 
 // [GUEST-ONB-FIX] Гість-онбординг при першому запуску
 if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getItem('onboardingDone')) {

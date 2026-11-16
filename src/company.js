@@ -8,10 +8,8 @@ const _companyInfoMem = new Map();
 const _companyPageMem = new Map();
 
 function readCompanyCacheAll() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(COMPANY_CACHE_KEY)) || {};
-    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
-  } catch { return {}; }
+  const raw = typeof mcCacheGet === 'function' ? mcCacheGet(COMPANY_CACHE_KEY, {}) : {};
+  return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
 }
 
 function writeCompanyCacheAll(cache) {
@@ -21,7 +19,7 @@ function writeCompanyCacheAll(cache) {
       entries.sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
       cache = Object.fromEntries(entries.slice(0, COMPANY_CACHE_MAX));
     }
-    localStorage.setItem(COMPANY_CACHE_KEY, JSON.stringify(cache));
+    if (typeof mcCacheSet === 'function') mcCacheSet(COMPANY_CACHE_KEY, cache);
   } catch {}
 }
 

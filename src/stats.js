@@ -501,14 +501,12 @@ const COL_CACHE_KEY = 'mycinema.colCache.v1';
 const COL_CACHE_TTL = 24 * 60 * 60 * 1000; /* FIX-COL-TTL */
 
 function readColCache() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(COL_CACHE_KEY)) || {};
-    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
-  } catch { return {}; }
+  const raw = typeof mcCacheGet === 'function' ? mcCacheGet(COL_CACHE_KEY, {}) : {};
+  return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
 }
 
 function writeColCache(cache) {
-  try { localStorage.setItem(COL_CACHE_KEY, JSON.stringify(cache)); } catch {}
+  if (typeof mcCacheSet === 'function') mcCacheSet(COL_CACHE_KEY, cache);
 }
 
 async function fetchMissingCollections(colIds) {
@@ -1248,7 +1246,7 @@ function renderActorsTab() {
       fireBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         setActorAdj(a.id, a.adj > 0 ? 0 : 1);
-        try { localStorage.removeItem(RECS_CACHE); } catch {}
+        if (typeof mcCacheDel === 'function') mcCacheDel(RECS_CACHE);
         state.home.sig = null;
         renderStatistics();
       });
@@ -1258,7 +1256,7 @@ function renderActorsTab() {
       sadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         setActorAdj(a.id, a.adj < 0 ? 0 : -1);
-        try { localStorage.removeItem(RECS_CACHE); } catch {}
+        if (typeof mcCacheDel === 'function') mcCacheDel(RECS_CACHE);
         state.home.sig = null;
         renderStatistics();
       });

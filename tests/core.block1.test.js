@@ -95,3 +95,12 @@ describe('Block 1 fixes & invariants', () => {
     expect(sRight).toBeGreaterThan(sWrongT);
   });
 });
+
+describe('Block 2 IndexedDB cache fallback', () => {
+  it('mcCacheSet / mcCacheGet / mcCacheDel коректно зберігають і видаляють дані', () => {
+    window.mcCacheSet('mycinema.metaCache.v2', { 'movie-1': { ts: 123 } });
+    expect(window.mcCacheGet('mycinema.metaCache.v2', {})).toEqual({ 'movie-1': { ts: 123 } });
+    window.mcCacheDel('mycinema.metaCache.v2');
+    expect(window.mcCacheGet('mycinema.metaCache.v2', {})).toEqual({});
+  });
+});

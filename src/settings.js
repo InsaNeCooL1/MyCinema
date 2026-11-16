@@ -21,8 +21,7 @@ function openSettings() {
 
 /* FIX-RELEASE-HANDLERS-2 */
 function _clearReleaseCaches() {
-  try { localStorage.removeItem(RECS_CACHE); } catch (e) {}
-  try { localStorage.removeItem(GEN_CACHE); } catch (e) {}
+  if (typeof mcCacheDel === 'function') { mcCacheDel(RECS_CACHE); mcCacheDel(GEN_CACHE); }
   state.home.sig = null;
   state.home.recs = null;
   state.home.general = null;

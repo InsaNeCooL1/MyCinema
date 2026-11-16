@@ -5,14 +5,12 @@ const RELEASE_CACHE_TTL = 6 * 60 * 60 * 1000;
 let _releaseFetchRunning = false;
 
 function readReleaseCache() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(RELEASE_CACHE_KEY) || '{}');
-    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
-  } catch { return {}; }
+  const raw = typeof mcCacheGet === 'function' ? mcCacheGet(RELEASE_CACHE_KEY, {}) : {};
+  return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
 }
 
 function writeReleaseCache(cache) {
-  try { localStorage.setItem(RELEASE_CACHE_KEY, JSON.stringify(cache)); } catch {}
+  if (typeof mcCacheSet === 'function') mcCacheSet(RELEASE_CACHE_KEY, cache);
 }
 
 function collectCachedReleaseEvents(cache) {
