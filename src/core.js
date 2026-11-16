@@ -121,7 +121,8 @@ const settings = {
   /* FIX-RELEASE-SETTINGS */
   digitalOnly: localStorage.getItem('mycinema.digitalOnly') !== 'false',       // default true
   streamingOnlyUA: localStorage.getItem('mycinema.streamingOnlyUA') === 'true', // default false
-  showStatusBadges: localStorage.getItem('mycinema.showStatusBadges') !== 'false' // FIX-STATUS-TOGGLE
+  showStatusBadges: localStorage.getItem('mycinema.showStatusBadges') !== 'false', // FIX-STATUS-TOGGLE
+  enableStreams: localStorage.getItem('mycinema.enableStreams') !== 'false'
 };
 
 /* FIX-RELEASE-HELPERS — спільні для card.js і home.js */

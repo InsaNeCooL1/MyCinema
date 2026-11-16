@@ -13,7 +13,7 @@
   ].join(', ');
 
   // Білий список (тільки ці елементи будуть доступні всередині картки)
-  const CARD_ALLOWED = '.btn-lampa, .btn-uakino, .btn-watched, .card-x';
+  const CARD_ALLOWED = '.btn-uakino, .btn-watched, .card-x';
 
   function getVisibleElements() {
     let scope = document;

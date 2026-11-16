@@ -345,6 +345,7 @@ window.logoutUser = async () => {
   try {
     var _keys = (window.MC_LOCAL_KEYS || ['mycinema.library','mycinema.deleted','onboardingDone']);
     _keys.forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    if (typeof evictHeavyCaches === 'function') evictHeavyCaches();
   } catch (e) {}
   await supabase.auth.signOut();
   location.reload();

@@ -319,7 +319,6 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === 'TEXTAREA' || tag === 'INPUT') return;
-  if (window.LampaRoom && LampaRoom.isOpen()) { LampaRoom.close(); return; }
   if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
   if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
   if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }
@@ -499,6 +498,7 @@ async function deleteAccount() {
   try {
     var keys = (window.MC_LOCAL_KEYS || []).concat(['mycinema.lang']);
     keys.forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });
+    if (typeof evictHeavyCaches === 'function') evictHeavyCaches();
   } catch (e) {}
 
   try { if (window.supabase) await window.supabase.auth.signOut(); } catch (e) {}

@@ -1,7 +1,8 @@
 'use strict';
 
 // ============ API ============
-const PROXY_URL = "https://mycinema-proxy.insaneteresh123.workers.dev";
+const DEFAULT_PROXY_URL = "https://mycinema-proxy.insaneteresh123.workers.dev";
+let PROXY_URL = (() => { try { return localStorage.getItem('mycinema.tmdbProxy') || DEFAULT_PROXY_URL; } catch { return DEFAULT_PROXY_URL; } })();
 const TMDB_IMG = "https://image.tmdb.org/t/p/";
 
 // ============ CONSTANTS ============

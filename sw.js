@@ -106,9 +106,6 @@ self.addEventListener('fetch', (event) => {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
   if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return;
 
-  // Ізольована кімнатка Lampa — не перехоплюємо через SW MyCinema
-  if (url.origin === self.location.origin && (url.pathname.includes('/lampa/') || url.pathname.endsWith('/lampa'))) return;
-
   // Ніколи не кешуємо API / Auth / зовнішні запити даних
   if (
     url.hostname.endsWith('supabase.co') ||

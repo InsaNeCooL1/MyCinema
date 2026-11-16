@@ -248,16 +248,18 @@
     const uaYear = (d.release_date || d.first_air_date || '').slice(0, 4) || String(r.year || '');
     const uaType = d.media_type || r.type || (d.name ? 'tv' : 'movie');
     const uaImdb = d.imdb_id || (d.external_ids && d.external_ids.imdb_id) || null;
-    const uakinoBtn = el('button', 'btn-uakino');
-    uakinoBtn.innerHTML = '<span class="uakino-grad-text">UA KINO</span>';
-    uakinoBtn.onclick = () => {
-      if (typeof window.openStreamPicker === 'function') {
-        window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb, uaOrigTitle);
-      } else {
-        alert('Плеєр не завантажено. Онови сторінку (Ctrl+Shift+R).');
-      }
-    };
-    wrap.append(uakinoBtn);
+    if (settings.enableStreams !== false) {
+      const uakinoBtn = el('button', 'btn-uakino');
+      uakinoBtn.innerHTML = '<span class="uakino-grad-text">UA KINO</span>';
+      uakinoBtn.onclick = () => {
+        if (typeof window.openStreamPicker === 'function') {
+          window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb, uaOrigTitle);
+        } else {
+          alert('Плеєр не завантажено. Онови сторінку (Ctrl+Shift+R).');
+        }
+      };
+      wrap.append(uakinoBtn);
+    }
 
     const isWatched = s.status === 'watched';
     const isDropped = s.status === 'dropped';

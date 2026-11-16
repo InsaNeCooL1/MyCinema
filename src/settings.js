@@ -409,6 +409,49 @@ function injectKbdNavToggle() {
   hint.style.cssText = 'font-size:12px;padding:0 4px;margin-top:0;';
   sec.appendChild(hint);
 
+  const stLabel = document.createElement('label');
+  stLabel.className = 'settings-toggle';
+  const stInp = document.createElement('input');
+  stInp.type = 'checkbox';
+  stInp.id = 'streams-enable-toggle';
+  stInp.checked = settings.enableStreams !== false;
+  stInp.addEventListener('change', function () {
+    settings.enableStreams = !!this.checked;
+    localStorage.setItem('mycinema.enableStreams', this.checked ? 'true' : 'false');
+    if (cardStack.length) renderCard(true);
+    showSyncToast(this.checked ? '▶️ UA KINO увімкнено' : '🙈 UA KINO вимкнено');
+  });
+  const stSpan = document.createElement('span');
+  stSpan.textContent = 'Вбудований перегляд (UA KINO)';
+  stLabel.appendChild(stInp);
+  stLabel.appendChild(stSpan);
+  sec.appendChild(stLabel);
+
+  const pxBtn = document.createElement('button');
+  pxBtn.className = 'settings-btn';
+  pxBtn.type = 'button';
+  pxBtn.textContent = '🌐 Проксі-сервери (TMDB / Потік)';
+  pxBtn.addEventListener('click', () => {
+    const curTmdb = localStorage.getItem('mycinema.tmdbProxy') || '';
+    const nextTmdb = prompt('URL проксі для TMDB (порожньо = стандартний):', curTmdb);
+    if (nextTmdb !== null) {
+      const cleanT = nextTmdb.trim().replace(/\/+$/, '');
+      if (cleanT && !/^https?:\/\//i.test(cleanT)) { alert('Невірний URL'); return; }
+      if (cleanT) { localStorage.setItem('mycinema.tmdbProxy', cleanT); PROXY_URL = cleanT; }
+      else { localStorage.removeItem('mycinema.tmdbProxy'); if (typeof DEFAULT_PROXY_URL !== 'undefined') PROXY_URL = DEFAULT_PROXY_URL; }
+    }
+    const curStream = localStorage.getItem('mycinema.proxy') || '';
+    const nextStream = prompt('URL проксі для балансерів (порожньо = стандартний):', curStream);
+    if (nextStream !== null) {
+      const cleanS = nextStream.trim().replace(/\/+$/, '');
+      if (cleanS && !/^https?:\/\//i.test(cleanS)) { alert('Невірний URL'); return; }
+      if (cleanS) localStorage.setItem('mycinema.proxy', cleanS);
+      else localStorage.removeItem('mycinema.proxy');
+    }
+    showSyncToast('✅ Налаштування проксі збережено');
+  });
+  sec.appendChild(pxBtn);
+
   if (target && target.parentNode) target.parentNode.insertBefore(sec, target);
   else modal.querySelector('.settings-box')?.appendChild(sec);
 }
