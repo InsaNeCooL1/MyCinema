@@ -44,7 +44,7 @@ let lib = load();
 let _dirtyItems = new Set();
 let _saveTimer = null;
 let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_ADJUST_KEY)) || {}; } catch { return {}; } })();
-const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics', 'game']);
+const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'activity', 'statistics', 'game']);
 let _savedTab = 'home';
 try {
   const t = localStorage.getItem('mycinema.activeTab');
@@ -67,7 +67,8 @@ let state = {
   game: { active: false, type: 'movie', round: 0, totalRounds: 20, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() },
   stats: { tab: 'taste', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } },
   librarySearch: '', librarySort: localStorage.getItem('mycinema.librarySort') || 'updated', /* FIX-SORT-PERSIST */
-  calendarMonth: null, calendarStatus: 'all'
+  calendarMonth: null, calendarStatus: 'all',
+  activityFilter: 'all', activitySort: 'newest'
 };
 let cardStack = [];
 let filterPage = 1;
@@ -454,6 +455,56 @@ function saveLocalOnly() {
     localStorage.setItem(LS, JSON.stringify(lib));
     localStorage.setItem(LS_DEL, JSON.stringify(libTombstones));
   } catch (e) { console.error(e); showSyncToast('⚠ Сховище переповнене'); }
+}
+
+// ============ ACTIVITY LOG ============
+const ACTIVITY_LOG_KEY = 'mycinema.activityLog.v1';
+const ACTIVITY_LOG_MAX = 500;
+
+function readActivityLog() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(ACTIVITY_LOG_KEY) || '[]');
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+function writeActivityLog(arr) {
+  try {
+    localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(arr.slice(0, ACTIVITY_LOG_MAX)));
+  } catch {}
+}
+
+function clearActivityLog() {
+  try { localStorage.removeItem(ACTIVITY_LOG_KEY); } catch {}
+}
+
+function logActivity(entry) {
+  if (!entry || !entry.cat || !entry.text) return;
+  const now = Date.now();
+  const list = readActivityLog();
+  const item = entry.item || null;
+  const itemKey = entry.key || (item && item.key) || '';
+  const rec = {
+    id: now + '-' + Math.random().toString(36).slice(2, 6),
+    ts: now,
+    cat: entry.cat,
+    sub: entry.sub || '',
+    icon: entry.icon || '•',
+    text: entry.text,
+    key: itemKey,
+    title: entry.title || (item && item.title) || '',
+    poster: entry.poster !== undefined ? entry.poster : (item && item.poster) || null,
+    type: entry.type || (item && item.type) || ''
+  };
+  // Склеюємо швидкі повторні оцінки одного тайтлу (протягом 25с) в один запис
+  if (entry.coalesceKey && list.length && list[0].coalesceKey === entry.coalesceKey && (now - list[0].ts) < 25000) {
+    rec.coalesceKey = entry.coalesceKey;
+    list[0] = rec;
+  } else {
+    if (entry.coalesceKey) rec.coalesceKey = entry.coalesceKey;
+    list.unshift(rec);
+  }
+  writeActivityLog(list);
 }
 
 // Єдина точка видалення тайтлу з lib
@@ -885,19 +936,24 @@ function isDismissed(key) { return !!dismissedRecs[key]; }
 function dismissRec(item) {
   if (!item || !item.key) return;
   dismissedRecs[item.key] = { ts: Date.now(), genres: item.genres || [], title: item.title || '' };
+  logActivity({ cat: 'dismiss', sub: 'dismiss', icon: '🙈', text: 'Сховано з рекомендацій', item });
   saveDismissed();
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(saveToCloud, 800);
 }
 function undismissRec(key) {
+  const old = dismissedRecs[key];
   delete dismissedRecs[key];
+  logActivity({ cat: 'dismiss', sub: 'undismiss', icon: '👁️', text: 'Повернуто в рекомендації', key, title: old?.title || key });
   saveDismissed();
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(saveToCloud, 800);
 }
 function clearDismissed() {
+  const cnt = Object.keys(dismissedRecs || {}).length;
   dismissedRecs = {};
   dismissedClearedAt = Date.now();
+  if (cnt > 0) logActivity({ cat: 'dismiss', sub: 'clear', icon: '👁️', text: `Повернуто схованих рекомендацій: ${cnt}`, title: 'Рекомендації' });
   saveDismissed();
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(saveToCloud, 800);
@@ -973,6 +1029,7 @@ function recordEloMatch(winner, loser) {
   l.eloUpdated = eloNow;
   l.updated = eloNow;
 
+  logActivity({ cat: 'elo', sub: 'win', icon: '👑', text: `Цар гори: перемога над «${loser.title || ''}» (+${delta} Elo)`, item: winner });
   save();
   return { delta, winnerElo: w.elo, loserElo: l.elo };
 }

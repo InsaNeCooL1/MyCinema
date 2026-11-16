@@ -323,6 +323,7 @@ function removeFromLibrary(key) {
     saveNow();
   } else {
     removeLibItem(key);
+    if (typeof logActivity === 'function') logActivity({ cat: 'remove', sub: 'delete', icon: '🗑️', text: 'Видалено зі списку', item: saved });
     saveNow();
   }
   refresh();

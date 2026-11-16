@@ -341,7 +341,12 @@
       delBtn.innerHTML = ICONS.trash;
       delBtn.title = 'Видалити';
       delBtn.onclick = () => {
-        if (confirm('Видалити тайтл?')) { removeLibItem(r.key); saveNow(); closeCard(); }
+        if (confirm('Видалити тайтл?')) {
+          const snap = lib[r.key] || r;
+          removeLibItem(r.key);
+          if (typeof logActivity === 'function') logActivity({ cat: 'remove', sub: 'delete', icon: '🗑️', text: 'Видалено з бібліотеки', item: snap });
+          saveNow(); closeCard();
+        }
       };
       wrap.append(delBtn);
     }

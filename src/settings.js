@@ -142,6 +142,7 @@ function importLibrary() {
       }
       lib = data;
       for (const k of Object.keys(data)) _dirtyItems.add(k); /* SYNC-FIX-IMPORT */
+      if (typeof logActivity === 'function') logActivity({ cat: 'import', sub: 'import', icon: '📥', text: `Імпортовано тайтлів: ${count}`, title: 'Бібліотека' });
       await saveNow();
       refresh();
       showSyncToast('📥 ' + count);

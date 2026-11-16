@@ -444,6 +444,53 @@ function updateCore(r, patch) {
   lib[r.key] = merged;
   _dirtyItems.add(r.key); // Позначаємо для синхронізації
   markCardLibDirty(); // updateCore
+
+  if (typeof logActivity === 'function') {
+    if (patch.status !== undefined && patch.status !== cur.status) {
+      const stMap = {
+        watched: ['✅', 'Позначено «Переглянуто»'],
+        watching: ['▶️', 'Позначено «Дивлюсь»'],
+        planned: ['📅', 'Додано в «Планую»'],
+        dropped: ['🕸️', 'Перенесено в «Закинуто»']
+      };
+      const pair = stMap[patch.status] || ['↩️', 'Знято статус'];
+      logActivity({ cat: 'status', sub: patch.status || 'none', icon: pair[0], text: pair[1], item: merged });
+    }
+    if (patch.favorite !== undefined && !!patch.favorite !== !!cur.favorite) {
+      logActivity({ cat: 'favorite', sub: patch.favorite ? 'add' : 'rem', icon: patch.favorite ? '❤️' : '💔', text: patch.favorite ? 'Додано в «Улюблене»' : 'Прибрано з «Улюбленого»', item: merged });
+    }
+    if (patch.ratings !== undefined && JSON.stringify(patch.ratings || {}) !== JSON.stringify(cur.ratings || {})) {
+      const avg = computeAverage(merged.ratings);
+      if (avg > 0) logActivity({ cat: 'rating', sub: 'movie', icon: '⭐', text: `Оцінено: ${fmtNum(avg)}/10`, item: merged, coalesceKey: 'rate-' + r.key });
+      else if (computeAverage(cur.ratings) > 0) logActivity({ cat: 'rating', sub: 'clear', icon: '🧹', text: 'Очищено оцінку', item: merged });
+    }
+    if (patch.seasonRatings !== undefined && JSON.stringify(patch.seasonRatings || {}) !== JSON.stringify(cur.seasonRatings || {})) {
+      const oldSR = cur.seasonRatings || {}, newSR = merged.seasonRatings || {};
+      const sKeys = new Set([...Object.keys(oldSR), ...Object.keys(newSR)]);
+      sKeys.forEach(sNum => {
+        if (JSON.stringify(oldSR[sNum] || {}) === JSON.stringify(newSR[sNum] || {})) return;
+        const avg = computeAverage(newSR[sNum]);
+        if (avg > 0) logActivity({ cat: 'rating', sub: 'season', icon: '⭐', text: `Сезон ${sNum}: оцінено ${fmtNum(avg)}/10`, item: merged, coalesceKey: `rate-${r.key}-s${sNum}` });
+        else if (computeAverage(oldSR[sNum]) > 0) logActivity({ cat: 'rating', sub: 'clear', icon: '🧹', text: `Сезон ${sNum}: очищено оцінку`, item: merged });
+      });
+    }
+    if (patch.watchedEpisodes !== undefined && patch.status !== 'watched') {
+      const prevSet = new Set(cur.watchedEpisodes || []);
+      const nextSet = new Set(merged.watchedEpisodes || []);
+      const added = [...nextSet].filter(k => !prevSet.has(k));
+      const removed = [...prevSet].filter(k => !nextSet.has(k));
+      const fmtEp = (k) => { const p = String(k).split('-'); return p.length === 2 ? `S${p[0]}E${String(p[1]).padStart(2, '0')}` : k; };
+      if (added.length === 1) logActivity({ cat: 'episode', sub: 'add', icon: '📺', text: `Переглянуто ${fmtEp(added[0])}`, item: merged });
+      else if (added.length > 1) logActivity({ cat: 'episode', sub: 'add', icon: '📺', text: `Переглянуто серій: ${added.length}`, item: merged });
+      if (removed.length === 1) logActivity({ cat: 'episode', sub: 'rem', icon: '📺', text: `Знято відмітку ${fmtEp(removed[0])}`, item: merged });
+      else if (removed.length > 1) logActivity({ cat: 'episode', sub: 'rem', icon: '📺', text: `Очищено серій: ${removed.length}`, item: merged });
+    }
+    if (patch.notesHistory !== undefined) {
+      const prevN = (cur.notesHistory || []).length, nextN = (merged.notesHistory || []).length;
+      if (nextN > prevN) logActivity({ cat: 'note', sub: 'add', icon: '📝', text: 'Додано нотатку', item: merged });
+      else if (nextN < prevN) logActivity({ cat: 'note', sub: 'rem', icon: '📝', text: 'Видалено нотатку', item: merged });
+    }
+  }
   const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);
   const hasSR = lib[r.key].seasonRatings && Object.keys(lib[r.key].seasonRatings).length > 0;
   const hasEps = lib[r.key].watchedEpisodes && lib[r.key].watchedEpisodes.length > 0;

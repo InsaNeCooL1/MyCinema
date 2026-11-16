@@ -542,12 +542,82 @@ body.mc-fs {
 .streams-status { text-align: center; color: var(--text-muted); padding: 26px 12px; font-size: 14px; }
 .streams-error { text-align: center; color: var(--danger); padding: 20px 12px; font-size: 13.5px; line-height: 1.5; }
 
-/* FIX-BATCH1-CSS */
+/* FIX-SIDEBAR-MOBILE-EVEN */
 @media (max-width: 899px), (max-height: 599px) {
   #sidebar .nav-group-btn { display: none; }
-  #sidebar .nav-dropdown { display: flex; flex-direction: column; padding-left: 0; gap: 2px; }
+  #sidebar .nav-dropdown { display: flex; flex-direction: column; padding-left: 0; gap: 3px; }
+  #sidebar .sidebar-nav { padding: 12px 10px; gap: 3px; }
+  #sidebar .nav-group { gap: 3px; }
+  #sidebar .nav-item {
+    min-height: 44px; padding: 9px 14px; margin: 0;
+    border: 1px solid transparent; border-radius: var(--r-sm);
+    font-size: 14.5px; line-height: 1.25; gap: 12px;
+    box-sizing: border-box; flex-shrink: 0;
+  }
+  #sidebar .nav-item.nav-item-accent {
+    margin: 0; border: 1px solid rgba(var(--accent-rgb), .28);
+  }
+  #sidebar .nav-icon {
+    width: 24px; height: 24px; font-size: 16px;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;
+  }
+  #sidebar .sidebar-footer { padding: 12px 14px; gap: 8px; }
+  #sidebar #sidebar-top-btn { display: none !important; }
+  #sidebar .login-btn-side, #sidebar .logout-btn-side {
+    height: 44px; min-height: 44px; padding: 0 14px;
+    display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+  }
+  #sidebar .logout-btn-side.logged-in .account-dot { position: static; border: 0; margin-left: 2px; flex-shrink: 0; }
   .recs-controls-bar .recs-mode-pills { display: none; }
 }
+
+/* ACTIVITY LOG & RELEASE SCHEDULE */
+.activity-controls {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center;
+}
+.activity-controls .calendar-select { flex: 1; min-width: 140px; padding: 8px 12px; font-size: 13px; }
+.activity-clear-btn {
+  padding: 8px 12px; border-radius: var(--r-sm); background: rgba(255, 92, 92, .12);
+  border: 1px solid rgba(255, 92, 92, .3); color: var(--danger); font-size: 12.5px; font-weight: 600;
+}
+.activity-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 30px; }
+.activity-row {
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px; min-height: 52px;
+  background: var(--bg-1); border: 1px solid rgba(255, 255, 255, .04); border-radius: var(--r-sm);
+  transition: background .15s;
+}
+.activity-row.clickable { cursor: pointer; }
+.activity-row.clickable:hover { background: var(--bg-2); }
+.activity-thumb {
+  width: 26px; height: 38px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: var(--bg-3);
+}
+.activity-thumb-icon {
+  width: 26px; height: 38px; border-radius: 4px; flex-shrink: 0; background: var(--bg-2);
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.activity-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.activity-title {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25;
+}
+.activity-desc {
+  font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25;
+}
+.activity-desc.cat-status { color: var(--accent); }
+.activity-desc.cat-rating { color: var(--mint); }
+.activity-desc.cat-dismiss { color: var(--violet); }
+.activity-desc.cat-remove { color: var(--danger); }
+.activity-desc.cat-favorite { color: var(--coral); }
+.activity-time {
+  font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); flex-shrink: 0; text-align: right;
+}
+.release-tag {
+  display: inline-block; padding: 2px 7px; border-radius: var(--r-xs); font-size: 11px; font-weight: 700;
+  font-family: var(--mono); margin-bottom: 2px;
+}
+.release-tag.ep { background: rgba(var(--accent-rgb), .15); color: var(--accent); }
+.release-tag.premiere { background: rgba(197, 163, 255, .16); color: var(--violet); }
+.release-tag.digital { background: rgba(157, 229, 195, .16); color: var(--mint); }
 
 /* --- Tab Contents (збережені зі старого коду) --- */
 .details-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }

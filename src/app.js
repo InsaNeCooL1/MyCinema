@@ -73,6 +73,7 @@ function refresh() {
   else if (state.tab === "statistics") renderStatistics();
   else if (state.tab === "notes") renderNotesList();
   else if (state.tab === "calendar") renderCalendar();
+  else if (state.tab === "activity" && typeof renderActivityLog === 'function') renderActivityLog();
   else if (state.tab === "top") renderMyTop();
   else renderLibrary();
 }
