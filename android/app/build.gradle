@@ -15,8 +15,8 @@ android {
         applicationId "com.mycinema.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (project.hasProperty('MC_VERSION_CODE') ? project.property('MC_VERSION_CODE').toInteger() : 100)
-        versionName (project.hasProperty('MC_VERSION_NAME') ? project.property('MC_VERSION_NAME').toString() : "3.0.0")
+        versionCode (project.hasProperty('MC_VERSION_CODE') ? project.property('MC_VERSION_CODE').toInteger() : 101)
+        versionName (project.hasProperty('MC_VERSION_NAME') ? project.property('MC_VERSION_NAME').toString() : "3.1.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'

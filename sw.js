@@ -12,6 +12,7 @@ const SHELL_ASSETS = [
   './styles.css',
   './manifest.json',
   './bundle.js',
+  './icon.svg',
 ];
 
 self.addEventListener('install', (event) => {

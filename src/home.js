@@ -1533,62 +1533,142 @@ function buildPlannedByMoodSection() {
 
   const moodKey = state.home.mood;
   const moodData = moodKey && MOODS[moodKey] ? MOODS[moodKey] : null;
+  if (!state.home.planFilter) state.home.planFilter = 'all';
 
-  let pool = allPlanned;
+  let moodPool = allPlanned;
   if (moodData) {
     const matched = allPlanned.filter(x => {
       if (!x.genres || !x.genres.length) return false;
       const targetGenres = x.type === 'tv' ? (moodData.tvGenres || moodData.genres) : moodData.genres;
       return x.genres.some(g => targetGenres.includes(g));
     });
-    if (matched.length) pool = matched;
+    if (matched.length) moodPool = matched;
   }
 
+  const applyTimeFilter = (arr, f) => {
+    if (f === 'short') return arr.filter(x => x.type === 'movie' && x.runtime > 0 && x.runtime <= 105);
+    if (f === 'movie') return arr.filter(x => x.type === 'movie');
+    if (f === 'mini') return arr.filter(x => x.type === 'tv' && (x.totalSeasons === 1 || (!x.totalSeasons && x.episode_count > 0 && x.episode_count <= 10)));
+    return arr;
+  };
+
+  const pool = applyTimeFilter(moodPool, state.home.planFilter);
   const sec = el('section', 'home-section planned-mood-sec');
   const head = el('div', 'section-head');
   const titleWrap = el('div', 'planned-head-left');
-  titleWrap.append(el('h2', 'section-title', '🎯 З твого «Планую»')); /* FIX-HOME-NO-SUB-PLANNED */
+  titleWrap.append(el('h2', 'section-title', '🎯 З твого «Планую»'));
 
   const rouletteBtn = el('button', 'roulette-btn', '🎲 Вибрати за мене');
   rouletteBtn.type = 'button';
   rouletteBtn.addEventListener('click', () => {
-    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const p = pool.length ? pool : moodPool;
+    const pick = p[Math.floor(Math.random() * p.length)];
     if (pick) openCard(pick);
   });
 
   head.append(titleWrap, rouletteBtn);
   sec.append(head);
 
-  const strip = el('div', 'home-grid'); /* FIX-PLANNED-GRID */
-  pool.slice(0, 14).forEach(item => {
-    strip.append(recCard(item, false));
+  const pfBar = el('div', 'plan-filter-bar');
+  [
+    ['all', 'Усі'],
+    ['short', '⚡ До 100 хв'],
+    ['movie', '🎬 Фільми'],
+    ['mini', '📺 Міні-серіали']
+  ].forEach(([fid, lbl]) => {
+    const b = el('button', 'recs-mode-pill' + (state.home.planFilter === fid ? ' active' : ''), lbl);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      state.home.planFilter = fid;
+      const fresh = buildPlannedByMoodSection();
+      if (fresh) sec.replaceWith(fresh);
+    });
+    pfBar.append(b);
   });
+  sec.append(pfBar);
+
+  if (!pool.length) {
+    sec.append(el('div', 'home-note', 'Немає тайтлів у «Планую» під цей фільтр (або ще не підвантажено хронометраж).'));
+    return sec;
+  }
+
+  const strip = el('div', 'home-grid');
+  pool.slice(0, 14).forEach(item => strip.append(recCard(item, false)));
   sec.append(strip);
   return sec;
 }
 
+function buildHomeTypeSwitch(taste) {
+  const sw = el('div', 'home-inline-type-switch');
+  const mBtn = el('button', 'home-inline-pill' + (state.home.tab === 'movie' ? ' active' : ''), '🎬 Фільми');
+  const tBtn = el('button', 'home-inline-pill' + (state.home.tab === 'tv' ? ' active' : ''), '📺 Серіали');
+  mBtn.type = 'button'; tBtn.type = 'button';
+  mBtn.addEventListener('click', () => {
+    if (state.home.tab === 'movie') return;
+    state.home.tab = 'movie';
+    try { localStorage.setItem('mycinema.home.tab', 'movie'); } catch (e) {}
+    state.home.shown.movie = 14;
+    renderHomeContent(taste);
+  });
+  tBtn.addEventListener('click', () => {
+    if (state.home.tab === 'tv') return;
+    state.home.tab = 'tv';
+    try { localStorage.setItem('mycinema.home.tab', 'tv'); } catch (e) {}
+    state.home.shown.tv = 14;
+    renderHomeContent(taste);
+  });
+  sw.append(mBtn, tBtn);
+  return sw;
+}
+
 function renderHomeContent(taste) {
   if (state.tab !== 'home') return;
+  if (!state.home.view) {
+    try { state.home.view = localStorage.getItem('mycinema.home.view') || 'my'; } catch { state.home.view = 'my'; }
+  }
   box.replaceChildren(); box.style.padding = '0';
 
-  box.append(renderTasteSummary(taste || computeTasteVector()));
+  const viewBarWrap = el('div', 'home-view-switch-wrap');
+  const viewBar = el('div', 'home-view-switch');
+  const myPill = el('button', 'home-view-pill' + (state.home.view === 'my' ? ' active' : ''), '✨ Для мене');
+  const trPill = el('button', 'home-view-pill' + (state.home.view === 'explore' ? ' active' : ''), '🌍 Тренди');
+  myPill.type = 'button'; trPill.type = 'button';
+  myPill.addEventListener('click', () => {
+    if (state.home.view === 'my') return;
+    state.home.view = 'my';
+    try { localStorage.setItem('mycinema.home.view', 'my'); } catch {}
+    renderHomeContent(taste);
+  });
+  trPill.addEventListener('click', () => {
+    if (state.home.view === 'explore') return;
+    state.home.view = 'explore';
+    try { localStorage.setItem('mycinema.home.view', 'explore'); } catch {}
+    renderHomeContent(taste);
+  });
+  viewBar.append(myPill, trPill);
+  viewBarWrap.append(viewBar);
+  box.append(viewBarWrap);
 
-  const cwSection = buildContinueWatchingSection();
-  if (cwSection) box.append(cwSection);
+  if (state.home.view === 'my') {
+    box.append(renderTasteSummary(taste || computeTasteVector()));
+    const cwSection = buildContinueWatchingSection();
+    if (cwSection) box.append(cwSection);
+  }
 
   const wrap = el('div', 'home-wrap');
 
-  const factCard = buildFactOfDayCard();
-  if (factCard) wrap.append(factCard);
+  if (state.home.view === 'my') {
+    const factCard = buildFactOfDayCard();
+    if (factCard) wrap.append(factCard);
 
-  const recs = state.home.recs;
-
-  // === БЛОК РЕКОМЕНДАЦІЙ ===
-  if (recs && recs.seeds > 0) {
-    const sec = el('section', 'home-section');
-    const head = el('div', 'section-head');
-    head.append(el('h2', 'section-title', '✨ Для тебе')); /* FIX-HOME-NO-SUB-FORYOU */
-    sec.append(head);
+    const recs = state.home.recs;
+    if (recs && recs.seeds > 0) {
+      const sec = el('section', 'home-section');
+      const head = el('div', 'section-head');
+      head.style.alignItems = 'center';
+      head.append(el('h2', 'section-title', '✨ Для тебе'));
+      head.append(buildHomeTypeSwitch(taste));
+      sec.append(head);
 
     // Єдиний блок режимів видачі та настрою під «Для тебе»
     const controlsBar = el('div', 'recs-controls-bar');
@@ -1675,40 +1755,19 @@ function renderHomeContent(taste) {
     wrap.append(sec);
   }
 
-  const plannedSec = buildPlannedByMoodSection();
-  if (plannedSec) wrap.append(plannedSec);
-
-  // Плаваючі таби (доступні і для персональних, і для загальних добірок)
-  if ((recs && recs.items && recs.items.length) || state.home.general) {
-    const tabsWrap = el('div', 'home-tabs-wrap');
-    const tabs = el('div', 'home-tabs');
-    const mTab = el('button', 'home-tab' + (state.home.tab === 'movie' ? ' active' : ''), '🎬 Фільми');
-    const tTab = el('button', 'home-tab' + (state.home.tab === 'tv' ? ' active' : ''), '📺 Серіали');
-
-    mTab.addEventListener('click', () => {
-      if (state.home.tab !== 'movie') {
-        state.home.tab = 'movie';
-        try { localStorage.setItem('mycinema.home.tab', 'movie'); } catch (e) {} /* FIX-TAB-SAVE-M */
-        state.home.shown.movie = 14; /* FIX-SHOWN-14 */
-        renderHomeContent(taste);
-      }
-    });
-    tTab.addEventListener('click', () => {
-      if (state.home.tab !== 'tv') {
-        state.home.tab = 'tv';
-        try { localStorage.setItem('mycinema.home.tab', 'tv'); } catch (e) {} /* FIX-TAB-SAVE-T */
-        state.home.shown.tv = 14; /* FIX-SHOWN-14 */
-        renderHomeContent(taste);
-      }
-    });
-
-    tabs.append(mTab, tTab);
-    tabsWrap.append(tabs);
-    wrap.append(tabsWrap);
+    const plannedSec = buildPlannedByMoodSection();
+    if (plannedSec) wrap.append(plannedSec);
   }
 
-  // === БЛОК ЗАГАЛЬНИХ ПІДБІРОК ===
-  if (state.home.general) {
+  if (state.home.view === 'explore' && !state.home.general) {
+    wrap.append(el('div', 'avail-empty', 'Підбірки зараз недоступні офлайн або ще завантажуються.'));
+  }
+  if (state.home.view === 'explore' && state.home.general) {
+    const exploreHead = el('div', 'section-head');
+    exploreHead.style.alignItems = 'center';
+    exploreHead.append(el('h2', 'section-title', '🌍 Тренди і платформи'));
+    exploreHead.append(buildHomeTypeSwitch(taste));
+    wrap.append(exploreHead);
     const g = state.home.general;
     if (!state.home.genShown) state.home.genShown = {};
 
@@ -1882,9 +1941,11 @@ function buildContinueWatchingSection() {
 
   watching.forEach(item => {
     const c = el('div', 'rec-card');
+    const pWrap = el('div', 'rec-poster-wrap');
     const p = el('img', 'rec-poster');
     if (item.poster) p.src = TMDB_IMG + 'w342' + item.poster;
-    c.append(p, el('div', 'row-title', item.title));
+    pWrap.append(p);
+    c.append(pWrap, el('div', 'row-title', item.title));
 
     const eps = item.watchedEpisodes || [];
     const tot = item.episode_count || 0;
@@ -1892,6 +1953,28 @@ function buildContinueWatchingSection() {
     const next = computeNextEpisode(item);
 
     if (next) {
+      let targetS = next.s, targetE = next.e, targetCode = next.code;
+      let qBtn = null;
+      if (!next.finished) {
+        qBtn = el('button', 'cw-next-btn', '+ ' + targetCode);
+        qBtn.type = 'button';
+        qBtn.title = `Позначити ${targetCode} переглянутою`;
+        qBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const latest = lib[item.key] || item;
+          const curEps = [...(latest.watchedEpisodes || [])];
+          const epKey = `${targetS}-${targetE}`;
+          if (!curEps.includes(epKey)) curEps.push(epKey);
+          if (typeof updateCore === 'function') {
+            updateCore(latest, { watchedEpisodes: curEps, status: latest.status === 'watched' ? 'watched' : 'watching' });
+          }
+          if (typeof showSyncToast === 'function') showSyncToast(`✅ ${targetCode}`);
+          const freshCw = buildContinueWatchingSection();
+          if (freshCw) sec.replaceWith(freshCw);
+        });
+        pWrap.append(qBtn);
+      }
+
       const baseText = next.finished
         ? 'Усі серії переглянуто'
         : `Далі: ${next.code}` + (tot > 0 ? ` · ${pct}%` : '');
@@ -1910,15 +1993,21 @@ function buildContinueWatchingSection() {
             if (epObj.air_date && epObj.air_date > todayIso) {
               const dt = new Date(epObj.air_date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
               labelEl.textContent = `Чекаємо ${next.code} · ${dt}`;
+              if (qBtn) qBtn.remove();
             } else if (epObj.name) {
               labelEl.textContent = `Далі: ${next.code} · ${epObj.name}`;
             }
           } else if (episodes.length > 0 && next.e > episodes.length) {
             const nextS = next.s + 1;
             const hasMoreSeasons = !item.totalSeasons || nextS <= item.totalSeasons;
-            labelEl.textContent = hasMoreSeasons
-              ? `Далі: S${nextS}E01` + (tot > 0 ? ` · ${pct}%` : '')
-              : 'Сезон завершено';
+            if (hasMoreSeasons) {
+              targetS = nextS; targetE = 1; targetCode = `S${nextS}E01`;
+              if (qBtn) { qBtn.textContent = '+ ' + targetCode; qBtn.title = `Позначити ${targetCode} переглянутою`; }
+              labelEl.textContent = `Далі: ${targetCode}` + (tot > 0 ? ` · ${pct}%` : '');
+            } else {
+              labelEl.textContent = 'Сезон завершено';
+              if (qBtn) qBtn.remove();
+            }
           }
         };
 

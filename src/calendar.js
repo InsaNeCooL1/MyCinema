@@ -383,6 +383,19 @@ function renderCalendar() {
     bestBtn.addEventListener('click', () => openCard(bestOfMonth.item));
     sumCard.append(bestBtn);
   }
+  if (state.calendarMonth) {
+    const [wy, wm] = state.calendarMonth.split('-').map(Number);
+    const wrBtn = el('button', 'cal-best-btn', '🎁 Підсумки місяця →');
+    wrBtn.type = 'button';
+    wrBtn.style.marginLeft = bestOfMonth ? '8px' : '0';
+    wrBtn.addEventListener('click', () => {
+      state.stats.tab = 'wrapped';
+      state.stats.wrappedMode = 'month';
+      state.stats.wrappedPeriod = `${wy}-${String(wm + 1).padStart(2, '0')}`;
+      setTab('statistics');
+    });
+    sumCard.append(wrBtn);
+  }
   wrap.append(sumCard);
 
   const toDayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -475,6 +488,7 @@ function renderActivityLog() {
     ['episode', '📺 Серії'],
     ['dismiss', '🙈 Сховані з рекомендацій'],
     ['favorite', '❤️ Улюблене'],
+    ['rewatch', '🔁 Повторні перегляди'],
     ['note', '📝 Нотатки'],
     ['elo', '👑 Цар гори'],
     ['remove', '🗑️ Видалення']
@@ -527,7 +541,7 @@ function renderActivityLog() {
   } else if (state.activitySort === 'type') {
     const rankOrder = {
       'status:watching': 1, 'status:planned': 2, 'status:watched': 3, 'status:dropped': 4, 'status:none': 5,
-      'rating': 6, 'episode': 7, 'favorite': 8, 'note': 9, 'elo': 10, 'dismiss': 11, 'remove': 12, 'import': 13
+      'rating': 6, 'episode': 7, 'rewatch': 8, 'favorite': 9, 'note': 9, 'elo': 10, 'dismiss': 11, 'remove': 12, 'import': 13
     };
     const getRank = (x) => rankOrder[x.cat + ':' + x.sub] || rankOrder[x.cat] || 99;
     entries = entries.slice().sort((a, b) => getRank(a) - getRank(b) || (b.ts || 0) - (a.ts || 0));

@@ -253,7 +253,7 @@
       uakinoBtn.innerHTML = '<span class="uakino-grad-text">UA KINO</span>';
       uakinoBtn.onclick = () => {
         if (typeof window.openStreamPicker === 'function') {
-          window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb, uaOrigTitle);
+          window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb, uaOrigTitle, { key: r.key });
         } else {
           alert('Плеєр не завантажено. Онови сторінку (Ctrl+Shift+R).');
         }
@@ -334,6 +334,21 @@
     notesBtn.innerHTML = `${ICONS.notes} <span>Нотатки</span>`;
     notesBtn.onclick = () => { window.openQuickNoteModal(ctx); };
     wrap.append(notesBtn);
+
+    if (s.status === 'watched') {
+      const rwCnt = s.rewatches || 0;
+      const rwBtn = el('button', 'status-btn btn-rewatch' + (rwCnt > 0 ? ' has-rw' : ''));
+      rwBtn.title = 'Зафіксувати повторний перегляд';
+      rwBtn.innerHTML = `<span>🔁</span>${rwCnt > 0 ? `<span class="rw-cnt">×${rwCnt + 1}</span>` : ''}`;
+      rwBtn.onclick = () => {
+        const latest = lib[r.key] || s;
+        const nextRw = (latest.rewatches || 0) + 1;
+        const dates = [...(latest.rewatchDates || []), Date.now()];
+        update(r, { rewatches: nextRw, rewatchDates: dates, statusDate: Date.now() });
+        if (typeof showSyncToast === 'function') showSyncToast(`🔁 Перегляд №${nextRw + 1}`);
+      };
+      wrap.append(rwBtn);
+    }
 
     if (lib[r.key]) {
       const delBtn = el('button', 'status-btn btn-del');
@@ -531,7 +546,7 @@
   }
 
 
-  function openQuickNoteModal(ctx) {
+  function openQuickNoteModal(ctx, editNote) {
     const r = ctx.item;
     const s = lib[r.key] || {};
     
@@ -539,14 +554,14 @@
     const content = el('div', 'quick-note-content');
     
     const header = el('div', 'quick-note-header');
-    header.append(el('h3', '', 'Нова думка'));
+    header.append(el('h3', '', editNote ? 'Редагувати думку' : 'Нова думка'));
     const closeBtn = el('button', 'quick-note-close', '✕');
     header.append(closeBtn);
     
     const textarea = document.createElement('textarea');
     textarea.className = 'quick-note-textarea';
     textarea.placeholder = 'Що думаєш з цього приводу?..';
-    textarea.value = ''; /* Завжди пусте для нової нотатки */
+    textarea.value = editNote ? (editNote.text || '') : '';
     
     const footer = el('div', 'quick-note-footer');
     const cancelBtn = el('button', 'quick-note-btn cancel', 'Скасувати');
@@ -565,13 +580,17 @@
       const val = textarea.value.trim();
       if (!val) { close(); return; }
       
-      const hist = s.notesHistory || [];
-      /* Міграція старого тексту, якщо він був */
+      const hist = [...(s.notesHistory || [])];
       if (s.notes && s.notes.trim() && !hist.some(n => n.text === s.notes)) {
         hist.push({ text: s.notes, ts: s.updated || Date.now() });
       }
-      
-      hist.unshift({ text: val, ts: Date.now() }); /* Нова нотатка зверху */
+      if (editNote) {
+        const idx = hist.findIndex(n => n.ts === editNote.ts && n.text === editNote.text);
+        if (idx >= 0) hist[idx] = { ...hist[idx], text: val, editedTs: Date.now() };
+        else hist.unshift({ text: val, ts: Date.now() });
+      } else {
+        hist.unshift({ text: val, ts: Date.now() });
+      }
       
       update(r, { notesHistory: hist, notes: null });
       saveNow();

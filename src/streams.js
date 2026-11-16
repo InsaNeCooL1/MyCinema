@@ -1,8 +1,11 @@
-/* Eneyida + UASerials + UACDN provider — Unified Search & Themed UI */
+/* Eneyida + UASerials + UACDN provider — Integrated Diary Player */
 (function () {
   'use strict';
 
   var PROXY_DEFAULT = 'https://mycinema-proxy-base.insaneteresh123.workers.dev';
+  var PREFS_KEY = 'mycinema.streamPrefs.v1';
+  var RESUME_KEY = 'mycinema.streamResume.v1';
+
   function getProxy() {
     try { return localStorage.getItem('mycinema.proxy') || PROXY_DEFAULT; }
     catch (e) { return PROXY_DEFAULT; }
@@ -11,12 +14,79 @@
     opts = opts || {};
     var parts = ['url=' + encodeURIComponent(url)];
     if (opts.referer) parts.push('referer=' + encodeURIComponent(opts.referer));
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var tmr = ctrl ? setTimeout(function () { ctrl.abort(); }, opts.timeout || 8000) : null;
     var init = { method: opts.method || 'GET', headers: opts.headers || {} };
     if (opts.body) init.body = opts.body;
+    if (ctrl) init.signal = ctrl.signal;
     return fetch(getProxy() + '?' + parts.join('&'), init).then(function (r) {
       if (!r.ok) throw new Error('Проксі HTTP ' + r.status);
       return r.text();
-    });
+    }).finally(function () { if (tmr) clearTimeout(tmr); });
+  }
+
+  function readJsonStore(k) {
+    try {
+      var raw = JSON.parse(localStorage.getItem(k) || '{}');
+      return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+    } catch (e) { return {}; }
+  }
+  function writeJsonStore(k, obj, limit) {
+    try {
+      var entries = Object.entries(obj);
+      if (entries.length > limit) {
+        entries.sort(function (a, b) { return ((b[1] && b[1].ts) || 0) - ((a[1] && a[1].ts) || 0); });
+        obj = Object.fromEntries(entries.slice(0, limit));
+      }
+      localStorage.setItem(k, JSON.stringify(obj));
+    } catch (e) {}
+  }
+
+  function getStreamPref(mediaKey) {
+    if (!mediaKey) return null;
+    return readJsonStore(PREFS_KEY)[mediaKey] || null;
+  }
+  function saveStreamPref(mediaKey, patch) {
+    if (!mediaKey) return;
+    var all = readJsonStore(PREFS_KEY);
+    all[mediaKey] = Object.assign({}, all[mediaKey] || {}, patch, { ts: Date.now() });
+    writeJsonStore(PREFS_KEY, all, 200);
+  }
+
+  function getResumePos(resumeKey) {
+    if (!resumeKey) return 0;
+    var r = readJsonStore(RESUME_KEY)[resumeKey];
+    return r && r.t > 15 ? r.t : 0;
+  }
+  function saveResumePos(resumeKey, t, duration) {
+    if (!resumeKey) return;
+    var all = readJsonStore(RESUME_KEY);
+    if (duration > 60 && (duration - t) < 25) {
+      delete all[resumeKey];
+    } else if (t > 15) {
+      all[resumeKey] = { t: Math.floor(t), ts: Date.now() };
+    }
+    writeJsonStore(RESUME_KEY, all, 100);
+  }
+
+  function fmtTimeSec(sec) {
+    var s = Math.max(0, Math.floor(sec));
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0');
+    return m + ':' + String(r).padStart(2, '0');
+  }
+
+  function extractNum(str, fallback) {
+    var m = String(str || '').match(/\d+/);
+    return m ? parseInt(m[0], 10) : (fallback || 0);
+  }
+
+  function isEpWatchedInLib(mediaKey, sNum, epNum) {
+    if (!mediaKey || typeof lib === 'undefined' || !lib[mediaKey]) return false;
+    var item = lib[mediaKey];
+    if (item.status === 'watched') return true;
+    var w = item.watchedEpisodes || [];
+    return w.indexOf(sNum + '-' + epNum) >= 0;
   }
 
   function esc(s) {
@@ -190,6 +260,44 @@
     });
   }
 
+  function searchDleSite(baseUrl, providerId, defaultTv, query) {
+    return px(baseUrl + '/index.php?do=search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'do=search&subaction=search&story=' + encodeURIComponent(query) + '&search_start=0&full_search=0&result_from=1'
+    }).then(function (html) {
+      var results = [], seen = {};
+      var hostEsc = baseUrl.replace(/^https?:\/\//, '').replace(/\./g, '\\.');
+      var re = new RegExp('<a[^>]+href="((?:https?:\\/\\/' + hostEsc + ')?\\/[^"#]*\\d+-[^"]+\\.html)"[^>]*>([\\s\\S]{1,160}?)<\\/a>', 'gi');
+      var m;
+      while ((m = re.exec(html)) !== null) {
+        var href = m[1];
+        if (href.indexOf('http') !== 0) href = baseUrl + (href.charAt(0) === '/' ? '' : '/') + href;
+        if (seen[href] || /\/(user|xfsearch|page)\//i.test(href)) continue;
+        var innerTxt = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        var win = html.slice(Math.max(0, m.index - 250), Math.min(html.length, m.index + 650));
+        if (!innerTxt || innerTxt.length < 2) {
+          var altM = win.match(/alt="([^"]{2,120})"/i) || win.match(/title="([^"]{2,120})"/i);
+          innerTxt = altM ? altM[1].trim() : '';
+        }
+        if (!innerTxt || innerTxt.length < 2 || /^(детальніше|дивитись|читати)/i.test(innerTxt)) continue;
+        seen[href] = 1;
+        var meta = extractSnippetMeta(win + ' ' + href);
+        results.push({ href: href, title: innerTxt, year: meta.year, isTvHint: meta.isTvHint !== null ? meta.isTvHint : defaultTv, provider: providerId });
+      }
+      return results;
+    });
+  }
+
+  function searchKinoukr(query) { return searchDleSite('https://kinoukr.tv', 'kinoukr', null, query); }
+  function searchUAFix(query) { return searchDleSite('https://uafix.net', 'uafix', null, query); }
+  function searchUASerialsMirror(query) {
+    return searchUASerials(query).catch(function () { return []; }).then(function (r) {
+      if (r && r.length) return r;
+      return searchDleSite('https://uaserials.pro', 'uaserials', true, query);
+    });
+  }
+
   function searchProviderSmart(searchFn, title, origTitle, year, type) {
     var q1 = String(title || '').replace(/[«»"“”]/g, '').trim();
     var q2 = String(origTitle || '').replace(/[«»"“”]/g, '').trim();
@@ -280,8 +388,40 @@
     return out;
   }
 
+  function resolveGenericDetailAndEmbed(cand) {
+    var ref = cand.href.replace(/^(https?:\/\/[^/]+).*$/, '$1/');
+    return px(cand.href).then(function (html) {
+      var m = html.match(/class="[^"]*tabs_b[^"]*visible[^"]*"[^>]*>[\s\S]{0,3000}?<iframe[^>]+(?:data-)?src="([^"]+)"/)
+        || html.match(/<iframe[^>]+(?:data-)?src="(https?:\/\/[^"]*(?:ashdi|tortuga|hdvbua|csst|monstro|qeruya|ufdub)[^"]+)"/i)
+        || html.match(/<iframe[^>]+(?:data-)?src="([^"]+)"/i);
+      if (!m) throw new Error('Player iframe не знайдено');
+      var embedUrl = m[1];
+      if (embedUrl.indexOf('//') === 0) embedUrl = 'https:' + embedUrl;
+      return px(embedUrl, { referer: ref }).then(function (eHtml) {
+        var fm = eHtml.match(/file\s*:\s*'([^']+)'/) || eHtml.match(/file\s*:\s*"([^"]+)"/);
+        if (fm) {
+          var raw = fm[1];
+          if (raw.indexOf('http') === 0) return [{ title: 'HD', file: raw }];
+          try { return JSON.parse(raw); } catch (e) {}
+        }
+        return [{ title: 'Плеєр (Iframe)', iframeUrl: embedUrl }];
+      }).catch(function () {
+        return [{ title: 'Плеєр (Iframe)', iframeUrl: embedUrl }];
+      });
+    });
+  }
+
   function loadFlatForResult(cand) {
     if (detailCache[cand.href]) return Promise.resolve(detailCache[cand.href]);
+    if (cand.provider === 'kinoukr' || cand.provider === 'uafix') {
+      return resolveGenericDetailAndEmbed(cand).then(function (res) {
+        if (Array.isArray(res) && res[0] && res[0].iframeUrl) { detailCache[cand.href] = res; return res; }
+        var flatG = flatten(res);
+        if (!flatG.length) throw new Error('Немає доступних джерел');
+        detailCache[cand.href] = flatG;
+        return flatG;
+      });
+    }
     var resolveP = cand.provider === 'uaserials'
       ? resolveUASerialsDetail(cand.href).then(fetchUASerialsEmbed)
       : resolveDetail(cand.href).then(fetchEmbedJson);
@@ -343,9 +483,16 @@
     var v = document.getElementById('streams-video');
     if (v) {
       var vid = v.querySelector('video');
-      if (vid) vid.pause();
+      var watchedTime = 0;
+      if (vid) {
+        watchedTime = vid.currentTime || 0;
+        if (v._resumeKey) saveResumePos(v._resumeKey, vid.currentTime || 0, vid.duration || 0);
+        vid.pause();
+      }
       if (v._hls) { try { v._hls.destroy(); } catch (e) {} }
+      var onClosed = v._onClosed;
       v.remove();
+      if (typeof onClosed === 'function') onClosed(watchedTime);
     }
   }
 
@@ -426,10 +573,13 @@
     return hlsLoading;
   }
 
-  function openVideo(url, subtitle) {
+  function openVideo(url, subtitle, meta) {
+    meta = meta || {};
     closeVideoOverlay();
     var ov = document.createElement('div');
     ov.id = 'streams-video';
+    ov._resumeKey = meta.resumeKey || '';
+    ov._onClosed = meta.onClosed || null;
     ov.style.cssText = 'position:fixed;inset:0;height:100dvh;width:100vw;background:#000;z-index:10000;display:flex;flex-direction:column;overflow:hidden;';
 
     var bar = document.createElement('div');
@@ -446,6 +596,22 @@
 
     var rightBtns = document.createElement('div');
     rightBtns.style.cssText = 'display:flex;gap:8px;align-items:center;margin-left:auto;';
+
+    var epPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExternalPlayer;
+    if (epPlugin && typeof epPlugin.open === 'function') {
+      var vlcBtn = document.createElement('button');
+      vlcBtn.type = 'button';
+      vlcBtn.textContent = 'VLC';
+      vlcBtn.title = 'Відкрити у зовнішньому плеєрі (VLC / MX)';
+      vlcBtn.style.cssText = 'background:rgba(var(--accent-rgb),0.15);border:1px solid rgba(var(--accent-rgb),0.4);color:var(--accent);height:36px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;';
+      vlcBtn.addEventListener('click', function () {
+        video.pause();
+        epPlugin.open({ url: url, title: meta.title || 'MyCinema' }).catch(function () {
+          if (typeof showSyncToast === 'function') showSyncToast('⚠ Зовнішній плеєр не знайдено');
+        });
+      });
+      rightBtns.appendChild(vlcBtn);
+    }
 
     var fsBtn = document.createElement('button');
     fsBtn.type = 'button'; fsBtn.title = 'На весь екран';
@@ -482,6 +648,26 @@
     ov.appendChild(bar); ov.appendChild(videoWrap);
     document.body.appendChild(ov);
 
+    var resumeAt = getResumePos(meta.resumeKey);
+    var resumed = false;
+    var lastSaveT = 0;
+    video.addEventListener('loadedmetadata', function () {
+      if (!resumed && resumeAt > 15 && (!video.duration || (video.duration - resumeAt) > 20)) {
+        resumed = true;
+        try { video.currentTime = resumeAt; } catch (e) {}
+        if (typeof showSyncToast === 'function') showSyncToast('▶ Продовжено з ' + fmtTimeSec(resumeAt));
+      }
+    });
+    video.addEventListener('timeupdate', function () {
+      var now = Date.now();
+      if (now - lastSaveT > 5000 && meta.resumeKey) {
+        lastSaveT = now;
+        saveResumePos(meta.resumeKey, video.currentTime || 0, video.duration || 0);
+      }
+    });
+    video.addEventListener('pause', function () {
+      if (meta.resumeKey) saveResumePos(meta.resumeKey, video.currentTime || 0, video.duration || 0);
+    });
     video.addEventListener('webkitbeginfullscreen', function () { setNativeFullscreen(true); });
     video.addEventListener('webkitendfullscreen', function () { setNativeFullscreen(false); });
 
@@ -583,20 +769,28 @@
     return ov;
   }
 
-  function renderUnifiedPicker(providers, mediaTitle) {
+  function renderUnifiedPicker(providers, mediaTitle, mediaKey) {
     var ov = document.getElementById('streams-overlay');
     if (!ov) return;
     var provBar = ov.querySelector('#streams-providers');
     var body = ov.querySelector('#streams-body');
     var reqSeq = 0;
 
+    var savedPref = getStreamPref(mediaKey);
+    var startProvIdx = 0;
+    if (savedPref && savedPref.provId) {
+      var foundIdx = providers.findIndex(function (p) { return p.id === savedPref.provId; });
+      if (foundIdx >= 0) startProvIdx = foundIdx;
+    }
+
     var ui = {
-      provIdx: 0,
+      provIdx: startProvIdx,
       matchIdxByProv: {},
       matchesOpen: false,
-      translation: '',
+      translation: (savedPref && savedPref.translation) || '',
       season: '',
-      quality: ''
+      quality: '',
+      pendingMark: null
     };
 
     function renderProvidersBar() {
@@ -612,8 +806,8 @@
           if (ui.provIdx === i) return;
           ui.provIdx = i;
           ui.matchesOpen = false;
-          ui.translation = '';
           ui.season = '';
+          saveStreamPref(mediaKey, { provId: p.id });
           renderProvidersBar();
           loadCurrentProvider();
         });
@@ -621,7 +815,9 @@
       });
     }
 
-    function playWithQuality(url, subtitle) {
+    function playWithQuality(url, subtitle, epMeta) {
+      var prov = providers[ui.provIdx];
+      saveStreamPref(mediaKey, { provId: prov ? prov.id : '', translation: ui.translation });
       fetchQualities(url).then(function (vars) {
         var chosen = null;
         if (ui.quality && vars.length > 0) {
@@ -630,7 +826,20 @@
           }
         }
         if (!chosen && vars.length > 0) chosen = vars[0];
-        openVideo(chosen ? chosen.url : url, subtitle);
+        var sNum = epMeta ? epMeta.sNum : 0;
+        var epNum = epMeta ? epMeta.epNum : 0;
+        var rKey = (mediaKey || mediaTitle) + '|s' + sNum + '|e' + epNum;
+        var labelTitle = mediaTitle + (epMeta && epMeta.code ? ' · ' + epMeta.code : '');
+        openVideo(chosen ? chosen.url : url, subtitle, {
+          resumeKey: rKey,
+          title: labelTitle,
+          onClosed: function (watchedSec) {
+            if (epMeta && mediaKey && watchedSec >= 25 && !isEpWatchedInLib(mediaKey, sNum, epNum)) {
+              ui.pendingMark = epMeta;
+              loadCurrentProvider();
+            }
+          }
+        });
       });
     }
 
@@ -672,7 +881,6 @@
           itemBtn.addEventListener('click', function () {
             ui.matchIdxByProv[prov.id] = idx;
             ui.matchesOpen = false;
-            ui.translation = '';
             ui.season = '';
             loadCurrentProvider();
           });
@@ -702,6 +910,35 @@
       if (seasons.length && (!ui.season || seasons.indexOf(ui.season) < 0)) ui.season = seasons[0];
 
       body.innerHTML = '';
+
+      if (ui.pendingMark && mediaKey) {
+        var pm = ui.pendingMark;
+        var markBar = document.createElement('div');
+        markBar.className = 'streams-mark-bar';
+        markBar.innerHTML = '<span class="streams-mark-txt">Позначити ' + esc(pm.code) + ' переглянутою?</span>' +
+          '<div class="streams-mark-acts">' +
+            '<button type="button" class="streams-mark-yes">✓ Так</button>' +
+            '<button type="button" class="streams-mark-no">✕</button>' +
+          '</div>';
+        markBar.querySelector('.streams-mark-yes').addEventListener('click', function () {
+          var itemObj = (typeof lib !== 'undefined' && lib[mediaKey]) || (typeof cardStack !== 'undefined' && cardStack[cardStack.length - 1]?.item);
+          if (itemObj && typeof update === 'function') {
+            var curEps = [].concat(itemObj.watchedEpisodes || []);
+            var ek = pm.sNum + '-' + pm.epNum;
+            if (curEps.indexOf(ek) < 0) curEps.push(ek);
+            update(itemObj, { watchedEpisodes: curEps, status: itemObj.status === 'watched' ? 'watched' : 'watching' });
+            if (typeof showSyncToast === 'function') showSyncToast('✅ ' + pm.code);
+          }
+          ui.pendingMark = null;
+          renderPlayerControls(rawItems, prov, activeIdx);
+        });
+        markBar.querySelector('.streams-mark-no').addEventListener('click', function () {
+          ui.pendingMark = null;
+          markBar.remove();
+        });
+        body.appendChild(markBar);
+      }
+
       body.appendChild(renderMatchSelector(prov, activeIdx));
 
       // Озвучка
@@ -720,6 +957,7 @@
             ch.addEventListener('click', function () {
               ui.translation = t;
               ui.season = '';
+              saveStreamPref(mediaKey, { provId: prov.id, translation: t });
               renderPlayerControls(rawItems, prov, activeIdx);
             });
             tRow.appendChild(ch);
@@ -737,6 +975,7 @@
           tSel.addEventListener('change', function () {
             ui.translation = this.value;
             ui.season = '';
+            saveStreamPref(mediaKey, { provId: prov.id, translation: this.value });
             renderPlayerControls(rawItems, prov, activeIdx);
           });
           tGrp.appendChild(tSel);
@@ -780,36 +1019,50 @@
         ? filtered.filter(function (x) { return (x.season || '') === ui.season; })
         : filtered;
 
-      // Кнопка Грати або список серій
-      if (!viewItems.length) {
+      var sNum = extractNum(ui.season, 1);
+
+      if (viewItems[0] && viewItems[0].iframeUrl) {
+        qGrp.style.display = 'none';
+        var ifBtn = document.createElement('button');
+        ifBtn.type = 'button';
+        ifBtn.className = 'streams-play-btn';
+        ifBtn.textContent = '▶ Відкрити плеєр балансера';
+        ifBtn.addEventListener('click', function () { openIframeOverlay(viewItems[0].iframeUrl, mediaTitle); });
+        body.appendChild(ifBtn);
+      } else if (!viewItems.length) {
         var errEl = document.createElement('div');
         errEl.className = 'streams-error';
         errEl.textContent = 'Немає джерел для обраних параметрів';
         body.appendChild(errEl);
       } else if (!hasSeasons || viewItems.length === 1) {
         var target = viewItems[0];
+        var epMetaSingle = hasSeasons ? { sNum: sNum, epNum: extractNum(target.episode, 1), code: 'S' + sNum + 'E' + String(extractNum(target.episode, 1)).padStart(2, '0') } : null;
         var playBtn = document.createElement('button');
         playBtn.type = 'button';
         playBtn.className = 'streams-play-btn';
         playBtn.textContent = '▶ ' + (hasSeasons && target.episode ? target.episode : 'Дивитись');
-        playBtn.addEventListener('click', function () { playWithQuality(target.url, target.subtitle); });
+        playBtn.addEventListener('click', function () { playWithQuality(target.url, target.subtitle, epMetaSingle); });
         body.appendChild(playBtn);
       } else {
         var epList = document.createElement('div');
         epList.className = 'streams-ep-list';
         viewItems.forEach(function (ep, idx) {
+          var epNum = extractNum(ep.episode, idx + 1);
+          var watchedMark = isEpWatchedInLib(mediaKey, sNum, epNum);
+          var epMeta = { sNum: sNum, epNum: epNum, code: 'S' + sNum + 'E' + String(epNum).padStart(2, '0') };
           var eb = document.createElement('button');
           eb.type = 'button';
           eb.className = 'streams-ep-btn';
-          eb.innerHTML = '<span class="streams-ep-title">' + esc(ep.episode || ('Серія ' + (idx + 1))) + '</span>' +
+          eb.innerHTML = '<span class="streams-ep-title">' +
+            (watchedMark ? '<span class="streams-ep-watched">✓</span>' : '') +
+            esc(ep.episode || ('Серія ' + (idx + 1))) + '</span>' +
             '<span class="streams-ep-qual" data-qual="' + idx + '"></span>';
-          eb.addEventListener('click', function () { playWithQuality(ep.url, ep.subtitle); });
+          eb.addEventListener('click', function () { playWithQuality(ep.url, ep.subtitle, epMeta); });
           epList.appendChild(eb);
         });
         body.appendChild(epList);
       }
 
-      // Підтягуємо якості без зміни висоти кнопок
       var localSeq = reqSeq;
       Promise.all(viewItems.map(function (ep) {
         return fetchQualities(ep.url).catch(function () { return []; });
@@ -859,7 +1112,10 @@
         btn.type = 'button';
         btn.className = 'streams-play-btn';
         btn.textContent = '▶ Відкрити UACDN плеєр';
-        btn.addEventListener('click', function () { openIframeOverlay(prov.url, mediaTitle); });
+        btn.addEventListener('click', function () {
+          saveStreamPref(mediaKey, { provId: 'uacdn' });
+          openIframeOverlay(prov.url, mediaTitle);
+        });
         body.appendChild(note);
         body.appendChild(btn);
         return;
@@ -881,7 +1137,6 @@
         renderPlayerControls(flat, prov, idx);
       }).catch(function (err) {
         if (seq !== reqSeq || !body.isConnected) return;
-        // Автофолбек на 2-й результат, якщо перший виявився битим і юзер сам не обирав конкретний індекс
         if (idx === 0 && prov.results.length > 1) {
           ui.matchIdxByProv[prov.id] = 1;
           loadFlatForResult(prov.results[1]).then(function (flat2) {
@@ -911,10 +1166,8 @@
     loadCurrentProvider();
   }
 
-  // ═══════════════════════════════════════════
-  //  Main: пошук + збір провайдерів
-  // ═══════════════════════════════════════════
-  function openStreamPicker(title, year, type, imdbId, origTitle) {
+  function openStreamPicker(title, year, type, imdbId, origTitle, opts) {
+    var mediaKey = (opts && opts.key) || '';
     var q = String(title || '').trim();
     var headerTitle = q + (year ? ' (' + year + ')' : '');
     createShell(headerTitle || 'Джерело UA');
@@ -935,20 +1188,28 @@
     Promise.allSettled([
       uacdnP,
       searchProviderSmart(searchEneyida, q, origTitle, year, type),
-      searchProviderSmart(searchUASerials, q, origTitle, year, type)
+      searchProviderSmart(searchUASerialsMirror, q, origTitle, year, type),
+      searchProviderSmart(searchKinoukr, q, origTitle, year, type),
+      searchProviderSmart(searchUAFix, q, origTitle, year, type)
     ]).then(function (results) {
       if (!document.getElementById('streams-overlay')) return;
       var uacdnUrl = results[0].status === 'fulfilled' ? results[0].value : null;
       var eneyida = results[1].status === 'fulfilled' ? results[1].value : [];
       var uas = results[2].status === 'fulfilled' ? results[2].value : [];
+      var kinoukr = results[3].status === 'fulfilled' ? results[3].value : [];
+      var uafix = results[4].status === 'fulfilled' ? results[4].value : [];
 
       var providers = [];
       if (uacdnUrl) providers.push({ id: 'uacdn', label: 'UACDN', url: uacdnUrl });
       if (type === 'tv') {
         if (uas.length) providers.push({ id: 'uaserials', label: 'UASerials', results: uas });
         if (eneyida.length) providers.push({ id: 'eneyida', label: 'Eneyida', results: eneyida });
+        if (uafix.length) providers.push({ id: 'uafix', label: 'UAFix', results: uafix });
+        if (kinoukr.length) providers.push({ id: 'kinoukr', label: 'Kinoukr', results: kinoukr });
       } else {
         if (eneyida.length) providers.push({ id: 'eneyida', label: 'Eneyida', results: eneyida });
+        if (kinoukr.length) providers.push({ id: 'kinoukr', label: 'Kinoukr', results: kinoukr });
+        if (uafix.length) providers.push({ id: 'uafix', label: 'UAFix', results: uafix });
         if (uas.length) providers.push({ id: 'uaserials', label: 'UASerials', results: uas });
       }
 
@@ -957,7 +1218,7 @@
         return;
       }
 
-      renderUnifiedPicker(providers, q || origTitle);
+      renderUnifiedPicker(providers, q || origTitle, mediaKey);
     }).catch(function (e) {
       var b = document.getElementById('streams-body');
       if (b) b.innerHTML = '<div class="streams-error">Помилка: ' + esc(e.message) + '</div>';

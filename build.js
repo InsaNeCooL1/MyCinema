@@ -14,6 +14,7 @@ const SRC_FILES = [
   'src/home.js',
   'src/library.js',
   'src/share.js',
+  'src/world-map.js',
   'src/stats.js',
   'src/game.js',
   'src/streams.js',

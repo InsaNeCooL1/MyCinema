@@ -198,6 +198,7 @@ async function loadMediaCardData(ctx) {
     if (meta.platforms) r.platforms = meta.platforms;
     if (meta.genres) { ctx.genres = meta.genres; r.genres = meta.genres; }
     if (meta.cast) ctx.cast = meta.cast;
+    if (meta.directors) { ctx.directors = meta.directors; r.directors = meta.directors; }
     if (meta.countries !== undefined) { ctx.countries = meta.countries; r.countries = meta.countries; }
     /* FIX-RELEASE-CARD-SAVE */
     let releaseDirty = false;
@@ -224,6 +225,7 @@ async function loadMediaCardData(ctx) {
       let dirty = releaseDirty;
       if (meta.genres && !lib[r.key].genres?.length) { lib[r.key].genres = meta.genres; dirty = true; }
       if (meta.cast && !lib[r.key].cast?.length) { lib[r.key].cast = meta.cast; dirty = true; }
+      if (meta.directors && !lib[r.key].directors?.length) { lib[r.key].directors = meta.directors; dirty = true; }
       if (lib[r.key].countries === undefined && meta.countries !== undefined) { lib[r.key].countries = meta.countries; dirty = true; }
       if (meta.runtime && !lib[r.key].runtime) { lib[r.key].runtime = meta.runtime; dirty = true; }
       if (meta.episode_count && lib[r.key].episode_count !== meta.episode_count) { lib[r.key].episode_count = meta.episode_count; dirty = true; }
@@ -415,6 +417,7 @@ function attachCtxMeta(entry, ctx) {
   if (!entry || !ctx || ctx.type !== 'media' || ctx.item?.key !== entry.key) return;
   if (ctx.genres?.length && !entry.genres?.length) entry.genres = ctx.genres;
   if (ctx.cast?.length && !entry.cast?.length) entry.cast = ctx.cast;
+  if (ctx.directors?.length && !entry.directors?.length) entry.directors = ctx.directors;
   if (entry.countries === undefined && ctx.countries !== undefined) entry.countries = ctx.countries;
   if (entry.type === 'tv' && !entry.totalSeasons && ctx.details?.seasons) {
     entry.totalSeasons = ctx.details.seasons.filter(x => x.season_number !== 0).length;
@@ -489,6 +492,9 @@ function updateCore(r, patch) {
       const prevN = (cur.notesHistory || []).length, nextN = (merged.notesHistory || []).length;
       if (nextN > prevN) logActivity({ cat: 'note', sub: 'add', icon: '📝', text: 'Додано нотатку', item: merged });
       else if (nextN < prevN) logActivity({ cat: 'note', sub: 'rem', icon: '📝', text: 'Видалено нотатку', item: merged });
+    }
+    if (patch.rewatches !== undefined && patch.rewatches > (cur.rewatches || 0)) {
+      logActivity({ cat: 'rewatch', sub: 'rewatch', icon: '🔁', text: `Повторний перегляд (×${patch.rewatches + 1})`, item: merged });
     }
   }
   const hasR = lib[r.key].ratings && Object.values(lib[r.key].ratings).some(v => v > 0);

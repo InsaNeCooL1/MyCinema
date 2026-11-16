@@ -281,6 +281,8 @@ function renderObservatoryShareCanvas(tabId, format) {
   const TAB_TITLES = {
     mytop:      [topTitle, topSub],
     taste:      ['ДНК мого смаку', 'TASTE OBSERVATORY'],
+    wrapped:    ['Мої кінопідсумки', 'MYCINEMA WRAPPED'],
+    directors:  ['Топ режисерів', 'DIRECTORS RANKING'],
     series:     ['Серіальний марафон', 'SERIES PROGRESS'],
     franchises: ['Мої франшизи', 'FRANCHISES'],
     countries:  ['Кіно-мандрівка', 'COUNTRIES'],
@@ -351,6 +353,51 @@ function renderObservatoryShareCanvas(tabId, format) {
         titlePx: 25, subPx: 18, rankPx: 24, rightPx: 27, radius: 16
       });
     }
+  } else if (tabId === 'wrapped') {
+    const w = computeWrappedStats(state.stats.wrappedMode || 'month', state.stats.wrappedPeriod);
+    const mNames = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+    let pTitle = w.periodKey || '';
+    if (w.mode === 'month' && pTitle.includes('-')) { const [yy, mm] = pTitle.split('-').map(Number); pTitle = `${mNames[mm - 1]} ${yy}`; }
+    else if (pTitle) pTitle = `${pTitle} рік`;
+    ctx.fillStyle = accent;
+    ctx.font = '800 28px ui-monospace, monospace';
+    ctx.fillText(pTitle.toUpperCase(), pad, bodyTop + 18);
+    const cardW = (bodyW - 24) / 2;
+    const cardH = isStory ? 166 : 138;
+    const y0 = bodyTop + 42;
+    drawShareStatBox(ctx, pad, y0, cardW, cardH, w.total, 'Переглянуто', theme, accent, rgb);
+    drawShareStatBox(ctx, pad + cardW + 24, y0, cardW, cardH, fmtDuration(w.mins).split(' ')[0] + ' год', 'Час у кіно', theme, accent, rgb);
+    drawShareStatBox(ctx, pad, y0 + cardH + 20, cardW, cardH, `${w.movies} / ${w.tvs}`, 'Фільми / Серіали', theme, accent, rgb);
+    drawShareStatBox(ctx, pad + cardW + 24, y0 + cardH + 20, cardW, cardH, w.periodAvg > 0 ? fmtNum(w.periodAvg) : '—', 'Середня оцінка', theme, accent, rgb);
+    const favY = y0 + cardH * 2 + 54;
+    const favBits = [];
+    if (w.topGenre) favBits.push(`Жанр: ${w.topGenre}`);
+    if (w.topCountry) favBits.push(`Країна: ${w.topCountry.name}`);
+    if (w.topDirector) favBits.push(`Режисер: ${w.topDirector.name}`);
+    if (favBits.length) {
+      ctx.fillStyle = theme.textSecondary;
+      ctx.font = '700 25px system-ui, sans-serif';
+      ctx.fillText(shareFitText(ctx, favBits.join(' · '), bodyW), pad, favY);
+    }
+    const rows = w.top3.map(x => ({
+      title: x.item.title,
+      sub: (x.item.type === 'tv' ? 'Серіал' : 'Фільм') + (x.item.year ? ' · ' + x.item.year : ''),
+      right: fmtNum(x.avg),
+      rightColor: '#9de5c3'
+    }));
+    drawShareRankRows(ctx, rows, pad, favY + 34, bodyW, isStory ? 124 : 96, 16, theme, accent, rgb);
+  } else if (tabId === 'directors') {
+    const { directors } = typeof computeDirectorProfiles === 'function' ? computeDirectorProfiles() : { directors: [] };
+    const byCount = state.stats.directorTab === 'count';
+    const list = directors.filter(d => byCount ? d.watchedCount >= 1 : d.ratedCount >= 1)
+      .sort((a, b) => byCount ? (b.watchedCount - a.watchedCount) : (b.score - a.score));
+    const maxRows = isStory ? 10 : 7;
+    const rows = list.slice(0, maxRows).map(d => ({
+      title: d.name,
+      sub: byCount ? `${d.watchedCount} проєктів` : `${d.ratedCount} оцін. · сер. ${fmtNum(d.rawAvg)}`,
+      right: byCount ? String(d.watchedCount) : fmtNum(d.score)
+    }));
+    drawShareRankRows(ctx, rows, pad, bodyTop, bodyW, isStory ? 110 : 94, 16, theme, accent, rgb);
   } else if (tabId === 'taste') {
     const taste = computeTasteVector();
     const avatar = typeof computeTempAvatarData === 'function' ? computeTempAvatarData() : null;

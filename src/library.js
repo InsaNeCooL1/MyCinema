@@ -176,8 +176,25 @@ function renderNotesList() {
     return;
   }
 
-  // Рендеримо список
-  allNotes.forEach(n => {
+  const nSearch = document.createElement('input');
+  nSearch.type = 'search';
+  nSearch.id = 'notes-search-inp';
+  nSearch.className = 'lib-search';
+  nSearch.style.marginTop = '12px';
+  nSearch.placeholder = 'Пошук по нотатках і назвах...';
+  nSearch.value = state.notesSearch || '';
+  const listHost = el('div');
+  const drawNotes = () => {
+    listHost.replaceChildren();
+    const sq = (state.notesSearch || '').toLowerCase().trim();
+    const filtered = sq
+      ? allNotes.filter(n => (n.text || '').toLowerCase().includes(sq) || (n.item.title || '').toLowerCase().includes(sq))
+      : allNotes;
+    if (!filtered.length) {
+      listHost.append(el('div', 'avail-empty', 'Нічого не знайдено'));
+      return;
+    }
+    filtered.forEach(n => {
     const c = el('div', 'note-feed-card');
     
     // Ліва частина
@@ -204,9 +221,18 @@ function renderNotesList() {
     }
     c.append(p);
     
-    c.addEventListener('click', () => openCard(n.item));
-    box.append(c);
+      c.addEventListener('click', () => openCard(n.item));
+      listHost.append(c);
+    });
+  };
+  let nTimer;
+  nSearch.addEventListener('input', (e) => {
+    state.notesSearch = e.target.value;
+    clearTimeout(nTimer);
+    nTimer = setTimeout(drawNotes, 100);
   });
+  box.append(nSearch, listHost);
+  drawNotes();
 }
 
 // ========== LIST ITEMS HELPERS ==========
@@ -233,6 +259,9 @@ function createListItem(r, showNumber, number) {
     }
     if (saved.elo && saved.eloGames > 1) {
       info.append(el("span", "badge elo", `🏆 ${saved.elo}`));
+    }
+    if (saved.rewatches > 0) {
+      info.append(el("span", "badge rewatch", `🔁 ×${saved.rewatches + 1}`));
     }
     if (r.type === 'tv' && saved.watchedEpisodes && saved.watchedEpisodes.length > 0) {
       const done = saved.watchedEpisodes.length;

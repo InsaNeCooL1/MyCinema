@@ -509,6 +509,112 @@ function computeActorProfiles() {
   return { globalCastAvg, globalTmdbAvg, actors };
 }
 
+function computeDirectorProfiles() {
+  const DIR_REF_PROJECTS = 4;
+  const items = Object.values(lib);
+  const ratedItems = items.map(x => ({ item: x, avg: computeItemRating(x).avg })).filter(x => x.avg > 0);
+  const G = ratedItems.length ? ratedItems.reduce((s, x) => s + x.avg, 0) / ratedItems.length : 7.2;
+  const hitTagDelta = Math.max(0.4, Math.min(0.8, (10 - G) * 0.55));
+  const hiScale = Math.max(0.8, Math.min(1.3, 10 - G));
+
+  const dirMap = new Map();
+  items.forEach(item => {
+    if (!Array.isArray(item.directors) || !item.directors.length) return;
+    const watched = hasWatched(item);
+    const avg = computeItemRating(item).avg;
+    if (!watched && avg <= 0) return;
+    const fKey = getItemFranchiseKey(item);
+    item.directors.forEach(d => {
+      if (!d || !d.id) return;
+      if (!dirMap.has(d.id)) {
+        dirMap.set(d.id, { id: d.id, name: d.name, profile_path: d.profile_path || null, watchedCount: 0, rated: [] });
+      }
+      const e = dirMap.get(d.id);
+      if (!e.profile_path && d.profile_path) e.profile_path = d.profile_path;
+      if (watched) e.watchedCount++;
+      if (avg > 0) e.rated.push({ item, avg, fKey });
+    });
+  });
+
+  const out = [];
+  for (const d of dirMap.values()) {
+    const rated = d.rated;
+    const n = rated.length;
+    if (!n) {
+      out.push({
+        id: d.id, name: d.name, profile_path: d.profile_path,
+        watchedCount: d.watchedCount, ratedCount: 0, effCount: 0,
+        rawAvg: 0, score: 0, hitCount: 0, missCount: 0, bestItem: null, bestAvg: 0
+      });
+      continue;
+    }
+
+    const sorted = [...rated].sort((x, y) => (y.avg - x.avg) || (parseInt(x.item.year || '9999') - parseInt(y.item.year || '9999')));
+    const frSeen = {}, frEff = {}, frRaw = {};
+    let sumW = 0, sumWR = 0, effCount = 0, hitCount = 0, hitW = 0, missCount = 0, penWeightedSum = 0;
+
+    for (const r of sorted) {
+      let fw = 1.0;
+      if (r.fKey) {
+        const k = frSeen[r.fKey] || 0;
+        frSeen[r.fKey] = k + 1;
+        fw = k === 0 ? 1.0 : (k === 1 ? 0.45 : (k === 2 ? 0.25 : 0.15));
+        frEff[r.fKey] = (frEff[r.fKey] || 0) + fw;
+        frRaw[r.fKey] = (frRaw[r.fKey] || 0) + 1;
+      }
+      const delta = r.avg - G;
+      sumW += fw;
+      sumWR += fw * r.avg;
+      effCount += fw;
+
+      if (delta > 0.30) {
+        hitW += fw * clampNum((delta - 0.30) / hiScale, 0, 1);
+        if (delta >= hitTagDelta) hitCount++;
+      }
+      if (delta < -0.35) {
+        const projPen = Math.min(0.22, 0.09 * Math.pow((-0.35 - delta) / 0.50, 0.85));
+        penWeightedSum += fw * projPen;
+        if (delta <= -0.85) missCount++;
+      }
+    }
+
+    const rawAvg = sumW > 0 ? sumWR / sumW : 0;
+    const stabAvg = (effCount * rawAvg + 1.5 * G) / (effCount + 1.5);
+
+    let countMod = 0;
+    if (effCount < DIR_REF_PROJECTS) {
+      countMod = -0.85 * Math.pow((DIR_REF_PROJECTS - effCount) / (DIR_REF_PROJECTS - 1), 1.45);
+    } else if (effCount > DIR_REF_PROJECTS) {
+      const qualFactor = clampNum((rawAvg - (G - 0.6)) / 1.4, 0, 1);
+      countMod = Math.min(0.35, 0.22 * Math.log(1 + (effCount - DIR_REF_PROJECTS) / DIR_REF_PROJECTS)) * qualFactor;
+    }
+
+    const hitBonusPct = 0.055 * (hitW / (sumW + 1.5));
+    const avgPenPct = penWeightedSum / (sumW + 0.5);
+
+    let maxFrEff = 0, maxFrRaw = 0;
+    for (const fk of Object.keys(frEff)) {
+      if (frEff[fk] > maxFrEff) { maxFrEff = frEff[fk]; maxFrRaw = frRaw[fk]; }
+    }
+    const frShare = effCount > 0 ? maxFrEff / effCount : 0;
+    const franchisePenaltyPct = (maxFrRaw >= 3 && frShare > 0.50)
+      ? Math.min(0.06, ((frShare - 0.50) / 0.50) * 0.06)
+      : 0;
+
+    const shrunk = stabAvg * (1 + hitBonusPct) * (1 - avgPenPct) * (1 - franchisePenaltyPct);
+    const score = clampNum(Math.min(rawAvg + 0.45, shrunk + countMod), 1, 10);
+    const best = sorted[0];
+
+    out.push({
+      id: d.id, name: d.name, profile_path: d.profile_path,
+      watchedCount: d.watchedCount, ratedCount: n, effCount,
+      rawAvg, score, hitCount, missCount,
+      bestItem: best ? best.item : null, bestAvg: best ? best.avg : 0
+    });
+  }
+  return { globalAvg: G, directors: out };
+}
+
 // ============ THEMES ============
 function hexToRgb(hex) {
   let h = hex.replace('#', '');
@@ -978,6 +1084,15 @@ function extractItemMeta(d, type) {
   if (d.credits?.cast?.length) {
     meta.cast = d.credits.cast.slice(0, CAST_LIMIT).map(a => ({ id: a.id, name: a.name, profile_path: a.profile_path }));
   }
+  const dirSeen = new Set();
+  const dirs = [];
+  (d.credits?.crew || []).filter(c => c.job === 'Director').forEach(c => {
+    if (c.id && !dirSeen.has(c.id)) { dirSeen.add(c.id); dirs.push({ id: c.id, name: c.name, profile_path: c.profile_path || null }); }
+  });
+  (d.created_by || []).forEach(c => {
+    if (c.id && !dirSeen.has(c.id)) { dirSeen.add(c.id); dirs.push({ id: c.id, name: c.name, profile_path: c.profile_path || null }); }
+  });
+  if (dirs.length) meta.directors = dirs.slice(0, 4);
   const countrySet = new Set();
   if (Array.isArray(d.production_countries)) {
     d.production_countries.forEach(c => { if (c && c.iso_3166_1) countrySet.add(c.iso_3166_1.toUpperCase()); });
@@ -1253,7 +1368,7 @@ function setKbdNavEnabled(on) {
       document.documentElement.classList.add('mc-kbd');
       activate();
     }
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Select' || e.keyCode === 23) {
       const focused = document.activeElement;
       if (focused && focused.matches(selectors)) {
         e.preventDefault();

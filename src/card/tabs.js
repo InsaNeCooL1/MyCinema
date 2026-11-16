@@ -62,6 +62,12 @@ function renderNotesTab(ctx) {
     const top = el('div', 'note-top');
     top.append(el('div', 'note-date', date));
     
+    const nActs = el('div', 'note-acts');
+    const editBtn = el('button', 'note-edit-btn', '✎');
+    editBtn.title = 'Редагувати';
+    editBtn.onclick = () => {
+      if (typeof window.openQuickNoteModal === 'function') window.openQuickNoteModal(ctx, n);
+    };
     const delBtn = el('button', 'note-del-btn', '✕');
     delBtn.title = 'Видалити запис';
     delBtn.onclick = () => {
@@ -70,7 +76,8 @@ function renderNotesTab(ctx) {
         update(r, { notesHistory: newHist, notes: null });
       }
     };
-    top.append(delBtn);
+    nActs.append(editBtn, delBtn);
+    top.append(nActs);
     
     item.append(top);
     item.append(el('div', 'note-content', n.text));
@@ -338,6 +345,53 @@ function renderSeasonsTab(ctx) {
   };
   header.append(clearBtn);
   scoreWrap.append(header);
+
+  const quickRow = el('div', 'quick-rate-bar');
+  quickRow.append(el('span', 'quick-rate-lbl', '⚡ В 1 клік:'));
+  [5, 6, 7, 8, 9, 10].forEach(qVal => {
+    const qb = el('button', 'quick-rate-pill', String(qVal));
+    qb.type = 'button';
+    qb.onclick = () => {
+      const latest = lib[r.key] || {};
+      const newSR = { ...(latest.seasonRatings || {}) };
+      const filled = {};
+      RATING_CRITERIA.forEach(c => { filled[c.key] = qVal; });
+      newSR[selNum] = filled;
+      const newTs = { ...(latest.seasonRatingTs || {}), [selNum]: Date.now() };
+      const nextStatus = latest.status !== 'watched' ? 'watching' : latest.status;
+      updateNoRender(r, { seasonRatings: newSR, status: nextStatus, seasonRatingTs: newTs });
+      refreshTvSeasonRatingUIInPlace();
+    };
+    quickRow.append(qb);
+  });
+  if (seasons.length > 1) {
+    const copyAllBtn = el('button', 'quick-rate-copy', '📋 На всі сезони');
+    copyAllBtn.type = 'button';
+    copyAllBtn.onclick = () => {
+      const latest = lib[r.key] || {};
+      const curSeasonR = (latest.seasonRatings || {})[selNum] || {};
+      if (!computeAverage(curSeasonR)) { showSyncToast('Спочатку оціни цей сезон'); return; }
+      if (!confirm(`Застосувати оцінку Сезону ${selNum} до всіх ${seasons.length} сезонів?`)) return;
+      const newSR = { ...(latest.seasonRatings || {}) };
+      const newTs = { ...(latest.seasonRatingTs || {}) };
+      const nowTs = Date.now();
+      seasons.forEach(ss => {
+        newSR[ss.season_number] = { ...curSeasonR };
+        newTs[ss.season_number] = nowTs;
+      });
+      updateNoRender(r, { seasonRatings: newSR, seasonRatingTs: newTs });
+      tabsBar.querySelectorAll('.season-tab-btn').forEach(tb => {
+        const sAvgAll = computeAverage(curSeasonR);
+        let b = tb.querySelector('.season-tab-badge');
+        if (!b) { b = el('span', 'season-tab-badge', '⭐ ' + fmtNum(sAvgAll)); tb.append(b); }
+        else b.textContent = '⭐ ' + fmtNum(sAvgAll);
+      });
+      refreshTvSeasonRatingUIInPlace();
+      showSyncToast(`✅ Оцінено всі ${seasons.length} сезонів`);
+    };
+    quickRow.append(copyAllBtn);
+  }
+  scoreWrap.append(quickRow);
 
   RATING_CRITERIA.forEach(crit => {
     const row = el('div', 'score-row');

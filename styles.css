@@ -619,6 +619,67 @@ body.mc-fs {
 .release-tag.premiere { background: rgba(197, 163, 255, .16); color: var(--violet); }
 .release-tag.digital { background: rgba(157, 229, 195, .16); color: var(--mint); }
 
+/* STAGE1-UX-UPGRADES */
+.cw-next-btn {
+  position: absolute; bottom: 6px; right: 6px; z-index: 3;
+  padding: 4px 8px; border-radius: var(--r-xs);
+  background: rgba(8, 7, 10, .86); border: 1px solid rgba(var(--accent-rgb), .55);
+  color: var(--accent); font-family: var(--mono); font-size: 10.5px; font-weight: 800;
+  transition: .15s; box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
+}
+.cw-next-btn:hover { background: var(--accent); color: var(--accent-fg); }
+.btn-rewatch { flex: 0 0 auto !important; min-width: 40px; padding: 0 10px !important; gap: 4px; }
+.btn-rewatch.has-rw { border-color: rgba(157, 229, 195, .45); color: var(--mint); background: rgba(157, 229, 195, .1); }
+.rw-cnt { font-family: var(--mono); font-size: 12px; font-weight: 800; }
+.badge.rewatch { background: rgba(157, 229, 195, .15); color: var(--mint); font-family: var(--mono); font-weight: 800; }
+.note-acts { display: flex; align-items: center; gap: 8px; }
+.note-edit-btn { background: none; border: none; color: var(--text-muted); font-size: 14px; cursor: pointer; opacity: .55; transition: .2s; }
+.note-edit-btn:hover { opacity: 1; color: var(--accent); }
+.quick-rate-bar { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--bg-2); border: 1px solid rgba(255,255,255,.04); }
+.quick-rate-lbl { font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-right: 2px; }
+.quick-rate-pill { min-width: 28px; height: 28px; border-radius: var(--r-xs); background: var(--bg-3); color: var(--text-secondary); font-family: var(--mono); font-size: 12px; font-weight: 700; transition: .15s; }
+.quick-rate-pill:hover { background: var(--accent); color: var(--accent-fg); }
+.quick-rate-copy { margin-left: auto; padding: 5px 10px; border-radius: var(--r-xs); background: rgba(var(--accent-rgb), .12); border: 1px solid rgba(var(--accent-rgb), .3); color: var(--accent); font-size: 11.5px; font-weight: 700; }
+.streams-ep-watched { color: var(--mint); font-weight: 800; margin-right: 6px; font-size: 12px; }
+.streams-mark-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: var(--r-sm); background: rgba(157, 229, 195, .10); border: 1px solid rgba(157, 229, 195, .35); margin-bottom: 4px; }
+.streams-mark-txt { font-size: 12.5px; color: var(--text); font-weight: 600; }
+.streams-mark-acts { display: flex; gap: 6px; flex-shrink: 0; }
+.streams-mark-yes { padding: 6px 12px; border-radius: var(--r-xs); background: var(--mint); color: #08140d; font-size: 12px; font-weight: 800; }
+.streams-mark-no { padding: 6px 8px; border-radius: var(--r-xs); background: var(--bg-3); color: var(--text-muted); font-size: 12px; }
+
+/* STAGE23-HOME-MAP-WRAPPED-TV */
+.home-view-switch-wrap { max-width: 720px; margin: 12px auto 0; padding: 0 16px; }
+.home-view-switch { display: flex; gap: 6px; padding: 4px; border-radius: var(--r-md); background: var(--bg-1); border: 1px solid rgba(255,255,255,.06); }
+.home-view-pill { flex: 1; padding: 9px 14px; border-radius: var(--r-sm); font-size: 13.5px; font-weight: 700; color: var(--text-muted); transition: .2s; }
+.home-view-pill.active { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: var(--accent-fg); box-shadow: 0 2px 12px rgba(var(--accent-rgb), .25); }
+@media (min-width: 900px) { .home-view-switch-wrap { max-width: 100%; padding: 0; } }
+.home-inline-type-switch { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--r-sm); background: var(--bg-1); border: 1px solid rgba(255,255,255,.06); }
+.home-inline-pill { padding: 6px 12px; border-radius: var(--r-xs); font-size: 12.5px; font-weight: 700; color: var(--text-muted); transition: .15s; }
+.home-inline-pill.active { background: var(--accent); color: var(--accent-fg); }
+.plan-filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 14px; }
+.world-map-card { background: var(--bg-1); border: 1px solid rgba(255,255,255,.06); border-radius: var(--r-md); padding: 12px; margin-bottom: 16px; }
+.world-map-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.world-map-title { font-family: var(--mono); font-size: 11.5px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); }
+.world-map-tip { font-size: 12px; font-weight: 600; color: var(--text-muted); font-family: var(--mono); }
+.world-map-tip.has-data { color: var(--accent); }
+.world-map-svg { width: 100%; height: auto; display: block; }
+.world-map-country { fill: var(--bg-3); stroke: rgba(255,255,255,.14); stroke-width: 0.7; cursor: pointer; transition: fill .2s, stroke .2s, fill-opacity .2s; }
+.world-map-country.visited { fill: var(--accent); stroke: rgba(var(--accent-rgb), .75); }
+.world-map-country.selected { stroke: #fff; stroke-width: 1.5; }
+.wrapped-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.wrapped-controls .calendar-select { min-width: 150px; }
+.wrapped-year-bars { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; align-items: end; padding-top: 8px; }
+.wrapped-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.wrapped-bar-fill { width: 100%; max-width: 24px; border-radius: 4px 4px 2px 2px; background: linear-gradient(180deg, var(--accent), var(--coral)); }
+.wrapped-bar-num { font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 700; min-height: 12px; }
+.wrapped-bar-lbl { font-family: var(--mono); font-size: 9.5px; color: var(--text-muted); }
+html.mc-kbd .streams-ep-btn:focus-visible, html.mc-kbd .streams-prov-btn:focus-visible,
+html.mc-kbd .streams-chip:focus-visible, html.mc-kbd .streams-play-btn:focus-visible,
+html.mc-kbd .episode-body:focus-visible, html.mc-kbd .home-view-pill:focus-visible,
+html.mc-kbd .home-inline-pill:focus-visible {
+  outline: 2px solid var(--accent) !important; outline-offset: 2px !important;
+}
+
 /* --- Tab Contents (збережені зі старого коду) --- */
 .details-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 .detail-item { background: var(--bg-1); padding: 12px 16px; border-radius: var(--r-md); border: 1px solid rgba(255,255,255,0.03); }

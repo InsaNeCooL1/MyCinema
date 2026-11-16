@@ -341,19 +341,33 @@ function injectApkUpdateButton() {
       const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
       const info = CapApp && CapApp.getInfo ? await CapApp.getInfo() : { version: '?', build: '0' };
       const curBuild = parseInt(info.build, 10) || 0;
-      const res = await fetch('https://api.github.com/repos/InsaNeCool1/MyCinema/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
+      const ep = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExternalPlayer;
+      const openExt = (u) => {
+        if (ep && typeof ep.openUrl === 'function') return ep.openUrl({ url: u }).catch(() => window.open(u, '_system'));
+        return window.open(u, '_blank');
+      };
+      const res = await fetch('https://api.github.com/repos/InsaNeCooL1/MyCinema/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
+      if (res.status === 404) {
+        if (confirm('GitHub API повернув 404 (репо приватний або ще без релізу).\n\nВідкрити сторінку релізів у браузері?')) {
+          openExt('https://github.com/InsaNeCooL1/MyCinema/releases/latest');
+        }
+        return;
+      }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const rel = await res.json();
       const tagNum = parseInt(String(rel.tag_name || '').replace(/\D+/g, ''), 10) || 0;
-      const curNum = curBuild >= 100 ? (curBuild - 100) : curBuild;
+      const curNum = curBuild > 101 ? (curBuild - 100) : 0;
       const apkAsset = (rel.assets || []).find(a => /\.apk$/i.test(a.name || ''));
       const dlUrl = (apkAsset && apkAsset.browser_download_url) || rel.html_url;
-      if (tagNum > curNum || !curBuild) {
+      const seenTag = localStorage.getItem('mycinema.seenReleaseTag') || '';
+      const isNew = curNum > 0 ? (tagNum > curNum) : (rel.tag_name && rel.tag_name !== seenTag);
+      if (isNew) {
         if (confirm(`Доступна версія ${rel.name || rel.tag_name} (поточна: ${info.version || curBuild}).\n\nВідкрити завантаження APK?`)) {
-          window.open(dlUrl, '_blank');
+          if (rel.tag_name) localStorage.setItem('mycinema.seenReleaseTag', rel.tag_name);
+          openExt(dlUrl);
         }
       } else {
-        showSyncToast(`✅ Встановлено актуальну збірку (${info.version || curBuild})`);
+        showSyncToast(`✅ Актуальна збірка (${rel.tag_name || info.version})`);
       }
     } catch (e) {
       showSyncToast('⚠ Не вдалося перевірити оновлення');
