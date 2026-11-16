@@ -40,6 +40,9 @@ function setTab(t, opts) {
   }
   _cardClosingForNav = false;
   state.tab = t;
+  if (typeof VALID_TABS !== 'undefined' && VALID_TABS.has(t)) {
+    try { localStorage.setItem('mycinema.activeTab', t); } catch {}
+  }
   closeSidebar();
   /* FIX-SETTAB-NAV */ if (typeof closeNavDropdowns === 'function') closeNavDropdowns();
   if (!(opts && opts.keepFilter) && typeof hideFilterDropdown === 'function') hideFilterDropdown();
@@ -195,10 +198,15 @@ if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.is
   });
 }
 /* FIX-DEEPLINK */
-var _initialHash = /^#\/(movie|tv|person|company)\/\d+$/.test(location.hash) ? location.hash : '';
+var _isReload = false;
+try {
+  var _navEntry = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+  _isReload = (_navEntry && _navEntry.type === 'reload') || (performance.navigation && performance.navigation.type === 1);
+} catch (e) {}
+var _initialHash = (!_isReload && /^#\/(movie|tv|person|company)\/\d+$/.test(location.hash)) ? location.hash : '';
 history.replaceState({ mc: 0 }, '', location.pathname + location.search + _initialHash);
 refresh();
-routeFromHash();
+if (_initialHash) routeFromHash();
 
 // [GUEST-ONB-FIX] Гість-онбординг при першому запуску
 if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getItem('onboardingDone')) {
@@ -217,31 +225,63 @@ if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getIte
     return;
   }
   
+  function openExitConfirmModal() {
+    if (document.getElementById('exit-confirm-modal')) return;
+    const m = el('div', 'exit-confirm-overlay');
+    m.id = 'exit-confirm-modal';
+    const boxEl = el('div', 'exit-confirm-box');
+    boxEl.append(el('h3', '', 'Вийти з MyCinema?'));
+    const btns = el('div', 'exit-confirm-actions');
+    const cancel = el('button', 'exit-confirm-btn cancel', 'Скасувати');
+    cancel.type = 'button';
+    cancel.onclick = () => m.remove();
+    const confirmBtn = el('button', 'exit-confirm-btn confirm', 'Вийти');
+    confirmBtn.type = 'button';
+    confirmBtn.onclick = () => { m.remove(); CapApp.exitApp(); };
+    btns.append(cancel, confirmBtn);
+    boxEl.append(btns);
+    m.append(boxEl);
+    m.onclick = (e) => { if (e.target === m) m.remove(); };
+    document.body.appendChild(m);
+  }
+
   CapApp.addListener('backButton', () => {
-    // 0. Ізольована кімнатка Lampa
-    
+    // 0. Діалог виходу, якщо вже відкритий
+    const exitDlg = document.getElementById('exit-confirm-modal');
+    if (exitDlg) { exitDlg.remove(); return; }
+
+    // 0.1. Плеєр / балансери (відео -> кроки назад -> закриття)
+    if (typeof window.handleStreamsBack === 'function' && window.handleStreamsBack()) return;
+
+    // 0.2. Поверхневі модалки картки та обсерваторії
+    const topOverlay = document.querySelector('.reaction-modal-overlay, .quick-note-overlay, .tags-modal-overlay, .share-modal-overlay');
+    if (topOverlay) { topOverlay.remove(); return; }
+
     // 1. Модальні вікна та оверлеї
     if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
     if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
     if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }
-    
 
     // 2. Бокове меню
     if (document.getElementById('sidebar').classList.contains('open')) { closeSidebar(); return; }
-    
+
     // 3. Автокомпліт та дропдаун фільтрів
     if (typeof filterDropdown !== 'undefined' && filterDropdown && !filterDropdown.classList.contains('hidden')) { hideFilterDropdown(); return; }
     if (document.querySelector('.nav-group.open')) { closeNavDropdowns(); return; }
     if (!autocomplete.classList.contains('hidden') && autocomplete.childElementCount) { hideAutocomplete(); return; }
-    
-    // 4. Стек карток (модалка тайтлу/актора)
-    if (cardStack.length) { history.back(); return; }
-    
+
+    // 4. Стек карток (модалка тайтлу/актора) з fallback
+    if (cardStack.length) {
+      if (typeof popTopCardFromBack === 'function') popTopCardFromBack();
+      else history.back();
+      return;
+    }
+
     // 5. Таби (якщо не на головній)
     if (state.tab !== 'home') { setTab('home'); return; }
-    
-    // 6. Вихід з додатку (тільки з головної)
-    CapApp.exitApp();
+
+    // 6. Підтвердження виходу з додатку (тільки з головної)
+    openExitConfirmModal();
   });
 })();
 

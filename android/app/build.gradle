@@ -3,21 +3,31 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.mycinema.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        mycinema {
+            storeFile file('mycinema-signing.jks')
+            storePassword 'mycinema2026'
+            keyAlias 'mycinema'
+            keyPassword 'mycinema2026'
+        }
+    }
     defaultConfig {
         applicationId "com.mycinema.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode (project.hasProperty('MC_VERSION_CODE') ? project.property('MC_VERSION_CODE').toInteger() : 100)
+        versionName (project.hasProperty('MC_VERSION_NAME') ? project.property('MC_VERSION_NAME').toString() : "3.0.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.mycinema
+        }
         release {
+            signingConfig signingConfigs.mycinema
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

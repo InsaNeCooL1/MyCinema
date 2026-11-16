@@ -282,6 +282,26 @@ async function loadMediaCardData(ctx) {
   } catch (e) { ctx.error = e.message; }
 }
 
+function popTopCardFromBack() {
+  if (!cardStack.length) return false;
+  const before = cardStack.length;
+  try { history.back(); } catch {}
+  setTimeout(() => {
+    if (cardStack.length === before && before > 0) {
+      cardStack.pop();
+      const iframe = card.querySelector('.card-hero-video');
+      if (iframe) iframe.src = 'about:blank';
+      if (!cardStack.length) {
+        overlay.classList.remove('open');
+        if (!(typeof _flushPendingSetTab === 'function' && _flushPendingSetTab())) refresh();
+      } else {
+        renderCard(true);
+      }
+    }
+  }, 140);
+  return true;
+}
+
 function closeCard() {
   const iframe = card.querySelector('.card-hero-video');
   if (iframe) iframe.src = 'about:blank';
@@ -334,7 +354,7 @@ window.addEventListener('popstate', async (e) => {
 function routeFromHash() {
   const m = location.hash.match(/^#\/(movie|tv|person|company)\/(\d+)$/);
   if (!m) return;
-  history.replaceState({}, '', location.pathname + location.search);
+  history.replaceState({ mc: 0 }, '', location.pathname + location.search);
   const id = parseInt(m[2]);
   if (m[1] === 'person') openPerson(id);
   else if (m[1] === 'company') openCompany(id);

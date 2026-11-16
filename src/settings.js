@@ -15,6 +15,7 @@ function openSettings() {
   injectSnowToggle();
   injectKbdNavToggle();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
+  if (typeof injectApkUpdateButton === 'function') injectApkUpdateButton();
   document.getElementById('settings-modal').classList.add('open');
 }
 
@@ -315,6 +316,54 @@ function injectDismissedReset() {
   btn.textContent = `Повернути сховані рекомендації (${getCount()})`;
 }
 
+
+// ========== APK UPDATE CHECKER (GitHub Releases) ==========
+function injectApkUpdateButton() {
+  const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if (!isNative) return;
+  const modal = document.getElementById('settings-modal');
+  if (!modal || modal.querySelector('#apk-update-btn')) return;
+  const sections = modal.querySelectorAll('.settings-section');
+  let target = null;
+  sections.forEach((sec) => {
+    const title = sec.querySelector('.settings-section-title');
+    if (title && /Дані/i.test(title.textContent)) target = sec;
+  });
+  if (!target) return;
+  const btn = document.createElement('button');
+  btn.id = 'apk-update-btn';
+  btn.className = 'settings-btn';
+  btn.textContent = '🔄 Перевірити оновлення APK';
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = '⏳ Перевірка...';
+    try {
+      const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+      const info = CapApp && CapApp.getInfo ? await CapApp.getInfo() : { version: '?', build: '0' };
+      const curBuild = parseInt(info.build, 10) || 0;
+      const res = await fetch('https://api.github.com/repos/InsaNeCool1/MyCinema/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const rel = await res.json();
+      const tagNum = parseInt(String(rel.tag_name || '').replace(/\D+/g, ''), 10) || 0;
+      const curNum = curBuild >= 100 ? (curBuild - 100) : curBuild;
+      const apkAsset = (rel.assets || []).find(a => /\.apk$/i.test(a.name || ''));
+      const dlUrl = (apkAsset && apkAsset.browser_download_url) || rel.html_url;
+      if (tagNum > curNum || !curBuild) {
+        if (confirm(`Доступна версія ${rel.name || rel.tag_name} (поточна: ${info.version || curBuild}).\n\nВідкрити завантаження APK?`)) {
+          window.open(dlUrl, '_blank');
+        }
+      } else {
+        showSyncToast(`✅ Встановлено актуальну збірку (${info.version || curBuild})`);
+      }
+    } catch (e) {
+      showSyncToast('⚠ Не вдалося перевірити оновлення');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔄 Перевірити оновлення APK';
+    }
+  });
+  target.appendChild(btn);
+}
 
 // ========== KEYBOARD NAV TOGGLE (local-only, no cloud sync) ==========
 function injectKbdNavToggle() {

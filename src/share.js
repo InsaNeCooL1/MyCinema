@@ -531,8 +531,9 @@ function renderObservatoryShareCanvas(tabId, format) {
     let nonUs = 0;
     items.forEach(it => {
       const avg = computeItemRating(it).avg;
-      if (!(it.countries.length === 1 && it.countries[0] === 'US')) nonUs++;
-      it.countries.forEach(code => {
+      const cList = it.countries.slice(0, 2);
+      if (!(cList.length === 1 && cList[0] === 'US')) nonUs++;
+      cList.forEach(code => {
         const m = typeof getCountryMeta === 'function' ? getCountryMeta(code) : { code, flag: '🌐', name: code };
         if (!cMap.has(m.code)) cMap.set(m.code, { ...m, watched: 0, mCnt: 0, tCnt: 0, sum: 0, cnt: 0 });
         const st = cMap.get(m.code);

@@ -57,6 +57,7 @@ function getMissingMetaItems() {
     if (!isActive) return false;
     if (!x.cast?.length) return true;
     if (x.type === 'movie' && !x.runtime) return true;
+    if (x.type === 'movie' && x.collection === undefined) return true;
     if (x.countries === undefined) return true;
     return false;
   });
@@ -109,7 +110,7 @@ async function fetchAllMissingMeta() {
         if (meta.platforms && !lib[item.key].platforms?.length) { lib[item.key].platforms = meta.platforms; changed = true; }
         if (lib[item.key].franchiseKey === undefined && 'franchiseKey' in meta) { lib[item.key].franchiseKey = meta.franchiseKey; changed = true; }
         if (item.type === 'movie' && lib[item.key].collection === undefined && 'collection' in meta) { lib[item.key].collection = meta.collection; changed = true; }
-        if (changed) { _dirtyItems.add(item.key); lib[item.key].updated = Date.now(); }
+        if (changed) { if (typeof preserveItemTimestamps === 'function') preserveItemTimestamps(lib[item.key]); _dirtyItems.add(item.key); lib[item.key].updated = Date.now(); }
       } catch {}
     }));
     state.stats.castProgress.done = Math.min(missing.length, i + batchSize);
@@ -611,7 +612,7 @@ function renderFranchisesTab() {
       pct,
       completed
     };
-  }).sort((a, b) => b.watchedCount - a.watchedCount || b.avgRating - a.avgRating || b.inLib.length - a.inLib.length);
+  }).filter(f => !f.parts || f.totalParts > 1).sort((a, b) => b.watchedCount - a.watchedCount || b.avgRating - a.avgRating || b.inLib.length - a.inLib.length);
 
   const totalWatchedInFr = franchises.reduce((s, f) => s + f.watchedCount, 0);
   const totalPartsKnown = franchises.reduce((s, f) => s + f.totalParts, 0);
@@ -850,10 +851,11 @@ function renderCountriesTab() {
 
   items.forEach(item => {
     const avg = computeItemRating(item).avg;
-    const isUsOnly = item.countries.length === 1 && item.countries[0] === 'US';
+    const cList = item.countries.slice(0, 2);
+    const isUsOnly = cList.length === 1 && cList[0] === 'US';
     if (!isUsOnly) nonUsCount++;
 
-    item.countries.forEach(code => {
+    cList.forEach(code => {
       const meta = getCountryMeta(code);
       if (!cMap.has(meta.code)) {
         cMap.set(meta.code, {
@@ -905,7 +907,7 @@ function renderCountriesTab() {
     const recRegionBuckets = { europe: [], asia: [], latam: [] };
 
     recentItems.forEach(it => {
-      it.countries.forEach(code => {
+      it.countries.slice(0, 2).forEach(code => {
         const m = getCountryMeta(code);
         if (m.code !== 'US') {
           if (!recCountryBuckets.has(m.code)) recCountryBuckets.set(m.code, { meta: m, items: [] });
@@ -1302,7 +1304,7 @@ function renderGenresTab() {
 function buildActivityHeatmap() {
   const counts = {};
   Object.values(lib).forEach(item => {
-    const ts = item.statusDate || item.updated || item.createdAt;
+    const ts = item.statusDate || (item.eloUpdated && item.updated === item.eloUpdated ? item.createdAt : (item.eloGames > 0 && item.createdAt ? item.createdAt : item.updated)) || item.createdAt;
     if (!ts) return;
     const d = new Date(ts);
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

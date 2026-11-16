@@ -38,8 +38,14 @@ let lib = load();
 let _dirtyItems = new Set();
 let _saveTimer = null;
 let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_ADJUST_KEY)) || {}; } catch { return {}; } })();
+const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics', 'game']);
+let _savedTab = 'home';
+try {
+  const t = localStorage.getItem('mycinema.activeTab');
+  if (t && VALID_TABS.has(t)) _savedTab = t;
+} catch {}
 let state = {
-  tab: 'home', typeFilter: 'all', topTypeFilter: 'all',
+  tab: _savedTab, typeFilter: 'all', topTypeFilter: 'all',
   filter: { query: '', type: 'all', decade: 'any', genre: 'any', minRating: 0, sortBy: 'popularity.desc', streaming: null },
   home: { 
     loading: false, 
@@ -314,7 +320,7 @@ function computeActorProfiles() {
     // Прогресія відносно бази 6 (тільки для Топу в Обсерваторії)
     let countMod = 0;
     if (effCount < ACTOR_REF_PROJECTS) {
-      countMod = -0.95 * Math.pow((ACTOR_REF_PROJECTS - effCount) / (ACTOR_REF_PROJECTS - 1), 1.15);
+      countMod = -2.20 * Math.pow((ACTOR_REF_PROJECTS - effCount) / (ACTOR_REF_PROJECTS - 1), 1.65);
     } else if (effCount > ACTOR_REF_PROJECTS) {
       const qualFactor = clampNum((rawAvg - (G - 0.6)) / 1.4, 0, 1);
       countMod = Math.min(0.40, 0.25 * Math.log(1 + (effCount - ACTOR_REF_PROJECTS) / ACTOR_REF_PROJECTS)) * qualFactor;
@@ -755,9 +761,10 @@ function normalizePlatformInfo(raw) {
   if (!raw || !raw.name) return null;
   const n = raw.name.trim();
   const low = n.toLowerCase();
+  if (/\b(amazon|apple tv|roku)\s+channel\b/i.test(low)) return null;
   const logo = raw.logo_path || raw.logo || null;
   if (low.includes('netflix')) return { key: 'netflix', name: 'Netflix', logo };
-  if (low === 'hbo' || low.includes('hbo max') || low === 'max') return { key: 'max', name: 'Max / HBO', logo };
+  if (low === 'hbo' || low === 'hbo max' || low === 'max') return { key: 'max', name: 'Max / HBO', logo };
   if (low.includes('prime video') || low === 'amazon' || low.includes('amazon prime')) return { key: 'prime', name: 'Prime Video', logo };
   if (low.includes('apple tv')) return { key: 'apple', name: 'Apple TV+', logo };
   if (low.includes('disney')) return { key: 'disney', name: 'Disney+', logo };
@@ -897,6 +904,28 @@ function getElo(item) {
   return (saved && typeof saved.elo === 'number') ? saved.elo : ELO_START;
 }
 
+function preserveItemTimestamps(entry) {
+  if (!entry) return;
+  const fallbackTs = entry.updated || entry.createdAt || 0;
+  if (entry.status && !entry.statusDate && fallbackTs > 0) {
+    entry.statusDate = fallbackTs;
+  }
+  if (entry.type === 'movie' && computeAverage(entry.ratings) > 0 && !entry.ratingUpdated && fallbackTs > 0) {
+    entry.ratingUpdated = fallbackTs;
+  }
+  if (entry.type === 'tv' && entry.seasonRatings) {
+    const srTs = entry.seasonRatingTs ? { ...entry.seasonRatingTs } : {};
+    let tsChanged = false;
+    for (const [sNum, rObj] of Object.entries(entry.seasonRatings)) {
+      if (computeAverage(rObj) > 0 && !srTs[sNum] && fallbackTs > 0) {
+        srTs[sNum] = fallbackTs + Number(sNum);
+        tsChanged = true;
+      }
+    }
+    if (tsChanged) entry.seasonRatingTs = srTs;
+  }
+}
+
 function recordEloMatch(winner, loser) {
   if (!winner || !loser || !winner.key || !loser.key) return null;
 
@@ -922,15 +951,21 @@ function recordEloMatch(winner, loser) {
   const expectedWin = 1 / (1 + Math.pow(10, (lElo - wElo) / 400));
   const delta = Math.round(ELO_K * (1 - expectedWin));
 
+  const eloNow = Date.now();
+  preserveItemTimestamps(w);
+  preserveItemTimestamps(l);
+
   w.elo = Math.round(wElo + delta);
   _dirtyItems.add(w.key);
   w.eloGames = (w.eloGames || 0) + 1;
-  w.updated = Date.now();
+  w.eloUpdated = eloNow;
+  w.updated = eloNow;
 
   l.elo = Math.round(lElo - delta);
   _dirtyItems.add(l.key);
   l.eloGames = (l.eloGames || 0) + 1;
-  l.updated = Date.now();
+  l.eloUpdated = eloNow;
+  l.updated = eloNow;
 
   save();
   return { delta, winnerElo: w.elo, loserElo: l.elo };

@@ -247,6 +247,7 @@
     wrap.append(watchBtn);
 
     const uaTitle = d.title || d.name || r.title || '';
+    const uaOrigTitle = d.original_title || d.original_name || '';
     const uaYear = (d.release_date || d.first_air_date || '').slice(0, 4) || String(r.year || '');
     const uaType = d.media_type || r.type || (d.name ? 'tv' : 'movie');
     const uaImdb = d.imdb_id || (d.external_ids && d.external_ids.imdb_id) || null;
@@ -254,7 +255,7 @@
     uakinoBtn.innerHTML = '<span class="uakino-grad-text">UA KINO</span>';
     uakinoBtn.onclick = () => {
       if (typeof window.openStreamPicker === 'function') {
-        window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb);
+        window.openStreamPicker(uaTitle, uaYear, uaType, uaImdb, uaOrigTitle);
       } else {
         alert('Плеєр не завантажено. Онови сторінку (Ctrl+Shift+R).');
       }
@@ -413,29 +414,95 @@
       header.append(clearBtn);
       wrap.append(header);
 
+      const syncMovieTotalAndShell = (curR) => {
+        const avgVal = computeAverage(curR);
+        const tvEl = wrap.querySelector('.score-total-val');
+        if (tvEl) {
+          let cls = 'score-total-val';
+          if (avgVal > 0) cls += ' ' + getTempClass(avgVal * 10);
+          tvEl.className = cls;
+          tvEl.textContent = avgVal > 0 ? fmtNum(avgVal) : '—';
+        }
+        const curS = lib[r.key] || {};
+        const hero = card.querySelector('.mobile-hero');
+        if (hero && !ctx.playingTrailer) {
+          let badge = hero.querySelector('.hero-badge');
+          if (avgVal > 0) {
+            const bCls = 'hero-badge ' + getTempClass(avgVal * 10);
+            if (!badge) { badge = el('div', bCls, fmtNum(avgVal)); hero.append(badge); }
+            else { badge.className = bCls; badge.textContent = fmtNum(avgVal); }
+          } else if (badge) badge.remove();
+        }
+        const watchedBtn = card.querySelector('.mobile-actions .btn-watched');
+        if (watchedBtn) {
+          const isW = curS.status === 'watched', isD = curS.status === 'dropped';
+          watchedBtn.className = 'btn-watched' + (isW ? ' active' : (isD ? ' dropped' : ''));
+          watchedBtn.innerHTML = isW
+            ? '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+            : (isD ? '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'
+              : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>');
+        }
+        const stWrap = card.querySelector('.mobile-statuses');
+        if (stWrap) {
+          const hasLib = !!lib[r.key];
+          const hasDel = !!stWrap.querySelector('.btn-del');
+          if (hasLib !== hasDel) stWrap.replaceWith(createStatuses(ctx));
+          else stWrap.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+          if (curS.status === 'planned') card.querySelectorAll('.mobile-statuses .status-btn')[0]?.classList.add('active');
+          if (curS.status === 'dropped') card.querySelectorAll('.mobile-statuses .status-btn')[1]?.classList.add('active');
+        }
+      };
+
+      const refreshMovieRatingUIInPlace = () => {
+        const latest = lib[r.key] || {};
+        const curR = latest.ratings || {};
+        wrap.querySelectorAll('.score-row').forEach((rowEl, rIdx) => {
+          const crit = RATING_CRITERIA[rIdx];
+          if (!crit) return;
+          const v = curR[crit.key] || 0;
+          rowEl.querySelectorAll('.light').forEach((lEl, i) => {
+            const on = (i + 1) <= v;
+            lEl.classList.toggle('on', on);
+            lEl.setAttribute('aria-checked', on ? 'true' : 'false');
+          });
+          const sv = rowEl.querySelector('.score-val');
+          if (sv) sv.textContent = `${v ? v : '0'}/10`;
+        });
+        syncMovieTotalAndShell(curR);
+      };
+
+      clearBtn.onclick = () => {
+        const latest = lib[r.key] || {};
+        if (Object.keys(latest.ratings || {}).length > 0) {
+          updateNoRender(r, { ratings: {}, status: latest.status === 'watched' ? null : latest.status });
+          refreshMovieRatingUIInPlace();
+        }
+      };
+
       const cur = s.ratings || {};
-      
       RATING_CRITERIA.forEach(crit => {
         const row = el('div', 'score-row');
         row.append(el('span', 'score-label', crit.label));
         const bottomRow = el('div', 'score-bottom-row');
-        
         const lights = el('div', 'score-lights');
-        const val = cur[crit.key] || 0;
+        const initVal = cur[crit.key] || 0;
         for (let i = 1; i <= 10; i++) {
-          const light = el('button', 'light' + (i <= val ? ' on' : ''));
+          const light = el('button', 'light' + (i <= initVal ? ' on' : ''));
           light.onclick = () => {
-            const newR = { ...(s.ratings || {}) };
-            if (val === i) delete newR[crit.key]; else newR[crit.key] = i;
-            let newStatus = s.status;
-            const avg = computeAverage(newR);
-            if (avg > 0) newStatus = 'watched'; else if (avg === 0 && s.status === 'watched') newStatus = null;
-            update(r, { ratings: newR, status: newStatus, ratingUpdated: Date.now() });
+            const latest = lib[r.key] || {};
+            const curR = { ...(latest.ratings || {}) };
+            const curVal = curR[crit.key] || 0;
+            if (curVal === i) delete curR[crit.key]; else curR[crit.key] = i;
+            let newStatus = latest.status;
+            const nextAvg = computeAverage(curR);
+            if (nextAvg > 0) newStatus = 'watched'; else if (nextAvg === 0 && latest.status === 'watched') newStatus = null;
+            updateNoRender(r, { ratings: curR, status: newStatus, ratingUpdated: Date.now() });
+            refreshMovieRatingUIInPlace();
           };
           lights.append(light);
         }
         bottomRow.append(lights);
-        bottomRow.append(el('span', 'score-val', `${val ? val : '0'}/10`));
+        bottomRow.append(el('span', 'score-val', `${initVal ? initVal : '0'}/10`));
         row.append(bottomRow);
         wrap.append(row);
       });
@@ -443,15 +510,8 @@
       const avg = computeAverage(cur);
       const totalRow = el('div', 'score-total');
       totalRow.append(el('span', 'score-total-label', 'Загальна'));
-      
       let avgCls = 'score-total-val';
-      if (avg > 0) {
-        const v100 = avg * 10;
-        if (v100 >= 80) avgCls += ' temp-green';
-        else if (v100 >= 66) avgCls += ' temp-yellow';
-        else if (v100 >= 55) avgCls += ' temp-orange';
-        else avgCls += ' temp-red';
-      }
+      if (avg > 0) avgCls += ' ' + getTempClass(avg * 10);
       totalRow.append(el('span', avgCls, avg > 0 ? fmtNum(avg) : '—'));
       wrap.append(totalRow);
     }

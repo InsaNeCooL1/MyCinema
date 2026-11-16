@@ -132,4 +132,15 @@ public class ExternalPlayerPlugin extends Plugin {
 
         call.reject("OPEN_FAILED");
     }
+
+    @PluginMethod
+    public void setFullscreen(PluginCall call) {
+        final boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+        getActivity().runOnUiThread(() -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).setImmersiveFullscreen(enabled);
+            }
+            call.resolve();
+        });
+    }
 }

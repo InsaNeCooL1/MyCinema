@@ -10,7 +10,12 @@ function renderCalendar() {
   head.append(el('h1', 'section-title', '📅 Календар'));
   wrap.append(head);
 
-  const itemTs = (x) => x.statusDate || x.updated || x.createdAt || 0;
+  const itemTs = (x) => {
+    if (x.statusDate) return x.statusDate;
+    if (x.eloUpdated && x.updated === x.eloUpdated) return x.createdAt || 0;
+    if (x.eloGames > 0 && x.createdAt) return x.createdAt;
+    return x.updated || x.createdAt || 0;
+  };
   // 1. Беремо всі тайтли з потрібними статусами й датою
   let allItems = Object.values(lib).filter(x => (x.status === 'watching' || x.status === 'watched') && itemTs(x) > 0);
   

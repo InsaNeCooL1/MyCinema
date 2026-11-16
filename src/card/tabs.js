@@ -181,12 +181,15 @@ function openReactionModal(r, epKey, current) {
   };
 }
 
-function rerenderCardTabsInPlace(ctx) {
+function rerenderCardTabsInPlace(ctx, opts) {
   const wrap = card.querySelector('.mobile-tabs-wrap');
   const scroll = card.querySelector('.card-scroll');
   if (!wrap) { renderCard(true); return; }
-  const savedTop = scroll ? scroll.scrollTop : 0;
-  wrap.replaceChildren(buildCardTabs(ctx), buildCardTabContent(ctx));
+  const savedTop = (ctx._pinnedScrollTop !== undefined) ? ctx._pinnedScrollTop : (scroll ? scroll.scrollTop : 0);
+  const content = buildCardTabContent(ctx);
+  if (opts && opts.noFade) content.classList.add('no-fade');
+  if (ctx._pendingTabMinH > 0) content.style.minHeight = ctx._pendingTabMinH + 'px';
+  wrap.replaceChildren(buildCardTabs(ctx), content);
   if (scroll) {
     scroll.scrollTop = savedTop;
     requestAnimationFrame(() => { if (scroll.isConnected) scroll.scrollTop = savedTop; });
@@ -213,15 +216,19 @@ function renderSeasonsTab(ctx) {
       sel.episodes = data.episodes || [];
       sel.episodesLoaded = true;
       ctx.seasonState.loadingSeason = false;
+      delete ctx._pendingTabMinH;
       if (cardStack[cardStack.length - 1] === ctx) {
-        if (ctx.activeTab === 'seasons') rerenderCardTabsInPlace(ctx);
+        if (ctx.activeTab === 'seasons') rerenderCardTabsInPlace(ctx, { noFade: true });
       }
+      delete ctx._pinnedScrollTop;
     }).catch(() => {
       sel.episodesLoaded = true;
       ctx.seasonState.loadingSeason = false;
+      delete ctx._pendingTabMinH;
       if (cardStack[cardStack.length - 1] === ctx) {
-        if (ctx.activeTab === 'seasons') rerenderCardTabsInPlace(ctx);
+        if (ctx.activeTab === 'seasons') rerenderCardTabsInPlace(ctx, { noFade: true });
       }
+      delete ctx._pinnedScrollTop;
     });
   }
 
@@ -235,12 +242,79 @@ function renderSeasonsTab(ctx) {
     if (avg > 0) tab.append(el('span', 'season-tab-badge', '⭐ ' + fmtNum(avg)));
     tab.addEventListener('click', () => {
       if (ctx.seasonState.selectedSeason === season.season_number) return;
+      const sc = card.querySelector('.card-scroll');
+      const curCont = card.querySelector('.mobile-tabs-wrap .card-tab-content');
+      ctx._pinnedScrollTop = sc ? sc.scrollTop : 0;
+      ctx._pendingTabMinH = (!season.episodesLoaded && curCont) ? curCont.offsetHeight : 0;
       ctx.seasonState.selectedSeason = season.season_number;
-      rerenderCardTabsInPlace(ctx); // season
+      rerenderCardTabsInPlace(ctx, { noFade: true }); // season
+      if (season.episodesLoaded) { delete ctx._pendingTabMinH; delete ctx._pinnedScrollTop; }
     });
     tabsBar.append(tab);
   });
   wrap.append(tabsBar);
+
+  const tempCls = (v100) => v100 >= 80 ? 'temp-green' : (v100 >= 66 ? 'temp-yellow' : (v100 >= 55 ? 'temp-orange' : 'temp-red'));
+  const refreshTvSeasonRatingUIInPlace = () => {
+    const latest = lib[r.key] || {};
+    const srObj = (latest.seasonRatings || {})[selNum] || {};
+    scoreWrap.querySelectorAll('.score-row').forEach((rowEl, rIdx) => {
+      const crit = RATING_CRITERIA[rIdx];
+      if (!crit) return;
+      const v = srObj[crit.key] || 0;
+      rowEl.querySelectorAll('.light').forEach((lEl, i) => {
+        const on = (i + 1) <= v;
+        lEl.classList.toggle('on', on);
+        lEl.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+      const sv = rowEl.querySelector('.score-val');
+      if (sv) sv.textContent = `${v ? v : '0'}/10`;
+    });
+    const sAvg = computeAverage(srObj);
+    const tvEl = scoreWrap.querySelector('.score-total-val');
+    if (tvEl) {
+      tvEl.className = 'score-total-val' + (sAvg > 0 ? ' ' + tempCls(sAvg * 10) : '');
+      tvEl.textContent = sAvg > 0 ? fmtNum(sAvg) : '—';
+    }
+    const activeTabBtn = tabsBar.querySelector('.season-tab-btn.active');
+    if (activeTabBtn) {
+      let badge = activeTabBtn.querySelector('.season-tab-badge');
+      if (sAvg > 0) {
+        if (!badge) { badge = el('span', 'season-tab-badge', '⭐ ' + fmtNum(sAvg)); activeTabBtn.append(badge); }
+        else badge.textContent = '⭐ ' + fmtNum(sAvg);
+      } else if (badge) badge.remove();
+    }
+    const ir = computeItemRating(latest);
+    const topTotalRow = Array.from(card.querySelectorAll('.tv-score-total')).find(x => !x.closest('.mobile-tabs-wrap'));
+    if (topTotalRow) {
+      let valEl = topTotalRow.querySelector('.tv-score-val, .score-empty-text');
+      if (ir.avg > 0) {
+        const cls = 'score-total-val tv-score-val ' + tempCls(ir.avg * 10);
+        if (!valEl) { valEl = el('span', cls, fmtNum(ir.avg)); topTotalRow.append(valEl); }
+        else { valEl.className = cls; valEl.textContent = fmtNum(ir.avg); }
+      } else if (valEl) {
+        valEl.className = 'score-empty-text';
+        valEl.textContent = 'Оцінок ще немає';
+      }
+    }
+    const hero = card.querySelector('.mobile-hero');
+    if (hero && !ctx.playingTrailer) {
+      let hBadge = hero.querySelector('.hero-badge');
+      if (ir.avg > 0) {
+        const hCls = 'hero-badge ' + tempCls(ir.avg * 10);
+        if (!hBadge) { hBadge = el('div', hCls, fmtNum(ir.avg)); hero.append(hBadge); }
+        else { hBadge.className = hCls; hBadge.textContent = fmtNum(ir.avg); }
+      } else if (hBadge) hBadge.remove();
+    }
+    const watchBtn = card.querySelector('.title-watch-btn');
+    if (watchBtn) watchBtn.classList.toggle('active', latest.status === 'watching');
+    const stWrap = card.querySelector('.mobile-statuses');
+    if (stWrap) {
+      const hasLib = !!lib[r.key];
+      const hasDel = !!stWrap.querySelector('.btn-del');
+      if (hasLib !== hasDel && window.MC?.createStatuses) stWrap.replaceWith(MC.createStatuses(ctx));
+    }
+  };
 
   const seasonRatings = (s.seasonRatings || {})[selNum] || {};
   const scoreWrap = el('div', 'mobile-score');
@@ -250,13 +324,16 @@ function renderSeasonsTab(ctx) {
   header.append(el('div', 'score-title', 'Моя оцінка (Сезон ' + selNum + ')'));
   const clearBtn = el('button', 'btn-clear-ratings', 'Очистити');
   clearBtn.onclick = () => {
-    if (Object.keys(seasonRatings).length > 0) {
-      const sr = { ...(s.seasonRatings || {}) };
+    const latest = lib[r.key] || {};
+    const curSeasonR = (latest.seasonRatings || {})[selNum] || {};
+    if (Object.keys(curSeasonR).length > 0) {
+      const sr = { ...(latest.seasonRatings || {}) };
       delete sr[selNum];
       const hasAnyRatings = Object.keys(sr).some(k => Object.keys(sr[k] || {}).length > 0);
-      let newStatus = s.status;
-      if (!hasAnyRatings && s.status === 'watching') newStatus = null;
-      update(r, { seasonRatings: sr, status: newStatus });
+      let newStatus = latest.status;
+      if (!hasAnyRatings && latest.status === 'watching') newStatus = null;
+      updateNoRender(r, { seasonRatings: sr, status: newStatus });
+      refreshTvSeasonRatingUIInPlace();
     }
   };
   header.append(clearBtn);
@@ -267,26 +344,29 @@ function renderSeasonsTab(ctx) {
     row.append(el('span', 'score-label', crit.label));
     const bottomRow = el('div', 'score-bottom-row');
     const lights = el('div', 'score-lights');
-    const val = seasonRatings[crit.key] || 0;
+    const initVal = seasonRatings[crit.key] || 0;
     
     for (let i = 1; i <= 10; i++) {
-      const light = el('button', 'light' + (i <= val ? ' on' : ''));
+      const light = el('button', 'light' + (i <= initVal ? ' on' : ''));
       light.onclick = () => {
-        const newSR = { ...(s.seasonRatings || {}) };
+        const latest = lib[r.key] || {};
+        const newSR = { ...(latest.seasonRatings || {}) };
         const curSR = { ...(newSR[selNum] || {}) };
-        if (val === i) delete curSR[crit.key]; else curSR[crit.key] = i;
+        const curVal = curSR[crit.key] || 0;
+        if (curVal === i) delete curSR[crit.key]; else curSR[crit.key] = i;
         if (Object.keys(curSR).length > 0) newSR[selNum] = curSR; else delete newSR[selNum];
-        let newStatus = s.status;
-        const avg = computeAverage(curSR);
-        if (avg > 0 && newStatus !== 'watched') newStatus = 'watching';
-        const newTs = { ...(s.seasonRatingTs || {}) };
+        let newStatus = latest.status;
+        const nextAvg = computeAverage(curSR);
+        if (nextAvg > 0 && newStatus !== 'watched') newStatus = 'watching';
+        const newTs = { ...(latest.seasonRatingTs || {}) };
         if (Object.keys(curSR).length > 0) newTs[selNum] = Date.now(); else delete newTs[selNum];
-        update(r, { seasonRatings: newSR, status: newStatus, seasonRatingTs: newTs });
+        updateNoRender(r, { seasonRatings: newSR, status: newStatus, seasonRatingTs: newTs });
+        refreshTvSeasonRatingUIInPlace();
       };
       lights.append(light);
     }
     bottomRow.append(lights);
-    bottomRow.append(el('span', 'score-val', `${val ? val : '0'}/10`));
+    bottomRow.append(el('span', 'score-val', `${initVal ? initVal : '0'}/10`));
     row.append(bottomRow);
     scoreWrap.append(row);
   });
@@ -294,14 +374,7 @@ function renderSeasonsTab(ctx) {
   const avg = computeAverage(seasonRatings);
   const totalRow = el('div', 'score-total');
   totalRow.append(el('span', 'score-total-label', 'Загальна'));
-  let avgCls = 'score-total-val';
-  if (avg > 0) {
-    const v100 = avg * 10;
-    if (v100 >= 80) avgCls += ' temp-green';
-    else if (v100 >= 66) avgCls += ' temp-yellow';
-    else if (v100 >= 55) avgCls += ' temp-orange';
-    else avgCls += ' temp-red';
-  }
+  let avgCls = 'score-total-val' + (avg > 0 ? ' ' + tempCls(avg * 10) : '');
   totalRow.append(el('span', avgCls, avg > 0 ? fmtNum(avg) : '—'));
   scoreWrap.append(totalRow);
   wrap.append(scoreWrap);

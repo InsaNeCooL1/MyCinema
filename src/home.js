@@ -801,7 +801,12 @@ function readRecsCache(sig, critical) {
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false; /* offline-recs-ttl-bypass */
     if (age >= RECS_TTL && !offline) return null;
     if (critical && c.critical !== critical) return null;
-    if (c.sig === sig || offline) return c.data;
+    if (c.sig === sig || offline) {
+      if (c.data && Array.isArray(c.data.items)) {
+        c.data = { ...c.data, items: c.data.items.filter(x => x && !lib[x.key]) };
+      }
+      return c.data;
+    }
   } catch {}
   return null;
 }
@@ -898,6 +903,8 @@ function getLastRatedProjects(limit) {
   const entries = [];
   Object.values(lib).forEach(item => {
     if (!item || !item.key) return;
+    const isEloUntracked = (item.eloUpdated && item.updated === item.eloUpdated) || (item.eloGames > 0 && !item.ratingUpdated);
+    const safeBaseTs = isEloUntracked ? (item.createdAt || item.updated || 0) : (item.updated || item.createdAt || 0);
     if (item.type === 'movie') {
       const avg = computeAverage(item.ratings);
       if (avg > 0) {
@@ -907,7 +914,7 @@ function getLastRatedProjects(limit) {
           title: item.title || '',
           avg,
           genres: item.genres || [],
-          ts: item.ratingUpdated || item.updated || item.createdAt || 0
+          ts: item.ratingUpdated || safeBaseTs
         });
       }
     } else if (item.type === 'tv') {
@@ -916,14 +923,16 @@ function getLastRatedProjects(limit) {
       Object.entries(sr).forEach(([sNum, ratings]) => {
         const avg = computeAverage(ratings);
         if (avg > 0) {
-          const baseTs = item.updated || item.createdAt || 0;
+          const tvBase = (item.eloUpdated && item.updated === item.eloUpdated) || (item.eloGames > 0 && !srTs[sNum])
+            ? (item.createdAt || item.updated || 0)
+            : (item.updated || item.createdAt || 0);
           entries.push({
             key: `${item.key}-s${sNum}`,
             item,
             title: `${item.title} (С${sNum})`,
             avg,
             genres: item.genres || [],
-            ts: srTs[sNum] || (baseTs + Number(sNum))
+            ts: srTs[sNum] || (tvBase + Number(sNum))
           });
         }
       });
@@ -1275,7 +1284,7 @@ function computeRecsSignature(seeds) {
 
 async function loadHome() {
   if (state.tab !== 'home') return;
-  if (!state.home.mode) state.home.mode = 'balance';
+  if (!state.home.mode || !window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches) state.home.mode = 'balance';
 
   const seeds = getSeeds();
   const taste = computeTasteVector();
@@ -1606,7 +1615,7 @@ function renderHomeContent(taste) {
     sec.append(controlsBar);
 
     const type = state.home.tab;
-    const allItems = recs.items.filter(x => x.type === type && !(typeof isDismissed === 'function' && isDismissed(x.key)));
+    const allItems = recs.items.filter(x => x.type === type && !lib[x.key] && !(typeof isDismissed === 'function' && isDismissed(x.key)));
     const shownCount = state.home.shown[type] || 14 /* FIX-SHOWN-14 */;
     const visibleItems = allItems.slice(0, shownCount);
 
@@ -1624,7 +1633,7 @@ function renderHomeContent(taste) {
       moreBtn.addEventListener('click', () => {
         const grid = sec.querySelector('.home-grid');
         const current = state.home.shown[type] || 14 /* FIX-SHOWN-14 */;
-        const fresh = (state.home.recs?.items || []).filter(x => x.type === type && !(typeof isDismissed === 'function' && isDismissed(x.key)));
+        const fresh = (state.home.recs?.items || []).filter(x => x.type === type && !lib[x.key] && !(typeof isDismissed === 'function' && isDismissed(x.key)));
         const nextShown = Math.min(fresh.length, current + 14) /* FIX-SHOWN-14 */;
         if (grid) fresh.slice(current, nextShown).forEach(item => grid.append(recCard(item, true)));
         state.home.shown[type] = nextShown;
