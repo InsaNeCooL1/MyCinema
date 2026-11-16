@@ -119,7 +119,28 @@
     const wrap = el('div', 'mobile-title');
     
     const titleRow = el('div', 'title-header-row');
-    if (r.type === 'tv') titleRow.append(el('div', 'tv-icon-badge', 'TV'));
+    if (r.type === 'tv') {
+      let _tvBadge;
+      if (ctx.providerPick) {
+        _tvBadge = el('div', 'tv-icon-badge tv-icon-badge-logo');
+        if (ctx.providerPick.logo) {
+          const _img = document.createElement('img');
+          _img.src = `https://image.tmdb.org/t/p/w92${ctx.providerPick.logo}`;
+          _img.alt = ctx.providerPick.name || '';
+          _img.title = ctx.providerPick.name || '';
+          _img.referrerPolicy = 'no-referrer';
+          _img.loading = 'lazy';
+          _img.className = 'tv-icon-img';
+          _tvBadge.append(_img);
+        } else {
+          _tvBadge.textContent = (ctx.providerPick.name.charAt(0) || '?').toUpperCase();
+          _tvBadge.classList.add('tv-icon-badge-letter');
+        }
+      } else {
+        _tvBadge = el('div', 'tv-icon-badge', 'TV');
+      }
+      titleRow.append(_tvBadge);
+    }
     titleRow.append(el('h1', 'title-main', d.title || d.name));
     wrap.append(titleRow);
 

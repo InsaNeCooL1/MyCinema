@@ -251,6 +251,23 @@ async function loadMediaCardData(ctx) {
       }
     }
     ctx.watchProviders = d['watch/providers']?.results?.UA || null;
+    /* [PROVIDER-PICK-v2] кружечок = мережа/студія (хто зняв), не стрімінг */
+    {
+      const preferredBrands = ['MGM+', 'Paramount+', 'HBO', 'HBO Max', 'Netflix', 'Disney+', 'Apple TV+', 'Showtime', 'AMC'];
+      let pick = null;
+      // 1. TV: пріоритетні бренди в networks
+      if (r.type === 'tv' && Array.isArray(d.networks) && d.networks.length) {
+        const net = d.networks.find(n => preferredBrands.includes(n.name) && n.logo_path)
+                 || d.networks.filter(n => n.logo_path).pop();
+        if (net) pick = { name: net.name, logo: net.logo_path, source: 'network' };
+      }
+      // 2. Fallback: перша production_company з логотипом (для фільмів і якщо немає networks)
+      if (!pick && Array.isArray(d.production_companies)) {
+        const studio = d.production_companies.find(c => c.logo_path);
+        if (studio) pick = { name: studio.name, logo: studio.logo_path, source: 'studio' };
+      }
+      ctx.providerPick = pick;
+    }
     
     const recs = d.recommendations?.results || [];
     const sims = d.similar?.results || [];

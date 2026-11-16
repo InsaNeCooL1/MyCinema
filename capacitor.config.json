@@ -4,9 +4,9 @@
   "webDir": "www",
   "server": {
     "androidScheme": "https",
-    "cleartext": false
+    "cleartext": true
   },
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": true
   }
 }

@@ -272,6 +272,9 @@ input#q::placeholder { color: var(--text-dim); }
 .mobile-title { display: flex; flex-direction: column; gap: 8px; }
 .title-header-row { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
 .tv-icon-badge { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: var(--r-sm); background: var(--bg-2); border: 1px solid rgba(255,255,255,0.1); font-family: var(--mono); font-weight: 800; font-size: 18px; color: var(--text-muted); flex-shrink: 0; }
+.tv-icon-badge-logo { padding: 5px; }
+.tv-icon-badge .tv-icon-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.tv-icon-badge.tv-icon-badge-letter { color: var(--accent); background: rgba(var(--accent-rgb), .12); border-color: rgba(var(--accent-rgb), .4); font-size: 16px; }
 .title-main { font-family: var(--serif); font-size: 32px; font-weight: 800; line-height: 1.15; margin: 0; background: linear-gradient(135deg, var(--text) 20%, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px; word-break: break-word; }
 
 .title-genres-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 4px; margin-bottom: 4px; }
