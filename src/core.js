@@ -25,11 +25,17 @@ function extractDigitalDate(d) {
 function extractProvidersUA(d) {
   const wp = (d && d['watch/providers'] && d['watch/providers'].results) || {};
   const ua = (wp.UA && wp.UA.flatrate) || (wp.US && wp.US.flatrate) || [];
-  return ua.map(p => ({
-    key: (typeof normalizePlatformInfo === 'function' ? normalizePlatformInfo({ name: p.provider_name }).key : p.provider_name),
-    name: p.provider_name,
-    logo: p.logo_path || null
-  }));
+  return ua.map(p => {
+    const info = typeof normalizePlatformInfo === 'function'
+      ? normalizePlatformInfo({ name: p.provider_name, logo_path: p.logo_path })
+      : null;
+    if (typeof normalizePlatformInfo === 'function' && !info) return null;
+    return {
+      key: info ? info.key : p.provider_name,
+      name: info ? info.name : p.provider_name,
+      logo: (info && info.logo) || p.logo_path || null
+    };
+  }).filter(Boolean);
 }
 
 // ============ STATE ============
