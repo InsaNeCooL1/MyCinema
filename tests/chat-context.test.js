@@ -43,6 +43,10 @@ function build() {
 beforeEach(() => {
   window.cardStack = [];
   window.state = { tab: 'home', home: { recs: null } };
+  // Кожен тест починається з чистого BYOK-стану: інакше модель/ключ
+  // з попереднього тесту витікає в UI налаштувань.
+  localStorage.removeItem('mycinema.geminiKey');
+  window.mcChat.setModel('gemma-4-31b-it');
 });
 
 afterEach(() => {
@@ -290,20 +294,20 @@ describe('chat UI', () => {
     expect(root.classList.contains('open')).toBe(false);
     expect(window.mcChat.handleBack()).toBe(false);
   });
-  it('надсилає запит напряму в OpenRouter із власним ключем', async () => {
+  it('надсилає запит напряму в Gemini API рідним форматом', async () => {
     window.cardStack = [];
     window.state = { tab: 'home', home: { recs: { items: [] } } };
-    window.mcChat.setApiKey('sk-or-v1-test-key');
+    window.mcChat.setApiKey('AIza-test-key');
 
     let captured = null;
     global.fetch = vi.fn(async (url, init) => {
       const u = String(url);
-      if (u.endsWith('/key')) return { ok: true, status: 200 };
+      if (u.endsWith('/models')) return { ok: true, status: 200, json: async () => ({ models: [] }) };
       captured = { url: u, headers: init.headers, body: JSON.parse(init.body) };
       return {
         ok: true,
         headers: { get: () => 'application/json' },
-        json: async () => ({ choices: [{ message: { content: 'Раджу **Прибуття** (2016).' } }] }),
+        json: async () => ({ candidates: [{ content: { parts: [{ text: 'Раджу **Прибуття** (2016).' }] } }] }),
       };
     });
 
@@ -319,17 +323,18 @@ describe('chat UI', () => {
       expect(document.querySelector('.mc-chat-send').textContent).toBe('→');
     }, { timeout: 3000 });
 
-    expect(captured.url).toBe('https://openrouter.ai/api/v1/chat/completions');
-    expect(captured.headers.Authorization).toBe('Bearer sk-or-v1-test-key');
-    expect(captured.body.model).toBe('google/gemini-2.5-flash');
-    expect(captured.body.stream).toBe(true);
-    expect(captured.body.messages[0].role).toBe('system');
-    expect(captured.body.messages[0].content).toContain('Кіно-помічник');
-    expect(captured.body.messages[0].content).toContain('CONTEXT_JSON:');
-    expect(captured.body.messages[captured.body.messages.length - 1]).toEqual({
+    expect(captured.url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:streamGenerateContent?alt=sse');
+    expect(captured.headers['x-goog-api-key']).toBe('AIza-test-key');
+    const system = captured.body.system_instruction.parts[0].text;
+    expect(system).toContain('Кіно-помічник');
+    expect(system).toContain('CONTEXT_JSON:');
+    expect(system).toContain('кінодруг');
+    expect(system).toContain('Рамки');
+    expect(captured.body.contents[captured.body.contents.length - 1]).toEqual({
       role: 'user',
-      content: 'Що подивитись на вечір?',
+      parts: [{ text: 'Що подивитись на вечір?' }],
     });
+    expect(captured.body.generationConfig.maxOutputTokens).toBe(800);
 
     const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
     expect(bubble.querySelector('strong').textContent).toBe('Прибуття');
@@ -350,25 +355,30 @@ describe('chat BYOK — ключ у налаштуваннях', () => {
     expect(global.fetch).not.toHaveBeenCalled();
     expect(document.querySelector('.mc-chat-messages').textContent).toContain('вставте ключ');
 
-    window.mcChat.setApiKey('  sk-or-v1-abc  ');
-    expect(localStorage.getItem('mycinema.openrouterKey')).toBe('sk-or-v1-abc');
+    window.mcChat.setApiKey('  AIza-abc  ');
+    expect(localStorage.getItem('mycinema.geminiKey')).toBe('AIza-abc');
     expect(window.mcChat.hasKey()).toBe(true);
-    window.mcChat.setModel('meta-llama/llama-3.3-70b-instruct');
-    expect(localStorage.getItem('mycinema.openrouterModel')).toBe('meta-llama/llama-3.3-70b-instruct');
+    window.mcChat.setModel('gemini-3.5-flash-lite');
+    expect(localStorage.getItem('mycinema.geminiModel')).toBe('gemini-3.5-flash-lite');
     window.mcChat.close();
   });
 
-  it('перевірка ключа ходить на /key і не витрачає токени', async () => {
+  it('перевірка ключа ходить на /models і не витрачає токени', async () => {
     let called = '';
     global.fetch = vi.fn(async (url) => {
       called = String(url);
-      return { ok: true, status: 200 };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ models: [{ name: 'models/gemma-4-31b-it' }, { name: 'models/gemini-3.5-flash-lite' }] }),
+      };
     });
-    window.mcChat.setApiKey('sk-or-v1-abc');
+    window.mcChat.setApiKey('AIza-abc');
     const result = await window.mcChat.checkKey(true);
     expect(result.ok).toBe(true);
-    expect(called).toBe('https://openrouter.ai/api/v1/key');
-    expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-or-v1-abc');
+    expect(called).toBe('https://generativelanguage.googleapis.com/v1beta/models');
+    expect(global.fetch.mock.calls[0][1].headers['x-goog-api-key']).toBe('AIza-abc');
+    expect(result.models).toEqual(['gemma-4-31b-it', 'gemini-3.5-flash-lite']);
   });
 
   it('помилка 401 пояснює, що ключ треба замінити', () => {
@@ -389,8 +399,9 @@ describe('chat BYOK — ключ у налаштуваннях', () => {
     const keyInput = section.querySelector('#mc-chat-api-key');
     expect(keyInput).toBeTruthy();
     expect(keyInput.type).toBe('password');
-    expect(keyInput.placeholder).toMatch(/sk-or/);
-    expect(section.querySelector('.mc-chat-api-link').getAttribute('href')).toBe('https://openrouter.ai/keys');
+    expect(keyInput.placeholder).toMatch(/AIza/);
+    expect(section.querySelector('.mc-chat-api-link').getAttribute('href')).toBe('https://aistudio.google.com/apikey');
+    expect(section.querySelector('.mc-chat-settings-hint').textContent).toContain('Gemini API');
 
     const show = section.querySelector('.mc-chat-api-show');
     // Кнопка «око» не повинна мати .settings-btn (там width:100% — вона стискає поле вводу).
@@ -405,20 +416,68 @@ describe('chat BYOK — ключ у налаштуваннях', () => {
     const modelSelect = section.querySelector('#mc-chat-api-model');
     expect(modelSelect.tagName).toBe('SELECT');
     expect(section.querySelector('input[type="text"]')).toBeFalsy();
-    expect(modelSelect.options.length).toBeGreaterThan(10);
     const ids = Array.from(modelSelect.options).map((o) => o.value);
-    expect(ids).toContain('google/gemini-2.5-flash');
-    expect(ids).toContain('deepseek/deepseek-v4.1-flash-1017');
-    expect(ids).toContain('openai/gpt-6-luna');
-    expect(ids).toContain('nvidia/nemotron-3-ultra-550b-a55b:free');
+    expect(ids).toEqual(['gemma-4-31b-it', 'gemini-3.5-flash-lite']);
+    expect(modelSelect.value).toBe('gemma-4-31b-it');
 
-    global.fetch = vi.fn(async () => ({ ok: true, status: 200 }));
-    keyInput.value = '  sk-or-v1-from-ui  ';
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ models: [{ name: 'models/gemma-4-31b-it' }, { name: 'models/gemini-3.5-flash-lite' }] }),
+    }));
+    keyInput.value = '  AIza-from-ui  ';
     section.querySelector('.mc-chat-api-save').click();
-    expect(localStorage.getItem('mycinema.openrouterKey')).toBe('sk-or-v1-from-ui');
+    expect(localStorage.getItem('mycinema.geminiKey')).toBe('AIza-from-ui');
     await vi.waitFor(() => {
       expect(document.querySelector('#mc-chat-model-status').textContent).toMatch(/Ключ працює/);
     }, { timeout: 2000 });
+  });
+
+  it('не показує thought-частини рідного стрімінгу Gemini', async () => {
+    window.cardStack = [];
+    window.state = { tab: 'home', home: { recs: { items: [] } } };
+    window.mcChat.setModel('gemma-4-31b-it');
+    window.mcChat.setApiKey('AIza-stream');
+    const sse = [
+      'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Внутрішній ланцюг', thought: true }] } }] }) + '\n\n',
+      'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Раджу ' }, { text: '«Дюну»' }] } }] }) + '\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+    const bytes = new TextEncoder().encode(sse);
+    let served = false;
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      headers: { get: () => 'text/event-stream' },
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (served) return { done: true };
+            served = true;
+            return { done: false, value: bytes };
+          },
+        }),
+      },
+    }));
+    if (!document.querySelector('.mc-chat-root').classList.contains('open')) {
+      document.querySelector('.mc-chat-fab').click();
+    }
+    document.querySelector('.mc-chat-input').value = 'Що подивитись?';
+    document.querySelector('.mc-chat-compose').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+
+    await vi.waitFor(() => {
+      const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
+      expect(bubble.textContent).toContain('Раджу «Дюну»');
+      expect(bubble.textContent).not.toContain('Внутрішній ланцюг');
+    }, { timeout: 3000 });
+    window.mcChat.clear(true);
+    window.mcChat.close();
+  });
+
+  it('у клієнті не лишилося OpenRouter', () => {
+    const src = fs.readFileSync('src/chat.js', 'utf-8');
+    const cfg = fs.readFileSync('src/config.js', 'utf-8');
+    expect(src).not.toMatch(/openrouter/i);
+    expect(cfg).not.toMatch(/openrouter/i);
   });
 
   it('вікно чату лежить поверх картки на десктопі', () => {
@@ -431,21 +490,26 @@ describe('chat BYOK — ключ у налаштуваннях', () => {
 
   it('вибір моделі зі списку зберігається одразу', async () => {
     global.fetch = vi.fn(async () => ({ ok: true, status: 200 }));
-    window.mcChat.setApiKey('sk-or-v1-abc');
+    window.mcChat.setApiKey('AIza-abc');
     const select = document.querySelector('#mc-chat-api-model');
-    select.value = 'z-ai/glm-5.3-flash';
+    select.value = 'gemini-3.5-flash-lite';
     select.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(localStorage.getItem('mycinema.openrouterModel')).toBe('z-ai/glm-5.3-flash');
+    expect(localStorage.getItem('mycinema.geminiModel')).toBe('gemini-3.5-flash-lite');
     await vi.waitFor(() => {
-      expect(document.querySelector('#mc-chat-model-status').textContent).toContain('z-ai/glm-5.3-flash');
+      expect(document.querySelector('#mc-chat-model-status').textContent).toContain('gemini-3.5-flash-lite');
     }, { timeout: 2000 });
   });
 
-  it('раніше вписана своя модель не губиться у списку', () => {
-    window.mcChat.setModel('my-provider/my-model');
-    const select = document.querySelector('#mc-chat-api-model');
-    expect(select.value).toBe('my-provider/my-model');
-    expect(Array.from(select.options).some((o) => o.value === 'my-provider/my-model')).toBe(true);
+  it('недоступна для ключа модель позначається попередженням', async () => {
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ models: [{ name: 'models/gemma-4-31b-it' }] }),
+    }));
+    window.mcChat.setApiKey('AIza-abc');
+    window.mcChat.setModel('gemini-3.5-flash-lite');
+    await window.mcChat.checkKey(true);
+    expect(document.querySelector('#mc-chat-model-status').textContent).toMatch(/недоступна/i);
   });
 
   it('поле API ховається, коли бота вимкнено, і з’являється при увімкненні', () => {
