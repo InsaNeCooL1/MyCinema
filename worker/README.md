@@ -5,26 +5,37 @@
 цей файл — вихідник, який вставляється в Cloudflare Worker
 (Dashboard → Workers → `mycinema-proxy` → Edit code).
 
-`worker/index.js` — повна заміна поточного воркера: старий TMDB/OMDb-проксі
-залишився недоторканим, додано лише `POST /imdb/batch`.
+`worker/index.js` — повна заміна поточного воркера: логіка TMDB/OMDb-проксі
+не змінилася, додано `POST /imdb/batch`. Усі ключі тепер читаються тільки з
+CF secrets — у коді немає жодного ключа.
 
-> ⚠️ **Ключів у коді немає.** MDBList-ключ читається тільки з CF secret
-> `MDBLIST_KEY` (`env.MDBLIST_KEY`). `worker/index.js` не комітиться (див.
-> `.gitignore`), але навіть у ньому ключ не зберігається — репо публічне.
->
-> 🔑 Ключ, який використовувався раніше, потрапив у публічний коміт і в чат —
-> **його треба ротувати** в кабінеті MDBList, після чого оновити CF secret:
-> `wrangler secret put MDBLIST_KEY` і перезадеплоїти цю версію файлу.
-> Живий воркер зараз ще працює на старому ключі з константи (у задеплоєному
-> коді), тому після ротації його треба оновити — інакше `/imdb/batch` почне
-> повертати помилку, а клієнт тихо впаде на TMDB.
+## Секрети (усі три обов'язкові)
+
+| Secret | Використовується | Що ламається без нього |
+|---|---|---|
+| `MDBLIST_KEY` | `POST /imdb/batch` | `500 MDBLIST_KEY not configured`, клієнт падає на TMDB |
+| `TMDB_KEY` | `GET /*` (каталог, discover, постери) | `500 TMDB_KEY not configured`, стрічка рекомендацій порожня |
+| `OMDB_KEY` | `GET /omdb?i=...` | `500 OMDB_KEY not configured`, не працює пошук по IMDb-id |
+
+```bash
+wrangler secret put MDBLIST_KEY
+wrangler secret put TMDB_KEY
+wrangler secret put OMDB_KEY
+```
+
+> 🔑 Старі значення (MDBList потрапив у публічний коміт і чат; TMDB/OMDb були
+> константами у вихідному коді воркера) — **ротуємо всі**. Живий воркер зараз
+> ще працює на старих константах у задеплоєному коді, тому після ротації треба
+> **спочатку виставити три нові секрети, а потім задеплоїти цей `index.js`**.
+> Помилка в цьому порядку = усі маршрути воркера повертають помилку.
+> APK перезбирати не потрібно: ключі в APK немає, він ходить на той самий URL.
 
 ## Що додано
 
 | Метод | Шлях | Що робить |
 |---|---|---|
 | `POST` | `/imdb/batch` | `tmdb_id → { imdbId, imdbRating, imdbVotes }` пачкою |
-| `OPTIONS` | будь-який | CORSpreflight (додано `POST` до `Allow-Methods`) |
+| `OPTIONS` | будь-який | CORS preflight (додано `POST` до `Allow-Methods`) |
 
 Старі шляхи (`/movie/550`, `/tv/1396`, `/omdb?i=tt...`) працюють як і раніше.
 
@@ -95,25 +106,29 @@ Content-Type: application/json
   `X-RateLimit-Remaining` зменшується на 1 за чанк; `/user` можна викликати
   для перевірки квоти без витрати.
 
-## Деплой (порядок)
+## Деплой (порядок — важливо)
 
-1. **Спочатку ротувати MDBList-ключ** (кабінет MDBList → API keys → regenerate)
-   й зберегти нове значення:
+1. **Ротувати всі три ключі** в кабінетах MDBList / TMDB / OMDb.
+2. **Виставити три нові секрети** (не вставляти ключі в код!):
    ```bash
    wrangler secret put MDBLIST_KEY
-   # ввести НОВИЙ ключ (не той, що був у чаті/коміті)
+   wrangler secret put TMDB_KEY
+   wrangler secret put OMDB_KEY
    ```
-2. Вставити `worker/index.js` у `mycinema-proxy` у Cloudflare Dashboard, Deploy.
-   Код очікує секрет `MDBLIST_KEY`; константи з ключем у файлі немає.
-   ⚠️ Якщо задеплоїти до того, як виставити секрет, `/imdb/batch` відповість `500`.
-3. Опційно створити KV namespace `IMDB_CACHE` і прив'язати його в налаштуваннях
+3. Вставити `worker/index.js` у `mycinema-proxy` у Cloudflare Dashboard, Deploy.
+   ⚠️ Поки секрети не виставлені — не деплоїти: усі маршрути повертають `500`.
+4. Опційно створити KV namespace `IMDB_CACHE` і прив'язати його в налаштуваннях
    воркера (інакше працює Cache API).
-4. Перевірка:
+5. Перевірка всіх трьох маршрутів:
    ```bash
-   curl -X POST https://mycinema-proxy.insaneteresh123.workers.dev/imdb/batch \
+   curl -s -X POST https://mycinema-proxy.insaneteresh123.workers.dev/imdb/batch \
      -H 'Content-Type: application/json' \
      -d '{"movies":[278,550],"tv":[1396]}'
+   curl -s 'https://mycinema-proxy.insaneteresh123.workers.dev/movie/550?language=uk-UA'
+   curl -s 'https://mycinema-proxy.insaneteresh123.workers.dev/omdb?i=tt0903747'
    ```
+   Усі мають повернути дані (не `500 ... not configured`). Старі ключі після
+   ротації повертатимуть 401/429 — якщо таке бачиш, у задеплоєному коді ще константи.
 
 ## Наступні кроки (поки не робив)
 
@@ -125,4 +140,6 @@ Content-Type: application/json
       `REC_PRIORS`, `imdbLoadFor()` для бібліотеки й пулу кандидатів).
 - [x] Два фікси: насичення `b` режимними бонусами (`recBaseScore`) + mood-витік
       у `_sourceRaw` (`REC_MOOD_SOURCE_CAP`).
-- [ ] Ротація MDBList-ключа й оновлення CF secret `MDBLIST_KEY` (поза репо).
+- [ ] Ротація **всіх трьох** ключів (MDBList / TMDB / OMDb) і виставлення CF
+      secret `MDBLIST_KEY`, `TMDB_KEY`, `OMDB_KEY`, потім перезадеплой воркера
+      (поза репо). APK перезбирати не потрібно — ключів у ньому немає.
