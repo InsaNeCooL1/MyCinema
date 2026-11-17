@@ -831,6 +831,7 @@ function mergeCloudExtras(cloud) {
 
   if (cloud.appearance) applyCloudAppearance(cloud.appearance);
   if (cloud.online) { if (applyCloudOnline(cloud.online)) changed = true; }
+  if (cloud.gemini) { if (applyCloudGemini(cloud.gemini)) changed = true; }
 
   return changed;
 }
@@ -906,6 +907,21 @@ function applyCloudOnline(c) {
   try { localStorage.setItem(LS_ONLINE, JSON.stringify(next)); } catch (e) {}
   try { localStorage.setItem('mycinema.room', JSON.stringify({ url: next.roomUrl })); } catch (e) {}
   return true;
+}
+
+// Ключ Gemini живе в профілі акаунта разом з іншими налаштуваннями онлайн.
+// Порівнюємо за ts: хто останній змінив ключ — той і перемагає.
+function getGeminiCloudPayload() {
+  if (window.mcChat && typeof window.mcChat.getCloudKey === 'function') {
+    return window.mcChat.getCloudKey();
+  }
+  return { key: '', ts: 0 };
+}
+
+function applyCloudGemini(g) {
+  if (!g || typeof g !== 'object') return false;
+  if (!window.mcChat || typeof window.mcChat.applyCloudKey !== 'function') return false;
+  return window.mcChat.applyCloudKey({ key: g.key || '', ts: g.ts || 0 });
 }
 
 function applyCloudAppearance(app) {
@@ -1017,7 +1033,8 @@ async function reconcileWithCloud() {
       actorAdjustTs,
       appearance: getAppearancePayload(),
       deleted: libTombstones,
-      online: getOnlineConfig()
+      online: getOnlineConfig(),
+      gemini: getGeminiCloudPayload()
     },
     updated_at: new Date().toISOString()
   });

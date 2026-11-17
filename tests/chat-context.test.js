@@ -453,6 +453,22 @@ describe('chat BYOK — ключ, ручний вибір моделі, лока
     window.mcChat.close();
   });
 
+  it('ключ Gemini готується до хмари й приймається з профілю за часом зміни', () => {
+    window.mcChat.setApiKey('AIza-sync');
+    const payload = window.mcChat.getCloudKey();
+    expect(payload.key).toBe('AIza-sync');
+    expect(payload.ts).toBeGreaterThan(0);
+    expect(Number(localStorage.getItem('mycinema.geminiKeyTs'))).toBe(payload.ts);
+    expect(window.getGeminiCloudPayload()).toEqual(payload);
+
+    window.applyCloudGemini({ key: 'AIza-cloud', ts: payload.ts + 1000 });
+    expect(window.mcChat.getCloudKey()).toEqual({ key: 'AIza-cloud', ts: payload.ts + 1000 });
+
+    // Старіший ключ з іншого пристрою не перезаписує новіший.
+    window.applyCloudGemini({ key: 'AIza-old', ts: payload.ts - 1000 });
+    expect(window.mcChat.getCloudKey().key).toBe('AIza-cloud');
+  });
+
   it('перевірка ключа ходить на /models без витрати токенів і показує обрану модель', async () => {
     global.fetch = vi.fn(async () => ({
       ok: true,

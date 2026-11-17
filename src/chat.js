@@ -12,6 +12,7 @@
   var MC_CHAT_HISTORY_KEY = 'mycinema.chat.v1';
   var MC_CHAT_ENABLED_KEY = 'mycinema.aiEnabled';
   var MC_AI_KEY_KEY = 'mycinema.geminiKey';
+  var MC_AI_KEY_TS_KEY = 'mycinema.geminiKeyTs';
   var MC_AI_QUOTA_KEY = 'mycinema.geminiQuota';
   var MC_AI_MODEL_KEY = 'mycinema.geminiModel';
   var MC_AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
@@ -189,17 +190,53 @@
     try { return String(localStorage.getItem(MC_AI_KEY_KEY) || '').trim(); } catch (_) { return ''; }
   }
 
-  function mcSaveKey(value) {
-    var clean = String(value == null ? '' : value).replace(/\s+/g, '').trim();
-    var changed = clean !== mcGetKey();
+  function mcGetKeyTs() {
+    try {
+      var ts = Number(localStorage.getItem(MC_AI_KEY_TS_KEY));
+      return isFinite(ts) && ts > 0 ? ts : 0;
+    } catch (_) { return 0; }
+  }
+
+  function mcSetKeyLocal(clean, ts) {
     try {
       if (clean) localStorage.setItem(MC_AI_KEY_KEY, clean);
       else localStorage.removeItem(MC_AI_KEY_KEY);
+      localStorage.setItem(MC_AI_KEY_TS_KEY, String(ts));
     } catch (_) {}
     mcChat.health = null;
     mcChat.healthTs = 0;
+  }
+
+  // Покет для хмари профілю: ключ + момент останньої локальної зміни.
+  function mcGetCloudKey() {
+    return { key: mcGetKey(), ts: mcGetKeyTs() };
+  }
+
+  // Застосовуємо ключ, що прийшов з хмари, без зворотного запису — інакше
+  // синхронізація зациклиться. Старіші версії ігноруємо.
+  function mcApplyCloudKey(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    var ts = Number(payload.ts) || 0;
+    if (ts <= mcGetKeyTs()) return false;
+    var clean = String(payload.key == null ? '' : payload.key).replace(/\s+/g, '').trim();
+    var changed = clean !== mcGetKey();
+    mcSetKeyLocal(clean, ts);
+    if (changed) mcClearQuota();
+    mcUpdateSettingsStatus();
+    return true;
+  }
+
+  function mcSaveKey(value) {
+    var clean = String(value == null ? '' : value).replace(/\s+/g, '').trim();
+    var changed = clean !== mcGetKey();
+    mcSetKeyLocal(clean, Date.now());
     // Блокування моделей належать проєкту, але новий ключ = новий початок.
     if (changed) mcClearQuota();
+    // Ключ тепер частина профілю: зберігаємо в хмару разом з іншими налаштуваннями.
+    if (typeof saveToCloud === 'function') {
+      saveToCloud().catch(function (e) { console.warn('[mcSaveKey][cloud]', e); });
+    }
+    mcUpdateSettingsStatus();
     return clean;
   }
 
@@ -1659,8 +1696,10 @@
     apiBlock.id = 'mc-chat-api-block';
 
     var hint = mcEl('div', 'notes-hint mc-chat-settings-hint',
-      'Власний ключ Gemini API: запит іде напряму з телефону в Google, ключ зберігається тільки тут і не синхронізується. ' +
-      'Боту надсилаються назва й опис поточної картки, рекомендації та стислий профіль смаку — нотатки, email і акаунт ні.');
+      'Власний ключ Gemini API: запити йдуть напряму з пристрою в Google. ' +
+      'Ключ зберігається локально й синхронізується з твоїм акаунтом, щоб не вводити його на кожному пристрої. ' +
+      'У запит до Gemini не потрапляють нотатки, email чи дані акаунта — тільки назва й опис поточної картки, ' +
+      'рекомендації та стислий профіль смаку.');
 
     var keyLabel = mcEl('label', 'mc-chat-api-label', 'API-ключ Gemini');
     keyLabel.setAttribute('for', 'mc-chat-api-key');
@@ -1818,6 +1857,9 @@
     markdown: mcMarkdown,
     setApiKey: function (key) { return mcSaveKey(key); },
     hasKey: function () { return !!mcGetKey(); },
+    getCloudKey: mcGetCloudKey,
+    applyCloudKey: mcApplyCloudKey,
+    getKeyTs: mcGetKeyTs,
     checkKey: mcCheckKey,
     getModel: mcGetSelectedModel,
     setModel: mcSaveSelectedModel,
