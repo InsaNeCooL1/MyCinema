@@ -73,5 +73,11 @@
   - Один токен `--white-rgb` замість 20 окремих `--white-04`: той самий ефект, менше шуму в `:root`.
   - Свідомо залишено 24 solid-white (alpha ≥ 0.6): сніг, плашки логотипів, білі іконки. Це не overlay, і вони не мають залежати від теми.
   - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
-- [ ] Етап B, крок 3: `!important` у desktop-media
+- [x] Етап B, крок 3: прибрано 104 `!important` із desktop-блоку `styles/95-layout-a11y.css` (`@media (min-width: 900px) and (min-height: 600px)`)
+  - Загальна кількість `!important`: **220 → 116**.
+  - Свідомо залишено 4 у блоці, бо вони розв'язують реальні конфлікти каскаду: `.nav-item` `height`/`margin` (38px і 0 vs 36px/4px у `40-nav.css`/`99-final.css`), `.search-container` `background`/`border` (скляна тема з `70-fixes-settings.css`).
+  - Видалено дубль `.sidebar-footer .icon-compact-btn .btn-label { display: none }` — той самий селектор уже є в `40-nav.css` із `display: none !important`.
+  - Перевірено: жоден JS inline-стиль не перекриває ці правила; у пізніших модулях (97, 99) немає правил із тим самим селектором+властивістю.
+  - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
+  - ⚠️ Потрібен візуальний smoke-тест на десктопі/APK (■ неможливо перевірити статично).
 - [ ] Етап B, крок 4: мертві класи (`mood-section`, `card-hero-stop`, `desktop-block-title`, `desktop-similar-block`)
