@@ -60,6 +60,7 @@
     timedOut: false,
     stoppedByUser: false,
     lastUserText: '',
+    lastApiError: null,
     previousFocus: null,
     els: null,
     streamBubble: null,
@@ -1132,6 +1133,18 @@
     return e;
   }
 
+  // Діагностика останньої помилки конкретної моделі — не показуємо
+  // користувачу, але залишаємо в window.mcChat._state.lastApiError.
+  function mcSetLastApiError(model, err) {
+    mcChat.lastApiError = {
+      model: model,
+      status: err && err.status ? err.status : 0,
+      message: err && err.message ? err.message : String(err || 'Невідома помилка.'),
+      data: err && err.data ? err.data : null,
+      ts: Date.now()
+    };
+  }
+
   // Рідний формат Google: candidates[0].content.parts[].text.
   // Частини з thought:true — внутрішнє міркування моделі, не показуємо його,
   // але зберігаємо сирі parts (з thoughtSignature) для наступного запиту.
@@ -1239,7 +1252,11 @@
 
   async function mcSend(text, opts) {
     text = String(text == null ? '' : text).trim();
-    if (!text || mcChat.busy) return;
+    if (!text) return;
+    if (mcChat.busy) {
+      mcShowSystemNote('Зачекайте, попередня відповідь ще обробляється.');
+      return;
+    }
     var apiKey = mcGetKey();
     if (!apiKey) {
       mcOpen();
@@ -1291,6 +1308,7 @@
       var done = false;
       var quotaHit = false;
       var unavailable = false;
+      var serverHit = false;
 
       for (var ci = 0; ci < chain.length && !done; ci++) {
         var model = chain[ci];
@@ -1366,6 +1384,11 @@
             break;
           }
         } catch (err) {
+          var abortedFetch = err && (err.name === 'AbortError' || String(err.message || '').toLowerCase().indexOf('abort') >= 0);
+          if (abortedFetch) throw err;
+          mcSetLastApiError(model, err);
+          var status = err && err.status;
+          if (status && !isNaN(Number(status))) status = Number(status);
           // 429 — тихий даунгрейд: ховаємо модель до retryDelay і беремо
           // наступну з каскаду в тому самому запиті користувача.
           if (err && err.rateLimited) {
@@ -1373,8 +1396,15 @@
             quotaHit = true;
             continue;
           }
-          if (err && err.status === 404) {
+          if (status === 404) {
             unavailable = true;
+            continue;
+          }
+          // 5xx і мережеві/парсинг-помилки можуть бути тимчасовими для
+          // конкретної моделі — тихо пробуємо наступну з каскаду.
+          if ((typeof status === 'number' && status >= 500) || !status) {
+            serverHit = true;
+            console.warn('[MyCinema][Gemini] ' + model + ': ' + (err && err.message ? err.message : 'помилка запиту'), err && err.data ? err.data : '');
             continue;
           }
           throw err;
@@ -1386,7 +1416,9 @@
           ? 'Сьогодні безкоштовні ліміти Gemini вичерпані для всіх моделей. Зачекайте трохи — я повернуся.'
           : (unavailable
             ? 'Наразі жодна з моделей Gemini недоступна. Спробуйте пізніше.'
-            : 'Не вдалося отримати відповідь. Спробуйте ще раз.'));
+            : (serverHit
+              ? 'Gemini API тимчасово недоступний. Спробуйте ще раз пізніше.'
+              : 'Не вдалося отримати відповідь. Спробуйте ще раз.')));
       }
     } catch (e) {
       assistant.streaming = false;

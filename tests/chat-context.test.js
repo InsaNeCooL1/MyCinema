@@ -90,6 +90,14 @@ function quotaResponse(delay) {
   };
 }
 
+function serverResponse(status = 503) {
+  return {
+    ok: false,
+    status,
+    json: async () => ({ error: { code: status, message: 'temporarily unavailable' } }),
+  };
+}
+
 function submitChat(text) {
   const root = document.querySelector('.mc-chat-root');
   if (!root || !root.classList.contains('open')) {
@@ -530,6 +538,30 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
 
     const quota = JSON.parse(localStorage.getItem('mycinema.geminiQuota'));
     expect(Number(quota['gemini-4-hydrogen'])).toBeGreaterThan(Date.now());
+  });
+
+  it('500/503 тихо переводить запит на наступну модель каскаду', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    window.mcChat.setApiKey('AIza-abc');
+    window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(serverResponse(503))
+      .mockResolvedValueOnce(jsonResponse({
+        candidates: [{ content: { parts: [{ text: 'Раджу «Дюну»' }] } }],
+      }));
+
+    submitChat('Порадь серіал на кілька вечорів');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble').textContent).toContain('Раджу «Дюну»');
+    }, { timeout: 3000 });
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
+    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.8-flash');
+    expect(document.querySelector('.mc-chat-error')).toBeNull();
+    expect(window.mcChat._state.lastApiError).toMatchObject({ model: 'gemini-4-hydrogen', status: 503 });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('моделі, яких немає в /models, пропускаються без помилки користувачу', async () => {
