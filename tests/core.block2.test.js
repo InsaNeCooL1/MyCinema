@@ -79,4 +79,9 @@ describe('Stage 2 & 3: Directors, Wrapped & World Map', () => {
     }
     expect(bad).toBe(0);
   });
+
+  it('карта не містить Антарктиди та РФ', () => {
+    expect(window.MC_WORLD_PATHS.some(p => p.a2 === 'AQ' || p.n === 10)).toBe(false);
+    expect(window.MC_WORLD_PATHS.some(p => p.a2 === 'RU' || p.n === 643)).toBe(false);
+  });
 });

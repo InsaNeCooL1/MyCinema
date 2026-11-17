@@ -125,7 +125,8 @@ async function main() {
   }
 
   const paths = topo.objects.countries.geometries
-    .filter(g => Number(g.id) !== 10) // Антарктида обрізана viewBox — не возимо її в бандлі
+    // Антарктида обрізана viewBox; РФ не відображаємо на карті за бажанням автора.
+    .filter(g => Number(g.id) !== 10 && Number(g.id) !== 643)
     .map(g => {
       const n = Number(g.id);
       let d = toPath(g);
