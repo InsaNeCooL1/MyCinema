@@ -509,7 +509,25 @@
   text-overflow: ellipsis;
 }
 .mc-chat-model-note { margin-top: 5px; font-size: 10.5px; line-height: 1.4; }
-.mc-chat-api-show { flex: 0 0 auto; min-width: 42px; padding: 8px; }
+/* Не додаємо клас .settings-btn — він має width:100% і розтягує рядок. */
+.mc-chat-api-show {
+  flex: 0 0 40px;
+  width: 40px;
+  min-width: 40px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--white-rgb), .12);
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mc-chat-api-show:hover { background: var(--bg-4); color: var(--accent); }
 .mc-chat-api-link {
   display: inline-block;
   margin-top: 6px;

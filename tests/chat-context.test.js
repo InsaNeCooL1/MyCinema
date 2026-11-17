@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import fs from 'node:fs';
 
 // chat.js — класичний скрипт; підвантажуємо його так само, як решта src.
 window.loadScript('src/chat.js');
@@ -392,6 +393,10 @@ describe('chat BYOK — ключ у налаштуваннях', () => {
     expect(section.querySelector('.mc-chat-api-link').getAttribute('href')).toBe('https://openrouter.ai/keys');
 
     const show = section.querySelector('.mc-chat-api-show');
+    // Кнопка «око» не повинна мати .settings-btn (там width:100% — вона стискає поле вводу).
+    expect(show.classList.contains('settings-btn')).toBe(false);
+    const css = fs.readFileSync('styles/85-chat.css', 'utf-8');
+    expect(css).toMatch(/\.mc-chat-api-show\s*\{[^}]*width:\s*40px/);
     show.click();
     expect(keyInput.type).toBe('text');
     show.click();

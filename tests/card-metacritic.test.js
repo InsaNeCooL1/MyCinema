@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 
 beforeAll(() => {
   window.loadScript('src/card/mobile.js');
@@ -45,5 +45,28 @@ describe('Metacritic badge на картці фільму', () => {
     const row = ratingsRow({ Ratings: [{ Source: 'Metacritic', Value: '81/100' }] }, 'tv');
     expect(row.querySelector('.rating-mc')).toBeNull();
     expect(row.querySelector('.rating-rt')).toBeNull();
+  });
+});
+
+describe('AI-значок на картці', () => {
+  afterEach(() => { delete window.mcChat; });
+
+  function actions(item = { key: 'movie-1', type: 'movie' }) {
+    return window.MC.createActions({ item, details: { title: 'Test' } });
+  }
+
+  it('з’являється, коли помічник увімкнено, і відкриває його', () => {
+    let opened = 0;
+    window.mcChat = { enabled: () => true, open: () => { opened++; } };
+    const btn = actions().querySelector('.btn-ai');
+    expect(btn).toBeTruthy();
+    expect(btn.textContent).toContain('AI');
+    btn.click();
+    expect(opened).toBe(1);
+  });
+
+  it('не з’являється, коли помічник вимкнено', () => {
+    window.mcChat = { enabled: () => false, open: () => {} };
+    expect(actions({ key: 'tv-1', type: 'tv' }).querySelector('.btn-ai')).toBeFalsy();
   });
 });

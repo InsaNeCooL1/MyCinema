@@ -291,6 +291,17 @@
       };
       wrap.append(uakinoBtn);
     }
+    // AI-значок на картці: відкриває помічника з контекстом поточного тайтлу.
+    if (window.mcChat && typeof window.mcChat.enabled === 'function' && window.mcChat.enabled()) {
+      const aiBtn = el('button', 'btn-ai');
+      aiBtn.innerHTML = '<span class="ai-grad-text">✦ AI</span>';
+      aiBtn.title = 'Спитати AI про цей тайтл';
+      aiBtn.setAttribute('aria-label', 'Відкрити AI-помічника');
+      aiBtn.onclick = () => {
+        if (window.mcChat && typeof window.mcChat.open === 'function') window.mcChat.open();
+      };
+      wrap.append(aiBtn);
+    }
     if (window.mcRoom && window.mcRoom.enabled()) {
       const roomBtn = el('button', 'btn-uakino');
       roomBtn.innerHTML = '<span class="uakino-grad-text">Кімната</span>';

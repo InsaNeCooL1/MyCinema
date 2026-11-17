@@ -1246,7 +1246,7 @@
     keyInput.autocomplete = 'off';
     keyInput.spellcheck = false;
     keyInput.setAttribute('aria-label', 'API-ключ OpenRouter');
-    var showBtn = mcEl('button', 'settings-btn mc-chat-api-show', '👁');
+    var showBtn = mcEl('button', 'mc-chat-api-show', '👁');
     showBtn.type = 'button';
     showBtn.title = 'Показати / сховати ключ';
     keyRow.append(keyInput, showBtn);
