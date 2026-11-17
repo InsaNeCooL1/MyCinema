@@ -783,8 +783,8 @@ html.mc-kbd .home-inline-pill:focus-visible {
 .sync-indicator.saved { color: var(--success); }
 .sync-indicator.error { color: var(--danger); }
 
-#auth-modal, #settings-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .85); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-#settings-modal.open { display: flex; }
+#auth-modal, .settings-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .85); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(8px); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+.settings-modal.open { display: flex; }
 .auth-box, .settings-box { background: var(--bg-1); padding: 26px; border-radius: var(--r-lg); width: 90%; max-width: 400px; box-shadow: 0 20px 60px rgba(0, 0, 0, .6); display: flex; flex-direction: column; gap: 12px; border: 1px solid rgba(var(--white-rgb), .05); max-height: 85vh; overflow-y: auto; }
 .auth-box h2, .settings-box h2 { margin: 0 0 6px; text-align: center; font-size: 20px; font-family: var(--serif); font-weight: 600; font-style: italic; }
 .auth-input { width: 100%; padding: 12px 16px; border: 0; border-radius: var(--r-sm); background: var(--bg-3); color: var(--text); font-size: 14px; outline: none; transition: .2s; }

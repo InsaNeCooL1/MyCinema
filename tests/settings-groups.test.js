@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import fs from 'node:fs';
 
 describe('Налаштування — меню з 4 груп', () => {
   beforeEach(() => {
@@ -33,6 +34,12 @@ describe('Налаштування — меню з 4 груп', () => {
     expect(handleSettingsBack()).toBe(true);
     expect(document.querySelectorAll('.settings-modal.open').length).toBe(0);
     expect(handleSettingsBack()).toBe(false);
+  });
+
+  it('всі групові модалки мають базовий оверлейний стиль (приховані до відкриття)', () => {
+    const css = fs.readFileSync('styles/20-desktop-stats.css', 'utf-8');
+    expect(css).toMatch(/#auth-modal,\s*\.settings-modal\s*\{[^}]*position:\s*fixed[^}]*display:\s*none/);
+    expect(css).toMatch(/\.settings-modal\.open\s*\{\s*display:\s*flex/);
   });
 
   it('перемикач «по мережі» показує й ховає поля парсеру та сервера', () => {
