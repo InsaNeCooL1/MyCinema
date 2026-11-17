@@ -192,8 +192,10 @@ AI-частина винесена **зі воркера в застосунок
 - Кнопка «Перевірити ключ» робить `GET /v1beta/models` — перевіряє ключ і доступні
   моделі, не витрачаючи токенів.
 - Запит іде на `POST /v1beta/models/{model}:streamGenerateContent?alt=sse`
-  з `generationConfig: { thinkingConfig: { thinkingLevel: 'low' }, maxOutputTokens: 1024 }`.
-  Сирі `parts` (з `thoughtSignature`) повертаються в `contents` наступних запитів.
+  з `generationConfig: { thinkingConfig: { thinkingLevel: 'low' }, maxOutputTokens: 4096 }`.
+  Якщо відповідь вийшла порожньою після thinking, той самий запит тихо
+  повторюється з `maxOutputTokens: 8192`. Сирі `parts` (з `thoughtSignature`)
+  повертаються в `contents` наступних запитів.
 - У Cloudflare жодних AI-секретів, KV для ліміту чи додаткових маршрутів не потрібно.
 
 ## Наступні кроки (поки не робив)

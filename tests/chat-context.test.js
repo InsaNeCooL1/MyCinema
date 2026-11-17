@@ -408,7 +408,7 @@ describe('chat UI', () => {
     });
     expect(captured.body.generationConfig).toEqual({
       thinkingConfig: { thinkingLevel: 'low' },
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,
     });
 
     const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
@@ -592,12 +592,36 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     const body = requestBodyAt(0);
     expect(body.generationConfig).toEqual({
       thinkingConfig: { thinkingLevel: 'low' },
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,
     });
     expect(body.generationConfig).not.toHaveProperty('thinkingLevel');
     expect(body.generationConfig).not.toHaveProperty('temperature');
     expect(body.generationConfig).not.toHaveProperty('topP');
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
+  });
+
+  it('порожню thought-only відповідь повторює з більшим лімітом токенів', async () => {
+    window.mcChat.setApiKey('AIza-abc');
+    window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        candidates: [{ content: { parts: [{ text: 'Міркую…', thought: true }] } }],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        candidates: [{ content: { parts: [{ text: 'Раджу «Дюну»' }] } }],
+      }));
+
+    submitChat('Порадь серіал на кілька вечорів');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble').textContent).toContain('Раджу «Дюну»');
+    }, { timeout: 3000 });
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
+    expect(global.fetch.mock.calls[1][0]).toContain('gemini-4-hydrogen');
+    expect(requestBodyAt(0).generationConfig.maxOutputTokens).toBe(4096);
+    expect(requestBodyAt(1).generationConfig.maxOutputTokens).toBe(8192);
+    expect(document.querySelector('.mc-chat-error')).toBeNull();
   });
 
   it('не показує thought, але повертає thoughtSignature у наступному запиті', async () => {

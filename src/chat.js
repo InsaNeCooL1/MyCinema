@@ -1225,6 +1225,18 @@
       });
   }
 
+  function mcBuildBody(contents, maxTokens) {
+    var context = mcBuildContext();
+    return {
+      system_instruction: { parts: [{ text: MC_AI_SYSTEM_PROMPT + '\n\nCONTEXT_JSON:\n' + JSON.stringify(context) }] },
+      contents: contents,
+      generationConfig: {
+        thinkingConfig: { thinkingLevel: 'low' },
+        maxOutputTokens: maxTokens
+      }
+    };
+  }
+
   async function mcSend(text, opts) {
     text = String(text == null ? '' : text).trim();
     if (!text || mcChat.busy) return;
@@ -1267,15 +1279,6 @@
     var lastRow = rows[rows.length - 1];
     mcChat.streamBubble = lastRow ? lastRow.querySelector('.mc-chat-bubble') : null;
 
-    var context = mcBuildContext();
-    var body = {
-      system_instruction: { parts: [{ text: MC_AI_SYSTEM_PROMPT + '\n\nCONTEXT_JSON:\n' + JSON.stringify(context) }] },
-      contents: contents,
-      generationConfig: {
-        thinkingConfig: { thinkingLevel: 'low' },
-        maxOutputTokens: 1024
-      }
-    };
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     mcChat.abort = ctrl;
     mcSetBusy(true);
@@ -1291,10 +1294,6 @@
 
       for (var ci = 0; ci < chain.length && !done; ci++) {
         var model = chain[ci];
-        assistant.content = '';
-        assistant.parts = [];
-        if (mcChat.streamBubble) mcRenderStreamBubble(assistant);
-
         var collected = [];
         var onPart = function (raw) { mcAppendPart(collected, raw); };
         var onDelta = function (delta) {
@@ -1303,44 +1302,69 @@
         };
 
         try {
-          var url = MC_AI_BASE + '/models/' + encodeURIComponent(model) + ':streamGenerateContent?alt=sse';
-          var res = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'x-goog-api-key': apiKey,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body),
-            signal: ctrl ? ctrl.signal : undefined
-          });
+          var maxTokens = 4096;
+          var retriedBigger = false;
 
-          if (!res.ok) {
-            var data = null;
-            try { data = await res.json(); } catch (_) {}
-            throw mcApiError(res.status, data);
-          }
+          while (true) {
+            assistant.content = '';
+            assistant.parts = [];
+            collected = [];
+            if (mcChat.streamBubble) mcRenderStreamBubble(assistant);
 
-          var ctype = (res.headers.get('Content-Type') || '').toLowerCase();
-          var canStream = !!(res.body && typeof res.body.getReader === 'function');
-          if (ctype.indexOf('text/event-stream') >= 0) {
-            if (canStream) await mcReadSse(res, onDelta, mcGeminiDelta, onPart);
-            else mcReadSseText(await res.text(), onDelta, mcGeminiDelta, onPart);
-          } else if (ctype.indexOf('application/json') >= 0 || !canStream) {
-            var json = await res.json();
-            var reply = mcGeminiReply(json, onPart);
-            if (!reply) throw mcApiError(0, json, 'Помічник повернув порожню відповідь. Спробуйте ще раз.');
-            assistant.content = reply;
+            var body = mcBuildBody(contents, maxTokens);
+            var url = MC_AI_BASE + '/models/' + encodeURIComponent(model) + ':streamGenerateContent?alt=sse';
+            var res = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'x-goog-api-key': apiKey,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(body),
+              signal: ctrl ? ctrl.signal : undefined
+            });
+
+            if (!res.ok) {
+              var data = null;
+              try { data = await res.json(); } catch (_) {}
+              throw mcApiError(res.status, data);
+            }
+
+            var ctype = (res.headers.get('Content-Type') || '').toLowerCase();
+            var canStream = !!(res.body && typeof res.body.getReader === 'function');
+            if (ctype.indexOf('text/event-stream') >= 0) {
+              if (canStream) await mcReadSse(res, onDelta, mcGeminiDelta, onPart);
+              else mcReadSseText(await res.text(), onDelta, mcGeminiDelta, onPart);
+            } else if (ctype.indexOf('application/json') >= 0 || !canStream) {
+              var json = await res.json();
+              assistant.content = mcGeminiReply(json, onPart);
+              mcRenderStreamBubble(assistant);
+            } else {
+              await mcReadSse(res, onDelta, mcGeminiDelta, onPart);
+            }
+
+            if (!assistant.content.trim()) {
+              // Gemini 4/3.x рахує thinking у maxOutputTokens. Якщо відповідь
+              // порожня, а thought-частини були — беремо більший запас і
+              // повторюємо ту саму модель, не показуючи помилку користувачу.
+              var hadThought = false;
+              for (var pi = 0; pi < collected.length; pi++) {
+                if (collected[pi].thought || collected[pi].thoughtSignature) { hadThought = true; break; }
+              }
+              if (hadThought && !retriedBigger) {
+                retriedBigger = true;
+                maxTokens = 8192;
+                continue;
+              }
+              throw mcApiError(0, null, 'Gemini не встиг дати відповідь. Спробуйте ще раз.');
+            }
+
+            assistant.parts = mcCleanParts(collected) || [];
+            assistant.streaming = false;
+            mcSaveHistory();
             mcRenderStreamBubble(assistant);
-          } else {
-            await mcReadSse(res, onDelta, mcGeminiDelta, onPart);
+            done = true;
+            break;
           }
-
-          if (!assistant.content.trim()) throw mcApiError(0, null, 'Помічник повернув порожню відповідь. Спробуйте ще раз.');
-          assistant.parts = mcCleanParts(collected) || [];
-          assistant.streaming = false;
-          mcSaveHistory();
-          mcRenderStreamBubble(assistant);
-          done = true;
         } catch (err) {
           // 429 — тихий даунгрейд: ховаємо модель до retryDelay і беремо
           // наступну з каскаду в тому самому запиті користувача.
