@@ -16,7 +16,7 @@
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   color: rgba(255, 255, 255, .85);
-  border: 1px solid rgba(255, 255, 255, .14);
+  border: 1px solid rgba(var(--white-rgb), .14);
   font-size: 11px;
   display: flex;
   align-items: center;
@@ -54,7 +54,7 @@
   color: var(--text-muted);
   font-size: 12.5px;
   font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, .05);
+  border: 1px solid rgba(var(--white-rgb), .05);
   transition: .2s;
 }
 .recs-mode-pill:hover {
@@ -127,7 +127,7 @@
   padding: 10px 12px;
   border-radius: 12px;
   background: var(--bg-1);
-  border: 1px solid rgba(255, 255, 255, .04);
+  border: 1px solid rgba(var(--white-rgb), .04);
   cursor: pointer;
   transition: .15s;
 }
@@ -189,7 +189,7 @@
   padding: 4px;
   border-radius: var(--r-sm);
   background: var(--bg-1);
-  border: 1px solid rgba(255, 255, 255, .06);
+  border: 1px solid rgba(var(--white-rgb), .06);
   margin-bottom: 14px;
 }
 .game-source-pill {

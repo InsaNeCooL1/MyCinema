@@ -55,7 +55,7 @@
 }
 .company-logo-box.empty {
   background: var(--bg-2);
-  border: 1px solid rgba(255, 255, 255, .08);
+  border: 1px solid rgba(var(--white-rgb), .08);
   font-family: var(--serif);
   font-size: 36px;
   font-weight: 800;
@@ -79,7 +79,7 @@
   padding: 4px 10px;
   border-radius: var(--r-xs);
   background: var(--bg-2);
-  border: 1px solid rgba(255, 255, 255, .08);
+  border: 1px solid rgba(var(--white-rgb), .08);
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
@@ -95,7 +95,7 @@
   line-height: 1.55;
   color: var(--text-secondary);
   background: var(--bg-1);
-  border: 1px solid rgba(255, 255, 255, .04);
+  border: 1px solid rgba(var(--white-rgb), .04);
   border-radius: var(--r-md);
   padding: 12px 14px;
   margin-bottom: 16px;
@@ -173,7 +173,7 @@
   font-weight: 800;
   padding: 2px 8px;
   border-radius: var(--r-xs);
-  border: 1px solid rgba(255, 255, 255, .12);
+  border: 1px solid rgba(var(--white-rgb), .12);
 }
 .temp-avatar-badge.hot  { color: var(--mint); background: rgba(157, 229, 195, .14); border-color: rgba(157, 229, 195, .35); }
 .temp-avatar-badge.warm { color: var(--accent); background: rgba(var(--accent-rgb), .14); border-color: rgba(var(--accent-rgb), .35); }
@@ -196,7 +196,7 @@
   overflow-x: auto;
   padding-top: 12px;
   margin-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, .05);
+  border-top: 1px solid rgba(var(--white-rgb), .05);
   scrollbar-width: none;
 }
 .temp-avatar-chips::-webkit-scrollbar { display: none; }
@@ -205,7 +205,7 @@
   padding: 4px 10px;
   border-radius: var(--r-xs);
   background: var(--bg-2);
-  border: 1px solid rgba(255, 255, 255, .06);
+  border: 1px solid rgba(var(--white-rgb), .06);
   color: var(--text-secondary);
   font-size: 11.5px;
   font-family: var(--mono);
@@ -266,7 +266,7 @@
   height: 38px;
   border-radius: var(--r-sm);
   background: var(--bg-2);
-  border: 1px solid rgba(255, 255, 255, .06);
+  border: 1px solid rgba(var(--white-rgb), .06);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -321,7 +321,7 @@
 }
 .share-modal-box {
   background: var(--bg-1);
-  border: 1px solid rgba(255, 255, 255, .08);
+  border: 1px solid rgba(var(--white-rgb), .08);
   border-radius: var(--r-lg);
   padding: 18px;
   width: 100%;

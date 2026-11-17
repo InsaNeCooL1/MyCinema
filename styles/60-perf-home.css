@@ -66,7 +66,7 @@
 }
 .franchise-card {
   background: var(--bg-1);
-  border: 1px solid rgba(255, 255, 255, .04);
+  border: 1px solid rgba(var(--white-rgb), .04);
   border-radius: var(--r-md);
   overflow: hidden;
   transition: border-color .2s;
@@ -100,7 +100,7 @@
   flex-direction: column;
   gap: 6px;
   padding: 0 12px 12px;
-  border-top: 1px solid rgba(255, 255, 255, .04);
+  border-top: 1px solid rgba(var(--white-rgb), .04);
   padding-top: 10px;
 }
 .franchise-part-row {
@@ -169,7 +169,7 @@ input#q::-webkit-search-cancel-button {
         -webkit-overflow-scrolling: touch;
         padding-bottom: 8px !important;
         scrollbar-width: thin !important;
-        scrollbar-color: var(--accent) rgba(255,255,255,0.05) !important;
+        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05) !important;
     }
     .mood-pills::-webkit-scrollbar {
         display: block !important;
@@ -180,7 +180,7 @@ input#q::-webkit-search-cancel-button {
         border-radius: 2px;
     }
     .mood-pills::-webkit-scrollbar-track {
-        background: rgba(255,255,255,0.05);
+        background: rgba(var(--white-rgb), .05);
         border-radius: 2px;
     }
 }
@@ -200,7 +200,7 @@ input#q::-webkit-search-cancel-button {
         padding: 4px !important;
         align-items: center !important;
         scrollbar-width: thin !important;
-        scrollbar-color: var(--accent) rgba(255,255,255,0.05) !important;
+        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05) !important;
     }
     /* Прибираємо скролбар-смужку, бо на десктопі вона зайва (скролимо мишкою/тачем) */
     body #results .mood-pills::-webkit-scrollbar {

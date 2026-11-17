@@ -7,7 +7,7 @@
   height: 32px;
   border-radius: var(--r-sm);
   background: var(--bg-2);
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border: 1px dashed rgba(var(--white-rgb), .2);
   color: var(--text-muted);
   cursor: pointer;
   transition: 0.2s;
@@ -44,7 +44,7 @@
   background: var(--bg-1);
   padding: 16px;
   border-radius: var(--r-lg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--white-rgb), .08);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
   display: flex;
   gap: 8px;

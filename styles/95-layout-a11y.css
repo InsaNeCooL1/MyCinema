@@ -10,7 +10,7 @@
     flex-direction: row !important;
     transform: none !important;
     border-right: none !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-bottom: 1px solid rgba(var(--white-rgb), .05) !important;
     padding: 0 20px !important;
     box-sizing: border-box !important;
     z-index: 1000 !important;
@@ -89,9 +89,9 @@
     width: 100% !important;
     max-width: 100% !important;
     height: 48px !important;
-    background: rgba(255, 255, 255, 0.15) !important;
+    background: rgba(var(--white-rgb), .15) !important;
     backdrop-filter: blur(16px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border: 1px solid rgba(var(--white-rgb), .4) !important;
     border-radius: 24px !important;
     display: flex !important;
     align-items: center !important;

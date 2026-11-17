@@ -69,6 +69,9 @@
 - [x] Етап B, крок 1: прибрано 6 невикористаних токенів (`--rose`, `--tmdb`, `--imdb`, `--rt`, `--shadow`, `--r-full`) і замінено literal `#ff5c5c` на `var(--danger)` у 3 місцях
   - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
   - Візуальних змін немає: `--danger` має те саме значення.
-- [ ] Етап B, крок 2: білі overlay-кольори → токени (`--white-04`, `--white-08` тощо)
+- [x] Етап B, крок 2: 108 білих overlay-кольорів (alpha < 0.6) → `rgba(var(--white-rgb), α)`
+  - Один токен `--white-rgb` замість 20 окремих `--white-04`: той самий ефект, менше шуму в `:root`.
+  - Свідомо залишено 24 solid-white (alpha ≥ 0.6): сніг, плашки логотипів, білі іконки. Це не overlay, і вони не мають залежати від теми.
+  - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
 - [ ] Етап B, крок 3: `!important` у desktop-media
 - [ ] Етап B, крок 4: мертві класи (`mood-section`, `card-hero-stop`, `desktop-block-title`, `desktop-similar-block`)

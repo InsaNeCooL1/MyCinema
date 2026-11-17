@@ -55,7 +55,7 @@
     background: var(--bg-1);
     padding: 16px;
     border-radius: var(--r-md);
-    border: 1px solid rgba(255,255,255,0.04);
+    border: 1px solid rgba(var(--white-rgb), .04);
   }
 
   .desktop-details-block .details-grid {
@@ -87,7 +87,7 @@
     background: var(--bg-1);
     padding: 16px;
     border-radius: var(--r-md);
-    border: 1px solid rgba(255,255,255,0.04);
+    border: 1px solid rgba(var(--white-rgb), .04);
   }
   
   .desktop-similar-block .similar-grid {
@@ -116,7 +116,7 @@
   padding: 8px 16px;
   border-radius: var(--r-sm);
   background: var(--bg-2);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(var(--white-rgb), .08);
   color: var(--text);
   font-size: 13.5px;
   font-weight: 600;
