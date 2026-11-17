@@ -415,7 +415,7 @@ describe('chat UI', () => {
     expect(system).toContain('Уявляй кожен тайтл із короткими тегами');
     expect(system).toContain('окремо подивись на елементи з type: "tv"');
     expect(system).toContain('Не ради нічого з taste.libraryTitles');
-    expect(system).toContain('не завершуй відповідь самим вступом');
+    expect(system).toContain('почни з короткої живої реакції');
     expect(system).toContain('Доктора Хауса');
     expect(system).toContain('Бігущого по лезу');
     expect(captured.body.contents[captured.body.contents.length - 1]).toEqual({

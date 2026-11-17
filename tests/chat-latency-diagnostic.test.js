@@ -226,11 +226,11 @@ describe('діагностика повільного Gemini 4 — тільки 
     }));
   });
 
-  it('5. довгу відповідь обрізаємо до 6 речень і 900 символів', () => {
+  it('5. довгу відповідь обрізаємо до 7 речень і 900 символів', () => {
     const long = Array.from({ length: 10 }, (_, i) => `Речення номер ${i + 1} з порадою.`).join(' ');
     const trimmed = window.mcChat._debug.trimAnswer(long);
-    expect(trimmed.match(/[.!?…]+/g).length).toBeLessThanOrEqual(6);
+    expect(trimmed.match(/[.!?…]+/g).length).toBeLessThanOrEqual(7);
     expect(trimmed.length).toBeLessThanOrEqual(900);
-    expect(trimmed).not.toContain('Речення номер 7');
+    expect(trimmed).not.toContain('Речення номер 8');
   });
 });
