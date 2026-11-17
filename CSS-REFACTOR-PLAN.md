@@ -79,7 +79,7 @@
   - Видалено дубль `.sidebar-footer .icon-compact-btn .btn-label { display: none }` — той самий селектор уже є в `40-nav.css` із `display: none !important`.
   - Перевірено: жоден JS inline-стиль не перекриває ці правила; у пізніших модулях (97, 99) немає правил із тим самим селектором+властивістю.
   - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
-  - ⚠️ Потрібен візуальний smoke-тест на десктопі/APK (■ неможливо перевірити статично).
+  - ✅ Візуальний smoke-тест на десктопі/APK пройдено користувачем: головна, картка, бібліотека, налаштування — без змін. Каскад тримається.
 - [x] Етап B, крок 4: видалено 4 мертві класи (`mood-section`, `card-hero-stop`, `desktop-block-title`, `desktop-similar-block`)
   - Усі чотири зустрічалися **тільки в CSS**, ані в `index.html`, ані в `src/**/*.js`.
   - `mood-section` — контейнер більше не рендериться (`renderMoodPills()` створює лише `mood-pills` / `mood-pill`); прибрано з `60-perf-home.css` і з групи селекторів у `95-layout-a11y.css`.
