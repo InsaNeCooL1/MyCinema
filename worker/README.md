@@ -1,13 +1,23 @@
 # MyCinema Worker — IMDb batch
 
-Локальна база для ендпоїнту `/imdb/batch`. **Не задеплоєно** — це файл, який ти
-вставляєш у Cloudflare Worker (Dashboard → Workers → `mycinema-proxy` → Edit code).
+Локальна база для ендпоїнту `/imdb/batch`. Ендпоїнт **задеплоєно** на
+`https://mycinema-proxy.insaneteresh123.workers.dev/imdb/batch` (URL не змінився);
+цей файл — вихідник, який вставляється в Cloudflare Worker
+(Dashboard → Workers → `mycinema-proxy` → Edit code).
 
 `worker/index.js` — повна заміна поточного воркера: старий TMDB/OMDb-проксі
 залишився недоторканим, додано лише `POST /imdb/batch`.
 
-> ⚠️ `worker/index.js` **не комітиться** (див. `.gitignore`) — усередині API-ключ
-> MDBList. Репо на GitHub, тому ключ має лишитися тільки на воркері.
+> ⚠️ **Ключів у коді немає.** MDBList-ключ читається тільки з CF secret
+> `MDBLIST_KEY` (`env.MDBLIST_KEY`). `worker/index.js` не комітиться (див.
+> `.gitignore`), але навіть у ньому ключ не зберігається — репо публічне.
+>
+> 🔑 Ключ, який використовувався раніше, потрапив у публічний коміт і в чат —
+> **його треба ротувати** в кабінеті MDBList, після чого оновити CF secret:
+> `wrangler secret put MDBLIST_KEY` і перезадеплоїти цю версію файлу.
+> Живий воркер зараз ще працює на старому ключі з константи (у задеплоєному
+> коді), тому після ротації його треба оновити — інакше `/imdb/batch` почне
+> повертати помилку, а клієнт тихо впаде на TMDB.
 
 ## Що додано
 
@@ -77,7 +87,8 @@ Content-Type: application/json
 
 - MDBList: `POST https://api.mdblist.com/tmdb/{movie|show}?apikey=KEY`
   з тілом `{ "ids": [...], "append_to_response": ["ratings"] }`.
-- Ключ читається як `env.MDBLIST_KEY`, інакше береться з константи у файлі.
+- Ключ читається **тільки** як `env.MDBLIST_KEY` (Cloudflare secret).
+  Без нього `/imdb/batch` повертає `500 {"ok":false,"error":"MDBLIST_KEY not configured"}`.
 - Кеш **7 днів**: якщо є KV-бinding `IMDB_CACHE` — використовується він;
   інакше — `caches.default` з синтетичним GET-ключем (працює одразу, без KV).
 - Витрата квоти: 1 запит на кожні 200 ID на тип. Перевірено:
@@ -86,13 +97,15 @@ Content-Type: application/json
 
 ## Деплой (порядок)
 
-1. Вставити `worker/index.js` у `mycinema-proxy` у Cloudflare Dashboard, Deploy.
-2. **Бажано** замість константи зробити секрет:
+1. **Спочатку ротувати MDBList-ключ** (кабінет MDBList → API keys → regenerate)
+   й зберегти нове значення:
    ```bash
    wrangler secret put MDBLIST_KEY
-   # ввести: l3p9jo493pa2i7phupvh5cm8k
+   # ввести НОВИЙ ключ (не той, що був у чаті/коміті)
    ```
-   і видалити рядок `const MDBLIST_KEY = '...'` — лишиться `env.MDBLIST_KEY`.
+2. Вставити `worker/index.js` у `mycinema-proxy` у Cloudflare Dashboard, Deploy.
+   Код очікує секрет `MDBLIST_KEY`; константи з ключем у файлі немає.
+   ⚠️ Якщо задеплоїти до того, як виставити секрет, `/imdb/batch` відповість `500`.
 3. Опційно створити KV namespace `IMDB_CACHE` і прив'язати його в налаштуваннях
    воркера (інакше працює Cache API).
 4. Перевірка:
@@ -108,5 +121,8 @@ Content-Type: application/json
       кеш на 7 днів (`mcCacheGet/Set`), `ok:false` → fallback на TMDB.
       Покритий `tests/imdb-ratings.test.js` (7 тестів).
 - [x] Підключення хелпера в `build.js` **перед** `src/home.js`.
-- [ ] Big-bang перехід математики на IMDb (residual у сідах і профілях акторів).
-- [ ] Два фікси: насичення `b` режимними бонусами + mood-витік у `_sourceRaw`.
+- [x] Big-bang перехід математики на IMDb (residual у сідах і профілях акторів,
+      `REC_PRIORS`, `imdbLoadFor()` для бібліотеки й пулу кандидатів).
+- [x] Два фікси: насичення `b` режимними бонусами (`recBaseScore`) + mood-витік
+      у `_sourceRaw` (`REC_MOOD_SOURCE_CAP`).
+- [ ] Ротація MDBList-ключа й оновлення CF secret `MDBLIST_KEY` (поза репо).

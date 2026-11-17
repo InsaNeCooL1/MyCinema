@@ -304,8 +304,13 @@ function getItemFranchiseKey(item) {
 function computeActorProfiles() {
   const items = Object.values(lib);
 
+  // IMDb як джерело залишку; якщо даних немає — tmdbRating (timely fallback).
+  const refOf = (item) => (typeof imdbRef === 'function')
+    ? imdbRef(item).rating
+    : (Number(item && item.tmdbRating) || 0);
+
   const ratedCastItems = items
-    .map(item => ({ item, castRating: getItemCastRating(item) }))
+    .map(item => ({ item, castRating: getItemCastRating(item), refRating: refOf(item) }))
     .filter(x => x.castRating > 0);
 
   // Історичне середнє критерію «Персонажі і каст»
@@ -313,9 +318,11 @@ function computeActorProfiles() {
     ? ratedCastItems.reduce((s, x) => s + x.castRating, 0) / ratedCastItems.length
     : 7.2;
 
-  const tmdbPairs = ratedCastItems.filter(x => x.item.tmdbRating > 0);
-  const globalTmdbAvg = tmdbPairs.length
-    ? tmdbPairs.reduce((s, x) => s + x.item.tmdbRating, 0) / tmdbPairs.length
+  // gT тепер перераховується на IMDb-базі (інакше серіали з їхнім
+  // завищеним IMDb викривили б recSignal).
+  const refPairs = ratedCastItems.filter(x => x.refRating > 0);
+  const globalRefAvg = refPairs.length
+    ? refPairs.reduce((s, x) => s + x.refRating, 0) / refPairs.length
     : 6.9;
 
   const G = globalCastAvg;
@@ -435,8 +442,8 @@ function computeActorProfiles() {
       }
 
       const dec = tasteDecay(r.item.updated);
-      const res = r.item.tmdbRating > 0
-        ? (r.castRating - G) - (r.item.tmdbRating - globalTmdbAvg)
+      const res = r.refRating > 0
+        ? (r.castRating - G) - (r.refRating - globalRefAvg)
         : (r.castRating - G);
       sumRecW += w * dec;
       sumRecRes += w * dec * res;
@@ -506,7 +513,7 @@ function computeActorProfiles() {
     });
   }
 
-  return { globalCastAvg, globalTmdbAvg, actors };
+  return { globalCastAvg, globalRefAvg, globalTmdbAvg: globalRefAvg, actors };
 }
 
 function computeDirectorProfiles() {

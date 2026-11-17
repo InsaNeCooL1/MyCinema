@@ -49,6 +49,49 @@ describe('Ранжування рекомендацій v2 (recs-math)', () => {
     expect(over).toBeCloseTo(full, 10); // кап 1.0, жодного подвійного бонусу
   });
 
+  it('IMDb апріори: фільми й серіали мають різні C/m', () => {
+    const p = window.recPriors;
+    expect(p('movie')).toEqual({ C: 0.63, m: 2000 });
+    expect(p('tv')).toEqual({ C: 0.72, m: 800 });
+    const b = window.recBayesRating;
+    // 8.8 при 200 голосах стягується до ~0.653, а не лишається 0.88
+    const wr = b(8.8, 200, p('movie').C, p('movie').m);
+    expect(wr).toBeCloseTo((200 * 0.88 + 2000 * 0.63) / 2200, 10);
+    expect(wr).toBeLessThan(0.7);
+    // серіали мають вищий апріор
+    expect(b(8.0, 100, p('tv').C, p('tv').m)).toBeGreaterThan(b(8.0, 100, p('movie').C, p('movie').m));
+  });
+
+  it('recBaseScore: режимний бонус не сплющує різницю 7.1 vs 8.3', () => {
+    const base = window.recBaseScore;
+    const weak = base(0.71, window.recGemBonus(2000, 0.71, 'movie'), 'movie'); // gems на межі WR
+    const strong = base(0.83, 0.00, 'movie'); // якісний фільм без бонусу
+    expect(strong).toBeGreaterThan(weak);
+    // режим може дати не більше 18% b
+    const noBonus = base(0.80, 0, 'movie');
+    const maxBonus = base(0.80, 0.30, 'movie');
+    expect(maxBonus - noBonus).toBeCloseTo(0.18, 10);
+    // серіали мають вищий центр
+    expect(base(0.77, 0, 'tv')).toBeCloseTo(base(0.71, 0, 'movie'), 10);
+  });
+
+  it('recGemBonus: бонус нульовий для порожнячок і для занадто популярних', () => {
+    const g = window.recGemBonus;
+    expect(g(10, 0.9, 'movie')).toBe(0);       // 10 голосів
+    expect(g(400, 0.65, 'movie')).toBe(0);      // WR нижче порогу
+    expect(g(3000, 0.8, 'movie')).toBeGreaterThan(0);
+    expect(g(50000, 0.9, 'movie')).toBe(0);     // вже не перлина
+    expect(g(800, 0.8, 'tv')).toBeGreaterThan(0);
+    expect(g(20000, 0.8, 'tv')).toBe(0);
+  });
+
+  it('recRankScore: бере _b, якщо він є (IMDb-шлях)', () => {
+    const r = window.recRankScore;
+    const entry = { _baseRaw: 0.0, _b: 0.9, _sourceRaw: 0, _profileRaw: 0, _eloRaw: 0 };
+    expect(r(entry, 0)).toBeGreaterThan(r({ ...entry, _b: 0.2 }, 0));
+    expect(r({ ...entry, _b: 2 }, 0)).toBeCloseTo(r({ ...entry, _b: 1 }, 0), 10); // кап
+  });
+
   it('recRankScore: скор абсолютний і не залежить від інших кандидатів', () => {
     const r = window.recRankScore;
     const good = { _baseRaw: 0.85, _sourceRaw: 2.5, _profileRaw: 1.8, _eloRaw: 0.8 };

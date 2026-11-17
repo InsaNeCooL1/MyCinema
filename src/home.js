@@ -53,8 +53,32 @@ function isExcludedFromTaste(x, avg) {
   if (!x) return true;
   if (x.excludeFromProfile === true) return true;
   if (x.excludeFromProfile === false) return false;
-  if (x.tmdbRating > 0 && avg > 0 && Math.abs(avg - x.tmdbRating) > 3) return true;
+  // Порівнюємо з IMDb, якщо він уже підтягнутий; інакше лишається TMDB.
+  const ref = (typeof imdbRef === 'function') ? imdbRef(x).rating : (x.tmdbRating || 0);
+  if (ref > 0 && avg > 0 && Math.abs(avg - ref) > 3) return true;
   return false;
+}
+
+// Одноразовий backfill IMDb для всієї бібліотеки — має завершитися ДО getSeeds().
+async function ensureLibraryImdb() {
+  if (typeof imdbLoadFor !== 'function') return { ok: false, total: 0 };
+  const movies = [], tv = [];
+  for (const x of Object.values(lib || {})) {
+    if (!x || !x.id) continue;
+    const t = (x.type === 'tv') ? 'tv' : 'movie';
+    if (typeof imdbLookup === 'function' && imdbLookup(t, x.id)) continue;
+    (t === 'tv' ? tv : movies).push(x.id);
+  }
+  let ok = true;
+  const groups = [];
+  for (const [t, arr] of [['movie', movies], ['tv', tv]]) {
+    for (let i = 0; i < arr.length; i += 400) groups.push([t, arr.slice(i, i + 400)]);
+  }
+  for (const [t, arr] of groups) {
+    const res = (t === 'tv') ? await imdbLoadFor([], arr) : await imdbLoadFor(arr, []);
+    if (!res.ok) ok = false;
+  }
+  return { ok, total: movies.length + tv.length };
 }
 
 function readMetaCacheAll() {
@@ -167,9 +191,14 @@ function getSeeds() {
       const eloBonus = elo > ELO_START ? Math.min((elo - ELO_START) / 100, 1.5) : 0;
       const strength = Math.min(10, base + favBonus + eloBonus);
 
-      const residual = (avg > 0 && x.tmdbRating > 0)
-        ? (avg - x.tmdbRating)
-        : (avg > 0 ? avg - 7.0 : 0.8);
+      // Big bang: residual рахуємо від IMDb. Якщо даних немає — TMDB як
+      // тимчасовий фольбек (головне, щоб обидва боки були з одного джерела).
+      const ref = (typeof imdbRef === 'function') ? imdbRef(x) : null;
+      const refVal = ref ? ref.rating : (x.tmdbRating || 0);
+      const defaultRef = x.type === 'tv' ? 7.6 : 6.9; // типові IMDb-середні
+      const residual = (avg > 0 && refVal > 0)
+        ? (avg - refVal)
+        : (avg > 0 ? avg - defaultRef : 0.8);
       const resFactor = clampNum(1 + residual / 2, 0.3, 2);
       const decayMult = Math.max(0.1, tasteDecay(x.updated));
       const rankScore = (strength / 10) * resFactor * (0.35 + 0.65 * decayMult);
@@ -413,20 +442,16 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   const currentYear = new Date().getFullYear();
   const baseDiscover = (type) => {
     const p = new URLSearchParams({ language: 'uk-UA' });
+    // TMDB лишається лише каталогом: м'який поріг голосів, ніякого
+    // vote_average.gte — справжню якість тепер перевіряє IMDb у pre-score.
+    p.set('vote_count.gte', type === 'movie' ? '20' : '10');
     if (mode === 'gems') {
       p.set('sort_by', 'vote_average.desc');
-      p.set('vote_count.gte', '60');
-      p.set('vote_count.lte', '2200');
-      p.set('vote_average.gte', '7.2');
     } else if (mode === 'fresh') {
       p.set('sort_by', 'popularity.desc');
-      p.set('vote_count.gte', '40');
-      p.set('vote_average.gte', '6.0');
       p.set(type === 'movie' ? 'primary_release_date.gte' : 'first_air_date.gte', `${currentYear - 2}-01-01`);
     } else {
       p.set('sort_by', 'popularity.desc');
-      p.set('vote_count.gte', '60');
-      p.set('vote_average.gte', '5.8');
     }
     if (type === 'tv') p.set('without_genres', EXCLUDED_TV_GENRES.join(','));
     return p;
@@ -468,7 +493,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       tmdbFetch(`/person/${aid}/tv_credits?language=uk-UA`)
         .then(d => {
           const castList = (d.cast || [])
-            .filter(r => r.poster_path && (r.vote_count || 0) >= 40 && !(r.genre_ids || []).some(g => EXCLUDED_TV_GENRES.includes(g)))
+            .filter(r => r.poster_path && (r.vote_count || 0) >= 10 && !(r.genre_ids || []).some(g => EXCLUDED_TV_GENRES.includes(g)))
             .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
             .slice(0, 10);
           return { type: 'tv', results: castList, source: 'cast', actorId: aid };
@@ -495,9 +520,13 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       if (!entry) continue;
 
       if (batch.source === 'mood') {
-        /* FIX-MOOD-WEIGHT-SRC */
+        /* FIX-MOOD-SOURCE-LEAK */
         const _mw = moodData.weight || 1.0;
-        entry._sourceRaw += 2.0 * _mw; /* FIX-MOOD-AGGR-SRC */
+        // Було 2.0 * 3.0 = 6.0 — настрій витісняв усе з pre-score.
+        // Тепер не більше REC_MOOD_SOURCE_CAP, як у інших discover-джерел.
+        entry._sourceRaw += (typeof REC_MOOD_SOURCE_CAP !== 'undefined')
+          ? Math.min(REC_MOOD_SOURCE_CAP, 0.4 * _mw)
+          : Math.min(1.2, 0.4 * _mw);
         entry._moodMatch = _mw;
         addReason(entry, 'mood', `${moodData.emoji} ${moodData.label}`, 8);
       } else if (batch.source === 'director') {
@@ -518,6 +547,17 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         entry._sourceRaw += 0.45;
       }
     }
+  }
+
+  // Пакетне підтягування IMDb для всього пулу — ДО pre-score,
+  // щоб якість оцінювалась за IMDb, а не за «дутими» TMDB-голосами.
+  if (typeof imdbLoadFor === 'function') {
+    const candMovies = [], candTv = [];
+    for (const entry of unique.values()) {
+      (entry.type === 'tv' ? candTv : candMovies).push(entry.id);
+    }
+    try { await imdbLoadFor(candMovies, candTv); }
+    catch (e) { console.warn('[MyCinema/IMDb] candidate batch fail:', e); }
   }
 
   // Насичення жанрів (Lift)
@@ -541,14 +581,43 @@ async function buildSmartRecommendations(seeds, mood, mode) {
   // Попередній фільтр по режиму + попередній скор для відбору топ-60 на credits/keywords
   const byType = { movie: [], tv: [] };
   for (const entry of unique.values()) {
-    if (mode === 'gems' && (entry.votes > 2500 || entry.tmdbRating < 7.0)) continue;
     if (mode === 'fresh' && ((parseInt(entry.year) || 0) < currentYear - 2)) continue;
 
-    // Байєсовське стиснення: 8.5 при 40 голосах < 8.5 при 4000 голосах
-    let baseRaw = recBayesRating(entry.tmdbRating, entry.votes);
-    if (mode === 'gems') baseRaw += clampNum((2500 - entry.votes) / 2500, 0, 0.3);
-    else if (mode === 'fresh') baseRaw += clampNum(((parseInt(entry.year) || currentYear - 2) - (currentYear - 2)) * 0.15, 0, 0.3);
-    else baseRaw += Math.min(entry.popularity / 250, 0.2);
+    // ── IMDb як джерело рейтингу й голосів ──────────────────────
+    const ref = (typeof imdbRef === 'function') ? imdbRef(entry) : null;
+    const refRating = ref ? ref.rating : (entry.tmdbRating || 0);
+    const refVotes = ref ? ref.votes : (entry.votes || 0);
+    const priors = (typeof recPriors === 'function') ? recPriors(entry.type) : { C: 0.65, m: 200 };
+
+    // Байєс: 8.8 при 200 голосах IMDb < 8.2 при 15 000 голосах.
+    const wr = recBayesRating(refRating, refVotes, priors.C, priors.m);
+    let modeBonus = 0;
+
+    if (mode === 'gems') {
+      if (ref && ref.source === 'imdb') {
+        // Справжні перлини: не порожнячки з 10 голосами.
+        const minV = entry.type === 'tv' ? 200 : 500;
+        if (refVotes < minV || wr < 0.68) continue;
+        modeBonus = (typeof recGemBonus === 'function')
+          ? recGemBonus(refVotes, wr, entry.type)
+          : clampNum((2500 - refVotes) / 2500, 0, 0.3);
+      } else {
+        // Тимчасовий TMDB-фольбек, поки IMDb даних немає.
+        if (entry.votes > 2500 || entry.tmdbRating < 7.0) continue;
+        modeBonus = clampNum((2500 - entry.votes) / 2500, 0, 0.3);
+      }
+    } else if (mode === 'fresh') {
+      modeBonus = clampNum(((parseInt(entry.year) || currentYear - 2) - (currentYear - 2)) * 0.15, 0, 0.3);
+    } else {
+      modeBonus = Math.min(entry.popularity / 250, 0.2);
+    }
+
+    const baseRaw = wr + modeBonus;
+    // Чистий IMDb WR і режимний бонус ідуть у b окремо, щоб бонус не
+    // забивав різницю між 7.1 і 8.3 через круту сигмоїду.
+    entry._b = (typeof recBaseScore === 'function')
+      ? recBaseScore(wr, modeBonus, entry.type)
+      : undefined;
 
     let liftSum = 0, liftCnt = 0;
     let bestGenreId = null, bestLift = 0;
@@ -582,7 +651,7 @@ async function buildSmartRecommendations(seeds, mood, mode) {
       if (_hits > 0) _moodBoost += Math.min(0.18, _hits * 0.05) * _mw2; /* FIX-MOOD-AGGR-BOOST */
       if (entry._moodMatch) _moodBoost += 0.12 * (entry._moodMatch);
     }
-    entry._moodBoost = _moodBoost;
+    entry._moodBoost = Math.min(0.6, _moodBoost);
 
     entry._preScore = entry._baseRaw * 0.35 + Math.min(entry._sourceRaw, 5) * 0.2 /* FIX-MOOD-AGGR-CAP */ + entry._genreMatch * 0.3 - entry._antiGenre + _moodBoost * 0.7; /* FIX-MOOD-AGGR-PRE */
 
@@ -1267,12 +1336,16 @@ function computeRecsSignature(seeds) {
   const castSig = `${castVals.length}:${castVals.reduce((a, b) => a + b, 0).toFixed(1)}`;
   const day = new Date().toISOString().slice(0, 10);
   const moodW = state.home.mood && MOODS[state.home.mood] ? (MOODS[state.home.mood].weight || 1) : 0; /* FIX-MOOD-AGGR-SIG */
-  return `v13|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-RELEASE-SIG */
+  return `v14-imdb|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-IMDB-SIG */
 }
 
 async function loadHome() {
   if (state.tab !== 'home') return;
   if (!state.home.mode || !window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches) state.home.mode = 'balance';
+
+  // Спочатку підтягуємо IMDb для бібліотеки, бо getSeeds() і профілі акторів
+  // вже рахують residual на його основі. При помилці — тихий TMDB-фольбек.
+  try { await ensureLibraryImdb(); } catch (e) { console.warn('[MyCinema/IMDb] library backfill fail:', e); }
 
   const seeds = getSeeds();
   const taste = computeTasteVector();
