@@ -48,25 +48,44 @@ describe('Metacritic badge на картці фільму', () => {
   });
 });
 
-describe('AI-значок на картці', () => {
-  afterEach(() => { delete window.mcChat; });
+describe('Кнопки перегляду на картці', () => {
+  const room = window.mcRoom || {};
+  const origEnabled = room.enabled;
+  const origOpen = room.open;
+
+  afterEach(() => {
+    if (origEnabled) room.enabled = origEnabled; else delete room.enabled;
+    if (origOpen) room.open = origOpen; else delete room.open;
+    delete window.mcChat;
+  });
 
   function actions(item = { key: 'movie-1', type: 'movie' }) {
     return window.MC.createActions({ item, details: { title: 'Test' } });
   }
 
-  it('з’являється, коли помічник увімкнено, і відкриває його', () => {
+  it('не дублює AI-кнопку між UA KINO та Онлайн', () => {
     let opened = 0;
     window.mcChat = { enabled: () => true, open: () => { opened++; } };
-    const btn = actions().querySelector('.btn-ai');
-    expect(btn).toBeTruthy();
-    expect(btn.textContent).toContain('AI');
-    btn.click();
-    expect(opened).toBe(1);
+    window.mcRoom.enabled = () => true;
+    window.mcRoom.open = () => {};
+
+    const row = actions();
+    expect(row.querySelector('.btn-ai')).toBeFalsy();
+    expect(row.textContent).not.toContain('AI');
+    expect([...row.querySelectorAll('.btn-uakino')].map(b => b.textContent.trim()))
+      .toEqual(['UA KINO', 'Онлайн']);
   });
 
-  it('не з’являється, коли помічник вимкнено', () => {
-    window.mcChat = { enabled: () => false, open: () => {} };
-    expect(actions({ key: 'tv-1', type: 'tv' }).querySelector('.btn-ai')).toBeFalsy();
+  it('кнопка Онлайн відкриває кімнату з контекстом картки', () => {
+    let opened = null;
+    window.mcRoom.enabled = () => true;
+    window.mcRoom.open = (ctx) => { opened = ctx; };
+
+    const row = actions();
+    const online = [...row.querySelectorAll('.btn-uakino')]
+      .find(b => b.textContent.trim() === 'Онлайн');
+    expect(online).toBeTruthy();
+    online.click();
+    expect(opened).toMatchObject({ key: 'movie-1', type: 'movie', title: 'Test' });
   });
 });

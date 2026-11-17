@@ -291,20 +291,11 @@
       };
       wrap.append(uakinoBtn);
     }
-    // AI-значок на картці: відкриває помічника з контекстом поточного тайтлу.
-    if (window.mcChat && typeof window.mcChat.enabled === 'function' && window.mcChat.enabled()) {
-      const aiBtn = el('button', 'btn-ai');
-      aiBtn.innerHTML = '<span class="ai-grad-text">✦ AI</span>';
-      aiBtn.title = 'Спитати AI про цей тайтл';
-      aiBtn.setAttribute('aria-label', 'Відкрити AI-помічника');
-      aiBtn.onclick = () => {
-        if (window.mcChat && typeof window.mcChat.open === 'function') window.mcChat.open();
-      };
-      wrap.append(aiBtn);
-    }
+    // Кнопку AI лишаємо лише плаваючу внизу екрана — тут вона дублювала її
+    // й стояла між UA KINO та Онлайн.
     if (window.mcRoom && window.mcRoom.enabled()) {
       const roomBtn = el('button', 'btn-uakino');
-      roomBtn.innerHTML = '<span class="uakino-grad-text">Кімната</span>';
+      roomBtn.innerHTML = '<span class="uakino-grad-text">Онлайн</span>';
       roomBtn.onclick = () => {
         const tvSeasons = (d.seasons || []).filter(x => x.season_number !== 0);
         const selSeason = (ctx.seasonState && ctx.seasonState.selectedSeason) ||

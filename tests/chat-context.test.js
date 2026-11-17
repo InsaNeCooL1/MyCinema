@@ -319,6 +319,8 @@ describe('chat context — рекомендації та смак', () => {
     expect(taste.topRated[0].title).toBe('Дюна');
     expect(taste.favorites.map(x => x.title)).toEqual(['Дюна']);
     expect(taste.statusCounts.watched).toBe(3);
+    expect(taste.libraryTitles.map(x => x.title)).toEqual(['Дюна', 'Прибуття', 'Без оцінки']);
+    expect(taste.libraryTitles[0]).toMatchObject({ type: 'movie', status: 'watched' });
   });
 
   it('не надсилає нотатки, email, uid та інші приватні поля', () => {
@@ -411,7 +413,9 @@ describe('chat UI', () => {
     expect(system).not.toContain('насамперед бери з context.recommendations.items');
     expect(system).toContain('Пріоритетними є тайтли зі стрічки');
     expect(system).toContain('Уявляй кожен тайтл із короткими тегами');
-    expect(system).toContain('маєш повне право сказати «ні»');
+    expect(system).toContain('окремо подивись на елементи з type: "tv"');
+    expect(system).toContain('Не ради нічого з taste.libraryTitles');
+    expect(system).toContain('не завершуй відповідь самим вступом');
     expect(system).toContain('Доктора Хауса');
     expect(system).toContain('Бігущого по лезу');
     expect(captured.body.contents[captured.body.contents.length - 1]).toEqual({
@@ -426,6 +430,8 @@ describe('chat UI', () => {
     const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
     expect(bubble.querySelector('strong').textContent).toBe('Прибуття');
     expect(document.querySelector('.mc-chat-root').classList.contains('open')).toBe(true);
+    // Після надсилання поле вводу має бути порожнім.
+    expect(document.querySelector('.mc-chat-input').value).toBe('');
 
     window.mcChat.clear(true);
     window.mcChat.close();
