@@ -406,7 +406,10 @@ describe('chat UI', () => {
       role: 'user',
       parts: [{ text: 'Що подивитись на вечір?' }],
     });
-    expect(captured.body.generationConfig).toEqual({ thinkingLevel: 'low', maxOutputTokens: 1024 });
+    expect(captured.body.generationConfig).toEqual({
+      thinkingConfig: { thinkingLevel: 'low' },
+      maxOutputTokens: 1024,
+    });
 
     const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
     expect(bubble.querySelector('strong').textContent).toBe('Прибуття');
@@ -587,7 +590,11 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     }, { timeout: 3000 });
 
     const body = requestBodyAt(0);
-    expect(body.generationConfig).toEqual({ thinkingLevel: 'low', maxOutputTokens: 1024 });
+    expect(body.generationConfig).toEqual({
+      thinkingConfig: { thinkingLevel: 'low' },
+      maxOutputTokens: 1024,
+    });
+    expect(body.generationConfig).not.toHaveProperty('thinkingLevel');
     expect(body.generationConfig).not.toHaveProperty('temperature');
     expect(body.generationConfig).not.toHaveProperty('topP');
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');

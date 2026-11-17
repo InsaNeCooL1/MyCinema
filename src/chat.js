@@ -16,7 +16,7 @@
   var MC_AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
   // Ліміти з AI Studio → Rate limit (RPD на проєкт): 20+20+20+500+500 = 1060.
-  // Усі п'ять підтримують thinking_level 'low' і рідний streamGenerateContent.
+  // Усі п'ять підтримують thinkingConfig.thinkingLevel 'low' і рідний streamGenerateContent.
   var MC_AI_CHAIN = [
     { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', rpd: 20 },
     { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', rpd: 20 },
@@ -106,11 +106,13 @@
   function mcCleanParts(parts) {
     if (!Array.isArray(parts)) return null;
     var out = [];
-    for (var i = 0; i < parts.length && out.length < 40; i++) {
+    for (var i = 0; i < parts.length && out.length < 120; i++) {
       var p = parts[i];
       if (!p || typeof p !== 'object') continue;
       var clean = {};
-      if (typeof p.text === 'string') clean.text = p.text.slice(0, 12000);
+      // Thought-частини не можна обрізати/зливати: разом із підписом це
+      // стан міркування, який треба повернути наступному запиту без змін.
+      if (typeof p.text === 'string') clean.text = p.thought ? p.text : p.text.slice(0, 12000);
       if (p.thought) clean.thought = true;
       if (typeof p.thoughtSignature === 'string') clean.thoughtSignature = p.thoughtSignature;
       if (typeof p.functionCall === 'object' && p.functionCall) clean.functionCall = p.functionCall;
@@ -1269,7 +1271,10 @@
     var body = {
       system_instruction: { parts: [{ text: MC_AI_SYSTEM_PROMPT + '\n\nCONTEXT_JSON:\n' + JSON.stringify(context) }] },
       contents: contents,
-      generationConfig: { thinkingLevel: 'low', maxOutputTokens: 1024 }
+      generationConfig: {
+        thinkingConfig: { thinkingLevel: 'low' },
+        maxOutputTokens: 1024
+      }
     };
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     mcChat.abort = ctrl;
