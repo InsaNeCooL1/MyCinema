@@ -55,11 +55,12 @@
 .tv-status.upcoming { background: rgba(var(--accent-rgb),0.12); color: var(--accent); border: 1px solid rgba(var(--accent-rgb),0.3); }
 .tv-status.ongoing { background: rgba(157,229,195,0.12); color: var(--mint); border: 1px solid rgba(157,229,195,0.3); }
 
-.meta-ratings-wrap { display: flex; gap: 8px; align-items: center; }
-.rating-tmdb, .rating-imdb, .rating-rt { padding: 6px 8px; border-radius: var(--r-sm); font-family: var(--mono); font-size: 13px; font-weight: 600; line-height: 1; color: var(--text-muted); }
+.meta-ratings-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rating-tmdb, .rating-imdb, .rating-rt, .rating-mc { padding: 6px 8px; border-radius: var(--r-sm); font-family: var(--mono); font-size: 13px; font-weight: 600; line-height: 1; color: var(--text-muted); }
 .rating-tmdb { background: rgba(1,180,228,0.12); border: 1px solid rgba(1,180,228,0.3); }
 .rating-imdb { background: rgba(245,197,24,0.12); border: 1px solid rgba(245,197,24,0.3); }
 .rating-rt { background: rgba(250,50,10,0.12); border: 1px solid rgba(250,50,10,0.3); }
+.rating-mc { background: rgba(0,206,124,0.12); border: 1px solid rgba(0,206,124,0.3); }
 .temp-green { color: #00ff88; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 .temp-yellow { color: #ffe600; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 .temp-orange { color: #ff8800; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }

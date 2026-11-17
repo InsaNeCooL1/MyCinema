@@ -211,12 +211,22 @@
         b.innerHTML = `IMDb:<span class="${getTempClass(val)}">${ctx.omdb.imdbRating}</span>`;
         ratingsWrap.append(b);
       }
-      if (r.type === 'movie' && ctx.omdb.Ratings) {
-        const rt = ctx.omdb.Ratings.find(x => x.Source === 'Rotten Tomatoes');
+      if (r.type === 'movie') {
+        const omdbRatings = Array.isArray(ctx.omdb.Ratings) ? ctx.omdb.Ratings : [];
+        const rt = omdbRatings.find(x => x.Source === 'Rotten Tomatoes');
         if (rt && rt.Value !== 'N/A') {
           const val = parseInt(rt.Value.replace('%', '')) || 0;
           const b = el('span', 'rating-rt');
           b.innerHTML = `RTom:<span class="${getTempClass(val)}">${val}</span>`;
+          ratingsWrap.append(b);
+        }
+        // Metacritic: у OMDb буває або в Ratings ("81/100"), або полем Metascore.
+        const mc = omdbRatings.find(x => x.Source === 'Metacritic');
+        const mcRaw = (mc && mc.Value !== 'N/A') ? mc.Value : ctx.omdb.Metascore;
+        const mcVal = parseInt(mcRaw, 10) || 0;
+        if (mcVal > 0) {
+          const b = el('span', 'rating-mc');
+          b.innerHTML = `Meta:<span class="${getTempClass(mcVal)}">${mcVal}</span>`;
           ratingsWrap.append(b);
         }
       }
