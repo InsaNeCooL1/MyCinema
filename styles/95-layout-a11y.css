@@ -1,0 +1,169 @@
+/* ========================================================= */
+/* FIX-DESKTOP-LAYOUT-RESTORE — Повернення верхнього меню ПК */
+/* ========================================================= */
+@media (min-width: 900px) and (min-height: 600px) {
+  /* 1. Sidebar -> Top Bar */
+  #sidebar {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 64px !important;
+    flex-direction: row !important;
+    transform: none !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding: 0 20px !important;
+    box-sizing: border-box !important;
+    z-index: 1000 !important;
+    background: var(--bg-0) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  }
+  #sidebar-backdrop, .hamburger { display: none !important; }
+  
+  .sidebar-header { margin-right: 20px !important; padding: 0 !important; border: none !important; height: 100% !important; display: flex !important; align-items: center !important; }
+  .sidebar-logo { margin: 0 !important; font-size: 24px !important; }
+  .sidebar-email { display: none !important; }
+  
+  .sidebar-nav {
+    flex-direction: row !important;
+    height: 100% !important;
+    padding: 0 !important;
+    gap: 4px !important;
+    align-items: center !important;
+    flex: 1 !important;
+    justify-content: center !important;
+    overflow: visible !important;
+  }
+  .nav-item {
+    height: 38px !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+  }
+  .nav-item.active::before { display: none !important; }
+  .nav-icon { display: none !important; }
+
+  .sidebar-footer {
+    flex-direction: row !important;
+    border: none !important;
+    padding: 0 !important;
+    gap: 8px !important;
+    align-items: center !important;
+    margin-left: 20px !important;
+  }
+  .sidebar-footer .icon-compact-btn {
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+  }
+  .sidebar-footer .icon-compact-btn .btn-label { display: none !important; }
+
+  /* 2. Body and Header */
+  body { padding-left: 0 !important; padding-top: 134px !important; }
+  body.no-search { padding-top: 64px !important; }
+  body.no-search #type-filter { margin-top: 24px !important; margin-bottom: 10px !important; }
+  
+  body > header {
+    position: fixed !important;
+    top: 64px !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 70px !important;
+    padding: 10px 40px !important;
+    background: transparent !important;
+    border: none !important;
+    z-index: 990 !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    backdrop-filter: none !important;
+  }
+  body.no-search > header { display: none !important; }
+  body:has(#overlay.open) > header { display: none !important; }
+  
+  .search-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 48px !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-radius: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 20px !important;
+    margin: 0 !important;
+  }
+  input#q { background: transparent !important; border: none !important; box-shadow: none !important; height: 100% !important; width: 100% !important; font-size: 15px !important; padding: 0 !important; }
+
+  /* 3. Content and Grid */
+  #results {
+    max-width: 100vw !important;
+    width: 100vw !important;
+    padding: 16px 40px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+  
+  .home-wrap, .mood-section, .taste-summary-container, .game-container, .filter-bar, #type-filter {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    box-sizing: border-box !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* Сітка на 7 колонок */
+  body #results .home-grid {
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 20px 16px !important;
+    width: 100% !important;
+  }
+
+  /* 4. Overlay */
+  #overlay {
+    top: 64px !important;
+    height: calc(100vh - 64px) !important;
+    z-index: 1100 !important;
+  }
+}
+
+/* FIX-FOCUS-RING & NO-TOUCH-HIGHLIGHT */
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+}
+img {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.rec-card, .item, .filmography-card, .similar-card, .actor-tile,
+.episode-poster-wrap, .franchise-head, .series-prog-row, .elo-row,
+.actor-rank-item, .nav-item, .nav-group-btn, .card-tab, .mood-pill,
+.recs-mode-pill, .home-tab, .filter-btn, button {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+html:not(.mc-kbd) :focus-visible {
+  outline: none;
+}
+html.mc-kbd :focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+html.mc-kbd .rec-card:focus-visible,
+html.mc-kbd .item:focus-visible,
+html.mc-kbd .card-tab:focus-visible {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: -2px !important;
+  border-radius: var(--r-sm);
+}
+

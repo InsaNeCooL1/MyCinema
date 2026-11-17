@@ -1,0 +1,246 @@
+/* =========================================
+   MEDIA QUERIES (DESKTOP) - УНІФІКОВАНО
+   ========================================= */
+@media (max-width: 520px) {
+  .taste-body { grid-template-columns: 1fr; gap: 10px; }
+  .taste-radar-wrap { max-width: 240px; margin: 0 auto; }
+}
+
+@media (min-width: 900px) {
+  /* Тепер всі контейнери мають однакову ширину і не "їдуть" */
+  #results, .home-wrap, .game-container, .taste-summary-container { max-width: 1000px; }
+  
+  .home-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px 14px; }
+  .onb-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .stats-grid { grid-template-columns: repeat(4, 1fr); }
+  .filmography-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .photo-gallery { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .filter-bar { max-width: 968px; margin-left: auto; margin-right: auto; }
+  .taste-body { grid-template-columns: 280px 1fr; gap: 32px; }
+
+
+}
+
+/* =========================================
+   CALENDAR / TIMELINE
+   ========================================= */
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.calendar-select {
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  color: var(--text);
+  border: 1px solid var(--bg-3);
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+}
+.timeline {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 40px;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 6px; bottom: 0;
+  width: 2px;
+  background: var(--bg-3);
+  border-radius: 2px;
+}
+.timeline-day-group {
+  margin-bottom: 24px;
+  position: relative;
+}
+.timeline-date {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 12px;
+  position: relative;
+}
+.timeline-date::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg-0);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.5);
+}
+.timeline-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Перевикористовуємо стилі .item, але трохи адаптуємо */
+.timeline-items .item {
+  margin-bottom: 0;
+  background: rgba(15, 14, 19, 0.6);
+  backdrop-filter: blur(10px);
+}
+
+@media (min-width: 1200px) {
+  #results, .home-wrap, .game-container, .taste-summary-container { max-width: 1300px; }
+  .home-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .filter-bar { max-width: 1268px; }
+}
+
+/* =========================================
+   RIPPLE & MISC
+   ========================================= */
+.ripple { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, .35); transform: scale(0); animation: ripple-anim .7s ease-out; pointer-events: none; z-index: 1; }
+@keyframes ripple-anim { to { transform: scale(1); opacity: 0; } }
+.nav-item, .filter-btn, .card-tab, .btn, .card-x, .filter-actions button, .query-bar button, .auth-btn, .onb-btn, .game-btn, .login-btn-side, .logout-btn-side, .season-tab-btn, .settings-btn, .cast-loader-btn, .mood-pill { position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+
+/* ============ CENTER TOAST ============ */
+.center-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: rgba(15, 14, 19, 0.95);
+  color: var(--mint);
+  padding: 16px 32px;
+  border-radius: var(--r-md);
+  font-size: 16px;
+  font-weight: 800;
+  z-index: 9999;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  border: 1px solid rgba(157, 229, 195, 0.3);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+.center-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* ============ CONTINUE WATCHING & LIGHT RADIUS ============ */
+.continue-watching-sec {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.light {
+  border-radius: var(--r-xs);
+}
+
+/* --- Історія пошуку --- */
+.ac-header {
+  padding: 12px 16px 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 800;
+  letter-spacing: .5px;
+}
+.ac-history {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  color: var(--text-secondary) !important;
+}
+.ac-history:hover {
+  color: var(--text) !important;
+}
+.ac-history svg {
+  opacity: .6;
+  flex-shrink: 0;
+}
+
+/* === MCM Snow v3 (2-layer parallax, GPU-composited) ================= */
+/* Налаштування інтенсивності: додавай/прибирай рядки radial-gradient.  */
+/* Швидкість: змінюй duration в animation (менше = швидше).             */
+
+.mcm-snow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;   /* не бере участі в hit-testing */
+  z-index: 1;
+  overflow: hidden;       /* ховає виступи шарів за viewport */
+}
+
+.mcm-snow::before,
+.mcm-snow::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Витягуємо шар на TILE_SIZE вгору і вниз — щоб анімація була безшовною */
+  top: calc(-1 * var(--tile, 600px));
+  bottom: calc(-1 * var(--tile, 600px));
+  background-repeat: repeat;
+  will-change: transform;  /* явно кажемо браузеру: буде анімація transform */
+  pointer-events: none;
+}
+
+/* ─── ДАЛЕКИЙ ШАР: маленькі, тьмяні, повільні ─── */
+.mcm-snow::before {
+  --tile: 500px;
+  background-size: 500px 500px;
+  opacity: 0.55;
+  animation: mcm-snow-far 45s linear infinite;
+  background-image:
+    radial-gradient(1px 1px at  40px  90px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(1px 1px at 180px  30px, rgba(255,255,255,0.75), transparent),
+    radial-gradient(1px 1px at 320px 210px, rgba(255,255,255,0.70), transparent),
+    radial-gradient(1px 1px at 100px 380px, rgba(255,255,255,0.80), transparent),
+    radial-gradient(1px 1px at 430px 450px, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at 250px 300px, rgba(255,255,255,0.75), transparent),
+    radial-gradient(1px 1px at 480px 130px, rgba(255,255,255,0.70), transparent),
+    radial-gradient(1px 1px at  30px 260px, rgba(255,255,255,0.80), transparent),
+    radial-gradient(1px 1px at 380px  60px, rgba(255,255,255,0.70), transparent),
+    radial-gradient(1px 1px at 200px 470px, rgba(255,255,255,0.75), transparent);
+}
+
+/* ─── БЛИЖНІЙ ШАР: більші, яскраві, швидші ─── */
+.mcm-snow::after {
+  --tile: 600px;
+  background-size: 600px 600px;
+  opacity: 0.9;
+  animation: mcm-snow-near 22s linear infinite;
+  background-image:
+    radial-gradient(2.5px 2.5px at  70px 120px, rgba(255,255,255,0.95), transparent),
+    radial-gradient(2px   2px   at 260px  50px, rgba(255,255,255,0.90), transparent),
+    radial-gradient(2px   2px   at 410px 230px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(3px   3px   at 150px 340px, rgba(255,255,255,0.95), transparent),
+    radial-gradient(2px   2px   at 500px 470px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2.5px 2.5px at 560px 200px, rgba(255,255,255,0.90), transparent),
+    radial-gradient(2px   2px   at 330px 520px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px   2px   at  50px 440px, rgba(255,255,255,0.90), transparent),
+    radial-gradient(2.5px 2.5px at 470px 340px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px   2px   at 220px 260px, rgba(255,255,255,0.90), transparent);
+}
+
+@keyframes mcm-snow-far {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, 500px, 0); }
+}
+@keyframes mcm-snow-near {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, 600px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mcm-snow::before,
+  .mcm-snow::after { animation: none; }
+}
+/* === /MCM Snow v3 === */
+
+
+

@@ -62,7 +62,10 @@
 ## Поточний стан
 
 - [x] Аудит `styles.css` → `CSS-AUDIT.md`
-- [ ] Етап A: створено `styles/*.css`, `build.js` конкатенує, diff чистий
+- [x] Етап A: створено `styles/*.css` (14 файлів), `build.js` конкатенує їх у `styles.css`
+  - Конкатенація до рефакторингу збіглася з оригіналом **байт-у-байт** (SHA-256 `72b2f0d6…`).
+  - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
+  - `styles.css` тепер генерований: у шапці є попередження `Do not edit`.
 - [ ] Етап B: токени
 - [ ] Етап B: `!important`
 - [ ] Етап B: мертві класи/змінні

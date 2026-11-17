@@ -1,0 +1,131 @@
+/* FIX-HIDE-BACK-MOBILE + FIX-SAFE-AREA-ALL-CARDS */
+@media (max-width: 899px) {
+  .card-bar {
+    display: none !important; /* Ховаємо кнопку назад на телефоні */
+  }
+  #overlay #card .card-scroll {
+    padding-top: calc(16px + env(safe-area-inset-top)) !important;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+  }
+  .card-mobile-root {
+    padding-top: 0 !important;
+  }
+}
+
+/* FIX-DESKTOP-GRID */
+@media (min-width: 900px) {
+  .card-desktop-root {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 40px;
+    padding-top: 20px;
+    align-items: start;
+  }
+
+  .card-desktop-left {
+    position: sticky;
+    top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .card-desktop-right {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-bottom: 40px;
+  }
+
+  /* Ховаємо таби в правій колонці, бо контент деталей вже зліва */
+  /* Але залишаємо акторів та нотатки */
+  
+  .desktop-block-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    margin-top: 0;
+  }
+
+  .desktop-details-block {
+    background: var(--bg-1);
+    padding: 16px;
+    border-radius: var(--r-md);
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .desktop-details-block .details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .desktop-details-block .detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    background: transparent;
+    padding: 0;
+    border: none;
+  }
+  
+  .desktop-details-block .detail-label {
+    margin-bottom: 0;
+    font-size: 13.2px; /* 12px + 10% */
+  }
+  
+  .desktop-details-block .detail-value {
+    font-size: 14.3px; /* 13px + 10% */
+    text-align: right;
+  }
+
+  .desktop-similar-block {
+    background: var(--bg-1);
+    padding: 16px;
+    border-radius: var(--r-md);
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  
+  .desktop-similar-block .similar-grid {
+    margin-top: 0;
+    grid-template-columns: repeat(4, 1fr); /* Рівно 4 постери в ряд */
+  }
+
+  /* Стилі для правої колонки (трохи більші шрифти) */
+  .card-desktop-right .title-main {
+    font-size: 42px; /* Більша назва на ПК */
+  }
+  .card-desktop-right .score-total-label,
+  .card-desktop-right .score-total-val {
+    font-size: 24px;
+  }
+}
+
+/* FIX-STUDIOS-CSS */
+.studios-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.studio-chip {
+  padding: 8px 16px;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.studio-chip:hover {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+

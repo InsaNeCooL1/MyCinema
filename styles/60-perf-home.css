@@ -1,0 +1,220 @@
+/* ========================================================= */
+/* PERF OPTIMIZATION (FPS & MOBILE WEBVIEW)                  */
+/* ========================================================= */
+.rec-dismiss {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(8, 7, 10, .78) !important;
+}
+
+.timeline-items .item {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--bg-1) !important;
+}
+
+
+
+
+
+@media (min-width: 900px) {
+  #overlay #card.is-person .card-scroll {
+    padding: 72px 40px 40px !important;
+  }
+}
+
+.person-lib-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  background: rgba(var(--accent-rgb), .12);
+  border: 1px solid rgba(var(--accent-rgb), .3);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+
+.person-bio-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.person-bio-source {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.person-wiki-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+.person-wiki-link:hover {
+  text-decoration: underline;
+}
+
+.franchise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.franchise-card {
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, .04);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.franchise-card.open {
+  border-color: rgba(var(--accent-rgb), .28);
+}
+.franchise-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.franchise-head:hover {
+  background: var(--bg-2);
+}
+.franchise-body {
+  flex: 1;
+  min-width: 0;
+}
+.franchise-chev {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.franchise-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+  border-top: 1px solid rgba(255, 255, 255, .04);
+  padding-top: 10px;
+}
+.franchise-part-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--r-xs);
+  background: var(--bg-2);
+  cursor: pointer;
+  transition: background .15s;
+}
+.franchise-part-row:hover {
+  background: var(--bg-3);
+}
+.franchise-part-poster {
+  width: 30px;
+  height: 45px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-3);
+}
+.series-prog-val.green { color: var(--mint); }
+.series-prog-val.yellow { color: var(--accent); }
+.series-prog-val.red { color: var(--danger); }
+
+/* CSS-CLEANED */
+
+/* ========================================================= */
+/* UI FIXES: SEARCH CANCEL & TASTE EXPAND                    */
+/* ========================================================= */
+input#q::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+@media (min-width: 900px) {
+  body #results > .taste-summary-container.is-expanded {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+
+/* ========================================================= */
+/* [MOOD-OVERFLOW-V2] Плитки в один рядок, поступове звуження */
+/* ========================================================= */
+
+/* Запобіжник для контейнера */
+.mood-section {
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+}
+.mood-pills {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Мобільний: горизонтальний скрол + видимий скролбар */
+@media (max-width: 899px) {
+    .mood-pills {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 8px !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: var(--accent) rgba(255,255,255,0.05) !important;
+    }
+    .mood-pills::-webkit-scrollbar {
+        display: block !important;
+        height: 4px;
+    }
+    .mood-pills::-webkit-scrollbar-thumb {
+        background: var(--accent);
+        border-radius: 2px;
+    }
+    .mood-pills::-webkit-scrollbar-track {
+        background: rgba(255,255,255,0.05);
+        border-radius: 2px;
+    }
+}
+
+/* Десктоп: один рядок, поступове зменшення відступів */
+@media (min-width: 900px) and (min-height: 600px) {
+    body #results > .mood-section {
+        overflow: hidden !important;
+        min-width: 0 !important;
+    }
+    body #results .mood-pills {
+        flex-wrap: nowrap !important; /* СУВОРО ОДИН РЯДОК */
+        height: 44px !important;
+        max-height: 44px !important;
+        overflow-x: auto !important; /* Якщо не влазить - горизонтальний скрол */
+        overflow-y: hidden !important;
+        padding: 4px !important;
+        align-items: center !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: var(--accent) rgba(255,255,255,0.05) !important;
+    }
+    /* Прибираємо скролбар-смужку, бо на десктопі вона зайва (скролимо мишкою/тачем) */
+    body #results .mood-pills::-webkit-scrollbar {
+        height: 0px !important;
+        display: none !important;
+    }
+    body #results .mood-pill {
+        height: 34px !important;
+        /* Поступове зменшення відступів та шрифту */
+        padding: 0 clamp(6px, 1vw, 16px) !important;
+        font-size: clamp(11px, 1vw, 13px) !important;
+        gap: clamp(2px, 0.5vw, 6px) !important;
+        flex-shrink: 0 !important; /* Не стискаємо самі плитки, але вони самі зменшуються */
+    }
+}
+
+

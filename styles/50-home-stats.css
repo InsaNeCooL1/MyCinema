@@ -1,0 +1,228 @@
+/* ========================================================= */
+/* STAGE 1: RECS V2, MODES, DISMISS, PLANNED STRIP           */
+/* ========================================================= */
+.rec-poster-wrap {
+  position: relative;
+  width: 100%;
+}
+.rec-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-xs);
+  background: rgba(8, 7, 10, .62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, .85);
+  border: 1px solid rgba(255, 255, 255, .14);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: .55;
+  transition: opacity .2s, background .2s, transform .15s;
+  z-index: 3;
+}
+.rec-card:hover .rec-dismiss,
+.rec-dismiss:hover {
+  opacity: 1;
+}
+.rec-dismiss:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  transform: scale(1.08);
+}
+.rec-card.dismissing {
+  opacity: 0;
+  transform: scale(.9);
+  transition: opacity .18s, transform .18s;
+}
+
+.recs-mode-pills {
+  display: flex;
+  gap: 8px;
+  margin: -4px 0 16px;
+  flex-wrap: wrap;
+}
+.recs-mode-pill {
+  padding: 6px 14px;
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, .05);
+  transition: .2s;
+}
+.recs-mode-pill:hover {
+  background: var(--bg-2);
+  color: var(--text);
+}
+.recs-mode-pill.active {
+  background: rgba(var(--accent-rgb), .16);
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), .45);
+}
+
+.planned-mood-sec .section-head {
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.planned-head-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.roulette-btn {
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), .18), rgba(197, 163, 255, .14));
+  border: 1px solid rgba(var(--accent-rgb), .35);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 800;
+  transition: .2s;
+  flex-shrink: 0;
+}
+.roulette-btn:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+  transform: translateY(-1px);
+}
+
+
+/* ========================================================= */
+/* STAGE 2: PROGRESS, STREAMING, HEATMAP, GAME SOURCE        */
+/* ========================================================= */
+.item-progress {
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-3);
+  overflow: hidden;
+  margin-top: 4px;
+}
+.item-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--mint));
+  transition: width .4s ease;
+}
+
+.series-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 22px;
+}
+.series-prog-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, .04);
+  cursor: pointer;
+  transition: .15s;
+}
+.series-prog-row:hover { background: var(--bg-2); }
+.series-prog-body { flex: 1; min-width: 0; }
+.series-prog-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.series-prog-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.platform-rank-logo {
+  width: 52px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #fff;
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+
+.heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.heatmap-grid {
+  display: flex;
+  gap: 4px;
+  width: max-content;
+}
+.heatmap-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.heatmap-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--bg-3);
+}
+.heatmap-cell.future { opacity: .2; }
+.heatmap-cell.lvl-1 { background: rgba(var(--accent-rgb), .28); }
+.heatmap-cell.lvl-2 { background: rgba(var(--accent-rgb), .52); }
+.heatmap-cell.lvl-3 { background: rgba(var(--accent-rgb), .76); }
+.heatmap-cell.lvl-4 { background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb), .45); }
+
+.game-source-switch {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  border: 1px solid rgba(255, 255, 255, .06);
+  margin-bottom: 14px;
+}
+.game-source-pill {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: .2s;
+}
+.game-source-pill:hover { color: var(--text); }
+.game-source-pill.active {
+  background: rgba(var(--accent-rgb), .18);
+  color: var(--accent);
+}
+
+/* CALENDAR SUMMARY */
+.cal-summary { margin-bottom: 20px; }
+.cal-best-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  background: rgba(var(--accent-rgb), .12);
+  border: 1px solid rgba(var(--accent-rgb), .28);
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  transition: .2s;
+}
+.cal-best-btn:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
