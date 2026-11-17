@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 
 describe('Stage 2 & 3: Directors, Wrapped & World Map', () => {
   beforeAll(() => {
+    window.loadScript('src/world-map-data.js');
     window.loadScript('src/world-map.js');
   });
 
@@ -55,10 +56,13 @@ describe('Stage 2 & 3: Directors, Wrapped & World Map', () => {
     expect(wYear.monthBins[10]).toBe(2); // Листопад (index 10)
   });
 
-  it('SVG мапа світу містить Україну з координатами Криму всередині UA', () => {
-    const ua = window.MC_WORLD_COUNTRIES.find(c => c.code === 'UA');
+  it('SVG мапа світу містить реальні контури та Україну з Кримом', () => {
+    expect(window.MC_WORLD_PATHS.length).toBeGreaterThan(150);
+    const ua = window.MC_WORLD_PATHS.find(p => p.a2 === 'UA');
     expect(ua).toBeDefined();
-    const lats = ua.polys[0].map(([, lat]) => lat);
-    expect(Math.min(...lats)).toBeLessThanOrEqual(44.5); // південна точка Криму
+    // Крим: субшлях з південною точкою ~44.4°N → y ≈ 126.7 у проєкції 1000x500
+    const ys = [...ua.d.matchAll(/,(\d+\.\d)/g)].map(m => Number(m[1]));
+    expect(Math.max(...ys)).toBeGreaterThan(126);
+    expect((ua.d.match(/M/g) || []).length).toBeGreaterThanOrEqual(2); // материк + Крим
   });
 });
