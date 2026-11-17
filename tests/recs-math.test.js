@@ -62,6 +62,35 @@ describe('Ранжування рекомендацій v2 (recs-math)', () => {
     expect(b(8.0, 100, p('tv').C, p('tv').m)).toBeGreaterThan(b(8.0, 100, p('movie').C, p('movie').m));
   });
 
+  it('recPriorsFor: TMDB-фольбек має m=200 і зберігає C за типом', () => {
+    const p = window.recPriorsFor;
+    expect(p('tmdb', 'movie')).toEqual({ C: 0.63, m: 200 });
+    expect(p('tmdb', 'tv')).toEqual({ C: 0.72, m: 200 });
+    expect(p('imdb', 'movie')).toEqual({ C: 0.63, m: 2000 });
+    expect(p('imdb', 'tv')).toEqual({ C: 0.72, m: 800 });
+
+    const b = window.recBayesRating;
+    const soft = b(7.5, 30, p('tmdb', 'movie').C, p('tmdb', 'movie').m);
+    const hard = b(7.5, 30, p('imdb', 'movie').C, p('imdb', 'movie').m);
+    expect(soft).toBeGreaterThan(hard); // картки без IMDb не обнуляються апріором
+  });
+
+  it('recBalanceBonus: log10 голосів основний, popularity — лише 25%', () => {
+    const bb = window.recBalanceBonus;
+    const imdb = (v, pop = 0) => bb({ source: 'imdb', votes: v }, pop);
+
+    expect(imdb(99, 250)).toBeCloseTo(0.05, 10);          // 10^2 → 0 + popularity 0.05
+    expect(imdb(9999, 0)).toBeCloseTo(0.10, 10);          // 10^4 → 0.10
+    expect(imdb(999999, 250)).toBeCloseTo(0.20, 10);      // 10^6 → кап 0.20
+    expect(imdb(1e9, 1e9)).toBeCloseTo(0.20, 10);         // подвійний кап
+    expect(imdb(1000, 0)).toBeGreaterThan(imdb(100, 0));
+
+    // popularity не може перевищити 25% бонусу
+    expect(bb({ source: 'tmdb', votes: 0 }, 250)).toBeCloseTo(0.05, 10);
+    // TMDB-шкала м'якша за IMDb (каталог має менше голосів)
+    expect(bb({ source: 'tmdb', votes: 200 }, 0)).toBeGreaterThan(imdb(200, 0));
+  });
+
   it('recBaseScore: режимний бонус не сплющує різницю 7.1 vs 8.3', () => {
     const base = window.recBaseScore;
     const weak = base(0.71, window.recGemBonus(2000, 0.71, 'movie'), 'movie'); // gems на межі WR

@@ -34,8 +34,37 @@ const REC_MOOD_FULL = 0.60;
 // Настроєвий discover більше не заливає _sourceRaw (було 2.0 * weight = 6.0).
 const REC_MOOD_SOURCE_CAP = 1.2;
 
+// WR для тайтлів без IMDb (source === 'tmdb'): м'який m, бо інакше
+// 2000 голосів апріора повністю з'їдають картки з малим TMDB vote_count.
+const REC_FALLBACK_WR_M = 200;
+
+// balance: основний сигнал — log10(голосів), popularity лише слабкий додаток.
+const REC_BALANCE_MAX = 0.2;
+const REC_BALANCE_POP_SHARE = 0.25; // popularity дає не більше 0.05 з 0.20
+
 function recPriors(type) {
   return REC_PRIORS[type] === REC_PRIORS.tv ? REC_PRIORS.tv : REC_PRIORS.movie;
+}
+
+// C лишається за типом, підміняємо тільки m для TMDB-фольбеку.
+function recPriorsFor(source, type) {
+  const p = recPriors(type);
+  return source === 'tmdb' ? { C: p.C, m: REC_FALLBACK_WR_M } : p;
+}
+
+// IMDb: log10 голосів 10^2 → 0, 10^6 → 0.20.
+// TMDB-фольбек: каталог має менше голосів, тому шкала 10^1 → 10^4.
+// popularity додає не більше 25% бонусу й не може перевищити REC_BALANCE_MAX.
+function recBalanceBonus(ref, popularity) {
+  const votes = Math.max(0, Number(ref && ref.votes) || 0);
+  const lg = Math.log10(1 + votes);
+  const isIMDb = !!(ref && ref.source === 'imdb');
+  const lo = isIMDb ? 2 : 1;
+  const hi = isIMDb ? 6 : 4;
+  const byVotes = REC_BALANCE_MAX * recClamp01((lg - lo) / (hi - lo));
+  const byPop = REC_BALANCE_MAX * REC_BALANCE_POP_SHARE
+    * recClamp01((Number(popularity) || 0) / 250);
+  return Math.min(REC_BALANCE_MAX, byVotes + byPop);
 }
 function recClamp01(v) {
   const n = Number(v);
@@ -103,6 +132,11 @@ function recRankScore(entry, jitter) {
 // Публічний API для home.js і тестів (classic script, без модулів).
 window.REC_PRIORS = REC_PRIORS;
 window.REC_MOOD_SOURCE_CAP = REC_MOOD_SOURCE_CAP;
+window.REC_FALLBACK_WR_M = REC_FALLBACK_WR_M;
+window.REC_BALANCE_MAX = REC_BALANCE_MAX;
+window.REC_BALANCE_POP_SHARE = REC_BALANCE_POP_SHARE;
 window.recPriors = recPriors;
+window.recPriorsFor = recPriorsFor;
+window.recBalanceBonus = recBalanceBonus;
 window.recBaseScore = recBaseScore;
 window.recGemBonus = recGemBonus;

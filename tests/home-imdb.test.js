@@ -66,6 +66,40 @@ describe('Home recommendations на IMDb (big bang)', () => {
     expect(seeds[0].residual).toBeCloseTo(-0.3, 6);
   });
 
+  it('buildSmartRecommendations: TMDB-фольбек WR m=200 і balance з log10 голосів', async () => {
+    window.loadScript('src/api.js');
+    window.imdbClearCache();
+    window.lib = { 'movie-278': makeItem() };
+
+    const seedDetail = {
+      id: 278,
+      credits: { crew: [], cast: [] },
+      keywords: { keywords: [] },
+      genres: [{ id: 18 }],
+      recommendations: {
+        results: [{
+          id: 999, media_type: 'movie', title: 'Candidate', poster_path: '/x.jpg',
+          vote_average: 7.5, vote_count: 30, popularity: 10,
+          genre_ids: [18], release_date: '2020-01-01',
+        }],
+      },
+    };
+    window.tmdbFetch = vi.fn(async (url) =>
+      url.includes('/movie/278') ? seedDetail : { results: [] });
+    global.fetch = vi.fn().mockResolvedValue(workerResponse({ movie: {}, tv: {} }));
+
+    const bayesSpy = vi.spyOn(window, 'recBayesRating');
+    const balSpy = vi.spyOn(window, 'recBalanceBonus');
+    const res = await window.buildSmartRecommendations(window.getSeeds(), null, 'balance');
+
+    const bayesCall = bayesSpy.mock.calls.find(c => c[1] === 30);
+    expect(bayesCall).toBeTruthy();
+    expect(bayesCall[2]).toBe(0.63); // C movie
+    expect(bayesCall[3]).toBe(200);  // m TMDB-фольбеку
+    expect(balSpy).toHaveBeenCalled();
+    expect(res.items.length).toBeGreaterThan(0);
+  });
+
   it('computeActorProfiles: globalRefAvg береться з IMDb', async () => {
     global.fetch = vi.fn().mockResolvedValue(workerResponse({
       movie: {

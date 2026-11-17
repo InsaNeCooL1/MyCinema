@@ -587,7 +587,9 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     const ref = (typeof imdbRef === 'function') ? imdbRef(entry) : null;
     const refRating = ref ? ref.rating : (entry.tmdbRating || 0);
     const refVotes = ref ? ref.votes : (entry.votes || 0);
-    const priors = (typeof recPriors === 'function') ? recPriors(entry.type) : { C: 0.65, m: 200 };
+    const priors = (typeof recPriorsFor === 'function')
+      ? recPriorsFor(ref && ref.source, entry.type)
+      : ((typeof recPriors === 'function') ? recPriors(entry.type) : { C: 0.65, m: 200 });
 
     // Байєс: 8.8 при 200 голосах IMDb < 8.2 при 15 000 голосах.
     const wr = recBayesRating(refRating, refVotes, priors.C, priors.m);
@@ -609,7 +611,9 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     } else if (mode === 'fresh') {
       modeBonus = clampNum(((parseInt(entry.year) || currentYear - 2) - (currentYear - 2)) * 0.15, 0, 0.3);
     } else {
-      modeBonus = Math.min(entry.popularity / 250, 0.2);
+      modeBonus = (typeof recBalanceBonus === 'function')
+        ? recBalanceBonus(ref, entry.popularity)
+        : Math.min(entry.popularity / 250, 0.2);
     }
 
     const baseRaw = wr + modeBonus;
@@ -1336,7 +1340,7 @@ function computeRecsSignature(seeds) {
   const castSig = `${castVals.length}:${castVals.reduce((a, b) => a + b, 0).toFixed(1)}`;
   const day = new Date().toISOString().slice(0, 10);
   const moodW = state.home.mood && MOODS[state.home.mood] ? (MOODS[state.home.mood].weight || 1) : 0; /* FIX-MOOD-AGGR-SIG */
-  return `v14-imdb|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-IMDB-SIG */
+  return `v15-imdb|${day}|n:${state.home.refreshNonce || 0}|${seedSig}|anti:${antiSig}|ex:${exSig}|adj:${adjSig}|cast:${castSig}|mood:${state.home.mood || 'any'}:${moodW}|mode:${state.home.mode || 'balance'}|dig:${settings.digitalOnly ? 1 : 0}|str:${settings.streamingOnlyUA ? 1 : 0}`; /* FIX-IMDB-SIG */
 }
 
 async function loadHome() {

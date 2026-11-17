@@ -259,14 +259,18 @@ p_g=\frac{N_g+1}{\sum_g N_g+D},\qquad
 Рейтинг і голоси кандидата беруться з IMDb (`imdbRef`). Байєсовське стиснення:
 
 \[
-R=\frac{r_{\text{IMDb}}}{10},\qquad v=v_{\text{IMDb}},\qquad
+R=\frac{r}{10},\qquad v=v_{\text{ref}},\qquad
 \text{WR}=\frac{vR+mC}{v+m}
 \]
 
-| тип | `C` | `m` |
-|---|---:|---:|
-| movie | 0.63 | 2000 |
-| tv | 0.72 | 800 |
+| джерело | тип | `C` | `m` |
+|---|---|---:|---:|
+| IMDb | movie | 0.63 | 2000 |
+| IMDb | tv | 0.72 | 800 |
+| TMDB (фолбек) | movie | 0.63 | **200** |
+| TMDB (фолбек) | tv | 0.72 | **200** |
+
+`C` залежить лише від типу; для `source === 'tmdb'` підміняється тільки `m` (`recPriorsFor`), щоб малий `vote_count` каталогу не з'їдався апріором у 2000 голосів.
 
 Режимний бонус:
 
@@ -276,9 +280,18 @@ R=\frac{r_{\text{IMDb}}}{10},\qquad v=v_{\text{IMDb}},\qquad
 0.25\,g_v\,g_{\text{zone}} & \text{gems (IMDb), див. нижче}\\
 \mathrm{clamp}\!\left(\frac{2500-v_{\text{TMDB}}}{2500},0,0.3\right) & \text{gems (TMDB-фольбек)}\\
 \mathrm{clamp}\!\left(0.15\,(y-(Y-2)),0,0.3\right) & \text{fresh}\\
-\min(\text{popularity}/250,\,0.2) & \text{balance}
+\mathrm{recBalanceBonus}(v_{\text{ref}},\text{popularity}) & \text{balance}
 \end{cases}
 \]
+
+Для `balance` основний сигнал — логарифм голосів, а не голий TMDB popularity:
+
+\[
+\text{recBalanceBonus}=\min\!\left(0.2,\ 0.2\,\mathrm{clamp}\!\left(\frac{\log_{10}(1+v)-\ell_0}{\ell_1-\ell_0},0,1\right)
++0.05\,\mathrm{clamp}\!\left(\frac{\text{popularity}}{250},0,1\right)\right)
+\]
+
+де `(\ell_0,\ell_1)=(2,6)` для IMDb (`10²→0`, `10⁶→0.20`) і `(1,4)` для TMDB-фольбеку. Popularity дає не більше 25 % бонусу (`0.05` з `0.20`) і слугує лише слабким додатком.
 
 Для `gems` з даними IMDb вимагається `v ≥ 500` (movie) / `200` (tv) і `WR ≥ 0.68`; інакше кандидат відсіюється. Коефіцієнти:
 
@@ -386,7 +399,7 @@ antiPenalty   = antiGenre + min(0.4, antiDir) + min(0.35, antiKw) + min(0.35, an
 Підпис рекомендацій:
 
 ```
-v14-imdb | дата | nonce | сіди(strength,resFactor) | антисіди | виключення |
+v15-imdb | дата | nonce | сіди(strength,resFactor) | антисіди | виключення |
 акторські корекції | сума акторських оцінок | настрій(weight) | режим |
 digitalOnly | streamingOnlyUA
 ```
@@ -400,11 +413,16 @@ digitalOnly | streamingOnlyUA
 Кандидат (movie): IMDb `8.8` при `15 000` голосах, популярність `120`, 2 recommendation-сіди, `genreMatch = 0.80`, актор `0.30`, режисер `0.20`, keyword `0.12`, `eloRaw = 0.7`, `moodBoost = 0.18`, `antiPenalty = 0.05`.
 
 1. **Байєс:** `WR = (15000·0.88 + 2000·0.63)/17000 ≈ 0.8506`.
-2. **balance:** `modeBonus = min(120/250, 0.2) = 0.20`, `baseRaw = 1.0506`.
-3. **База:** `b = 0.82·σ(0.8506; 0.71, 7.5) + 0.18·(0.20/0.30) ≈ 0.7281`.
+2. **balance:** `log₁₀(15001) ≈ 4.176 → 0.2·(4.176−2)/4 ≈ 0.1088`; `popularity` додає `0.05·(120/250) = 0.024`. `modeBonus ≈ 0.1328`, `baseRaw ≈ 0.9834`.
+3. **База:** `b = 0.82·σ(0.8506; 0.71, 7.5) + 0.18·(0.1328/0.30) ≈ 0.6878`.
 4. **Ознаки:** `s = σ(2.65; 1.40, 1.6) ≈ 0.8808`, `p = σ(1.42; 1.00, 2.5) ≈ 0.7408`, `e = σ(0.70; 0.50, 6) ≈ 0.7685`, `m = 0.18/0.60 = 0.30`.
-5. **Скор:** `0.32·0.7281 + 0.26·0.8808 + 0.22·0.7408 + 0.08·0.7685 + 0.12·0.30 − 0.05 ≈ 0.6725`.
-6. **Jitter:** `0.6325 … 0.7125`. Третій фільм тієї самої франшизи: `−0.08 → ≈ 0.5925`.
+5. **Скор:** `0.32·0.6878 + 0.26·0.8808 + 0.22·0.7408 + 0.08·0.7685 + 0.12·0.30 − 0.05 ≈ 0.6596`.
+6. **Jitter:** `0.6196 … 0.6996`. Третій фільм тієї самої франшизи: `−0.08 → ≈ 0.5796`.
+
+Для порівняння, картка без IMDb з `vote_count = 30`, `tmdbRating = 7.5` і тим самим popularity:
+
+- `m = 200` дає `WR = (30·0.75 + 200·0.63)/230 ≈ 0.6457` (з `m = 2000` було б `≈ 0.6318`);
+- `balance` використовує TMDB-шкалу `(1,4)` і popularity, тому не обнулюється.
 
 ---
 
@@ -416,6 +434,8 @@ digitalOnly | streamingOnlyUA
 | баланс ознак | `REC_WEIGHTS` у `src/recs-math.js` (сума = 1.0) |
 | різкість ознак | `REC_SLOPES`, `REC_CENTERS` у `src/recs-math.js` |
 | апріори IMDb | `REC_PRIORS` (окремо movie/tv) у `src/recs-math.js` |
+| апріор TMDB-фольбеку | `REC_FALLBACK_WR_M`, `recPriorsFor()` у `src/recs-math.js` |
+| balance-бонус | `recBalanceBonus()`, `REC_BALANCE_MAX`, `REC_BALANCE_POP_SHARE` у `src/recs-math.js` |
 | силу режиму в `b` | `REC_BASE_CENTER`, `REC_BASE_SLOPE`, `REC_MODE_SHARE` |
 | планку перлин | `recGemBonus()` у `src/recs-math.js` |
 | затухання смаку | `TASTE_HALFLIFE_DAYS` у `src/config.js` |
