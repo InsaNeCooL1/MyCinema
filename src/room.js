@@ -1,6 +1,7 @@
 /* ROOM-v1 — зовнішня «кімната»: URL, оверлей, міст postMessage */
 (function () {
   var LS = 'mycinema.room';
+  var DEFAULT_ROOM_URL = 'https://super-daifuku-28fbcd.netlify.app';
   var overlay = null, frame = null, card = null, roomOrigin = null, loadTimer = null, escHandler = null;
 
   function toast(m) {
@@ -39,9 +40,7 @@
     try { localStorage.setItem('mycinema.room', JSON.stringify({ url: String(next.roomUrl || '') })); } catch (e) {}
     return next;
   }
-  function load() { var o = getOnline(); return { url: o.roomUrl || '' }; }
-  function save(o) { setOnline({ roomUrl: (o && o.url) || '' }); }
-  function getUrl() { return String(getOnline().roomUrl || ''); }
+  function getUrl() { return String(getOnline().roomUrl || DEFAULT_ROOM_URL); }
   function enabled() { return !!getUrl(); }
   function serviceConfig() {
     var o = getOnline();
@@ -90,6 +89,7 @@
           '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' +
             '<button class="settings-btn" id="room-save">Зберегти</button>' +
             '<button class="settings-btn" id="room-check" type="button">Перевірити кімнату</button>' +
+            '<button class="settings-btn" id="room-default" type="button">Стандартна</button>' +
           '</div>' +
           '<div id="room-status" style="font-size:12px;opacity:.85;min-height:1.2em"></div>' +
           '<div style="font-size:12px;opacity:.7">Дані зберігаються в хмарі акаунта (при вході) і передаються в кімнату при відкритті.</div>' +
@@ -112,18 +112,22 @@
     var inpS = document.getElementById('room-server-url');
     var st = document.getElementById('room-status');
     var o = getOnline();
-    inpUrl.value = o.roomUrl || '';
+    inpUrl.value = o.roomUrl || DEFAULT_ROOM_URL;
     inpP.value = o.parserUrl || '';
     inpA.value = o.parserApi || '';
     inpS.value = o.serverUrl || '';
 
     document.getElementById('room-save').onclick = function () {
       var raw = inpUrl.value.trim();
-      var n = raw ? normalizeUrl(raw) : '';
-      if (raw && !n) { st.textContent = '❌ Некоректний URL кімнати'; return; }
-      inpUrl.value = n || '';
-      setOnline({ roomUrl: n || '', parserUrl: inpP.value.trim(), parserApi: inpA.value.trim(), serverUrl: inpS.value.trim() });
+      var n = raw ? normalizeUrl(raw) : DEFAULT_ROOM_URL;
+      if (!n) { st.textContent = '❌ Некоректний URL кімнати'; return; }
+      inpUrl.value = n;
+      setOnline({ roomUrl: n, parserUrl: inpP.value.trim(), parserApi: inpA.value.trim(), serverUrl: inpS.value.trim() });
       st.textContent = '✅ Збережено';
+    };
+    document.getElementById('room-default').onclick = function () {
+      inpUrl.value = DEFAULT_ROOM_URL;
+      st.textContent = 'Підставлено стандартну адресу — натисніть «Зберегти»';
     };
     document.getElementById('room-check').onclick = function () {
       var raw = inpUrl.value.trim();

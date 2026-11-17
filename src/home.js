@@ -1446,8 +1446,6 @@ function renderHomeSkeleton(taste) {
   box.replaceChildren();
 
   box.append(renderTasteSummary(taste || computeTasteVector()));
-  const cwSection = buildContinueWatchingSection();
-  if (cwSection) box.append(cwSection);
 
   const wrap = el('div', 'home-wrap');
   const factCard = buildFactOfDayCard();
@@ -1659,8 +1657,6 @@ function renderHomeContent(taste) {
 
   if (state.home.view === 'my') {
     box.append(renderTasteSummary(taste || computeTasteVector()));
-    const cwSection = buildContinueWatchingSection();
-    if (cwSection) box.append(cwSection);
   }
 
   const wrap = el('div', 'home-wrap');
