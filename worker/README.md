@@ -6,10 +6,14 @@
 (Dashboard → Workers → `mycinema-proxy` → Edit code).
 
 `worker/index.js` — повна заміна поточного воркера: логіка TMDB/OMDb-проксі
-не змінилася, додано `POST /imdb/batch`. Усі ключі тепер читаються тільки з
-CF secrets — у коді немає жодного ключа.
+не змінилася, додано `POST /imdb/batch`. Усі ключі читаються тільки з CF secrets —
+у коді немає жодного ключа.
 
-## Секрети (усі три обов'язкові)
+**AI-помічник через цей воркер більше не працює і не використовується.**
+Користувач вставляє власний ключ OpenRouter у Налаштування → AI-помічник,
+а застосунок звертається до OpenRouter напряму з пристрою.
+
+## Секрети
 
 | Secret | Використовується | Що ламається без нього |
 |---|---|---|
@@ -23,12 +27,10 @@ wrangler secret put TMDB_KEY
 wrangler secret put OMDB_KEY
 ```
 
-> 🔑 Старі значення (MDBList потрапив у публічний коміт і чат; TMDB/OMDb були
-> константами у вихідному коді воркера) — **ротуємо всі**. Живий воркер зараз
-> ще працює на старих константах у задеплоєному коді, тому після ротації треба
-> **спочатку виставити три нові секрети, а потім задеплоїти цей `index.js`**.
-> Помилка в цьому порядку = усі маршрути воркера повертають помилку.
-> APK перезбирати не потрібно: ключі в APK немає, він ходить на той самий URL.
+> 🔑 Старі ключі зі старого файлу вже давно ротовані — нічого відкликати не треба.
+> У новому `worker/index.js` ключів немає — тільки `env.*`. Порядок безпечний:
+> спочатку виставити секрети, потім задеплоїти код. Якщо задеплоїти без секретів —
+> маршрути повертатимуть `500`.
 
 ## Що додано
 
@@ -78,9 +80,11 @@ Content-Type: application/json
   "errors": [],
   "meta": {
     "source": "mdblist",
+    "cache": "d1",
     "requested": { "movie": 2, "tv": 1 },
     "found":     { "movie": 1, "tv": 1 },
     "cached":    { "movie": 0, "tv": 1 },
+    "negative":  { "movie": 0, "tv": 0 },
     "fetched":   { "movie": 1, "tv": 0 },
     "ts": 1763390000000
   }
@@ -92,7 +96,9 @@ Content-Type: application/json
 - `ok: false` означає, що **всі** чанки впали (квота/мережа) → клієнт робить
   fallback на TMDB для цього прогону;
 - частковий успіх → `ok: true` + заповнений `errors[]` (клієнт бере що є,
-  решту — з TMDB).
+  решту — з TMDB);
+- `missing` — лише **підтверджені** MDBList промахи. ID з чанка, що впав,
+  туди не потрапляють, щоб помилка квоти не отруїла негативний кеш.
 
 ### Джерело й кеш
 
@@ -100,26 +106,64 @@ Content-Type: application/json
   з тілом `{ "ids": [...], "append_to_response": ["ratings"] }`.
 - Ключ читається **тільки** як `env.MDBLIST_KEY` (Cloudflare secret).
   Без нього `/imdb/batch` повертає `500 {"ok":false,"error":"MDBLIST_KEY not configured"}`.
-- Кеш **7 днів**: якщо є KV-бinding `IMDB_CACHE` — використовується він;
-  інакше — `caches.default` з синтетичним GET-ключем (працює одразу, без KV).
 - Витрата квоти: 1 запит на кожні 200 ID на тип. Перевірено:
   `X-RateLimit-Remaining` зменшується на 1 за чанк; `/user` можна викликати
   для перевірки квоти без витрати.
 
+#### ⚠️ `caches.default` не працює на `*.workers.dev`
+
+Cache API на доменах `*.workers.dev` — **no-op** (працює лише на прив'язаному
+власному домені). Тому `/imdb/batch` **не** покладається на `caches.default`:
+без KV/D1binding кожен запит іде прямо в MDBList. Поле `meta.cache` показує
+активний бекенд: `d1`, `kv-shards` або `none`.
+
+| Бекенд | Binding | Витрата на 400 холодних ID | Ліміт безкоштовного тарифу |
+|---|---|---|---|
+| **D1 (рекомендовано)** | `IMDB_DB` | 1 SELECT + 1 batch INSERT | 5 млн читань / 100 тис. записів на добу |
+| KV (шарди) | `IMDB_CACHE` | ≤16 get + ≤16 put (16 ключів на тип) | 100 тис. читань / 1 тис. записів на добу |
+| немає | — | 0 (кешу немає) | — |
+
+Кеш **7 днів** для позитивних записів і **24 години** для `missing` —
+негативний кеш в обох бекендах. Старий формат «1 ключ KV = 1 фільм» більше
+не використовується (давав 600 операцій KV за один вхід).
+
+**D1 — схема (Workers → D1 → Create database → console):**
+
+```sql
+CREATE TABLE IF NOT EXISTS imdb_cache (
+  type TEXT NOT NULL,
+  tmdb_id INTEGER NOT NULL,
+  miss INTEGER NOT NULL DEFAULT 0,
+  payload TEXT NOT NULL DEFAULT '',
+  ts INTEGER NOT NULL,
+  PRIMARY KEY (type, tmdb_id)
+);
+```
+
+Потім у `wrangler.toml` (або Settings → Variables → D1 Database Bindings):
+
+```toml
+[[d1_databases]]
+binding = "IMDB_DB"
+database_name = "mycinema-imdb"
+database_id = "<з консолі CF>"
+```
+
 ## Деплой (порядок — важливо)
 
-1. **Ротувати всі три ключі** в кабінетах MDBList / TMDB / OMDb.
-2. **Виставити три нові секрети** (не вставляти ключі в код!):
+1. **Виставити три секрети** (не вставляти ключі в код!):
    ```bash
    wrangler secret put MDBLIST_KEY
    wrangler secret put TMDB_KEY
    wrangler secret put OMDB_KEY
    ```
-3. Вставити `worker/index.js` у `mycinema-proxy` у Cloudflare Dashboard, Deploy.
+2. Вставити `worker/index.js` у `mycinema-proxy` у Cloudflare Dashboard, Deploy.
    ⚠️ Поки секрети не виставлені — не деплоїти: усі маршрути повертають `500`.
-4. Опційно створити KV namespace `IMDB_CACHE` і прив'язати його в налаштуваннях
-   воркера (інакше працює Cache API).
-5. Перевірка всіх трьох маршрутів:
+3. **Бажано до деплою**: створити D1-базу `mycinema-imdb` зі схемою вище і
+   прив'язати її як `IMDB_DB`. Якщо D1 поки немає — створити KV namespace
+   `IMDB_CACHE` (шардований кеш). Без одного з цих біндингів `/imdb/batch`
+   працює, але **не кешується** на `workers.dev`.
+4. Перевірка маршрутів:
    ```bash
    curl -s -X POST https://mycinema-proxy.insaneteresh123.workers.dev/imdb/batch \
      -H 'Content-Type: application/json' \
@@ -127,8 +171,20 @@ Content-Type: application/json
    curl -s 'https://mycinema-proxy.insaneteresh123.workers.dev/movie/550?language=uk-UA'
    curl -s 'https://mycinema-proxy.insaneteresh123.workers.dev/omdb?i=tt0903747'
    ```
-   Усі мають повернути дані (не `500 ... not configured`). Старі ключі після
-   ротації повертатимуть 401/429 — якщо таке бачиш, у задеплоєному коді ще константи.
+   Усі мають повернути дані (не `500 ... not configured`).
+
+## AI-помічник — де він тепер
+
+AI-частина винесена **зі воркера в застосунок**. Причина конкретна: запит із
+Cloudflare Worker до OpenRouter відхилявся (`403 Access denied by security policy`)
+охороною OpenRouter ще до перевірки ключа. Прямий запит із пристрою до
+`https://openrouter.ai/api/v1/chat/completions` такий фільтр не проходить.
+
+- Ключ вводиться в **Налаштування → AI-помічник → API-ключ OpenRouter**
+  (`localStorage['mycinema.openrouterKey']`, не синхронізується з хмарою).
+- Модель за замовчуванням `google/gemini-2.5-flash`, змінюється там само.
+- Кнопка «Перевірити ключ» робить `GET /api/v1/key` — перевіряє ключ, не витрачаючи токенів.
+- У Cloudflare жодних AI-секретів, KV для ліміту чи додаткових маршрутів не потрібно.
 
 ## Наступні кроки (поки не робив)
 
@@ -140,6 +196,6 @@ Content-Type: application/json
       `REC_PRIORS`, `imdbLoadFor()` для бібліотеки й пулу кандидатів).
 - [x] Два фікси: насичення `b` режимними бонусами (`recBaseScore`) + mood-витік
       у `_sourceRaw` (`REC_MOOD_SOURCE_CAP`).
-- [ ] Ротація **всіх трьох** ключів (MDBList / TMDB / OMDb) і виставлення CF
-      secret `MDBLIST_KEY`, `TMDB_KEY`, `OMDB_KEY`, потім перезадеплой воркера
-      (поза репо). APK перезбирати не потрібно — ключів у ньому немає.
+- [ ] Виставити CF secret `MDBLIST_KEY`, `TMDB_KEY`, `OMDB_KEY` і задеплоїти
+      `worker/index.js` (поза репо). Старі ключі вже ротовані, нічого відкликати не треба.
+      Ключ OpenRouter вводиться користувачем у застосунку — у воркері його немає.

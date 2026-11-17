@@ -117,36 +117,97 @@
 
 <!-- ============ МОДАЛЬНІ ВІКНА ============ -->
 
-<div id="settings-modal">
+<!-- ============ НАЛАШТУВАННЯ: меню + 4 окремі групи ============ -->
+<div id="settings-modal" class="settings-modal">
   <div class="settings-box">
     <div class="settings-header">
       <h2>Налаштування</h2>
-      <button class="settings-close" onclick="closeSettings()">✕</button>
+      <button class="settings-close" onclick="closeSettings()" aria-label="Закрити налаштування">✕</button>
     </div>
-    
+    <button class="settings-btn settings-group-btn" onclick="openSettingsGroup('view')">
+      <span class="settings-group-icon">🎨</span><span>Вигляд</span><span class="settings-group-arrow">›</span>
+    </button>
+    <button class="settings-btn settings-group-btn" onclick="openSettingsGroup('online')">
+      <span class="settings-group-icon">🌐</span><span>Онлайн</span><span class="settings-group-arrow">›</span>
+    </button>
+    <button class="settings-btn settings-group-btn" onclick="openSettingsGroup('extra')">
+      <span class="settings-group-icon">⚙️</span><span>Додаткові функції</span><span class="settings-group-arrow">›</span>
+    </button>
+    <button class="settings-btn settings-group-btn" onclick="openSettingsGroup('data')">
+      <span class="settings-group-icon">💾</span><span>Дані</span><span class="settings-group-arrow">›</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── Вигляд ── -->
+<div id="settings-view-modal" class="settings-modal settings-group-modal">
+  <div class="settings-box">
+    <div class="settings-header">
+      <button class="settings-back" onclick="openSettingsMenu()" aria-label="Назад до налаштувань">←</button>
+      <h2>Вигляд</h2>
+      <button class="settings-close" onclick="closeSettings()" aria-label="Закрити">✕</button>
+    </div>
     <div class="settings-section">
-      <div class="settings-section-title">Тема</div>
       <div class="settings-subsection-label">Колір фону</div>
-      <div id="bg-swatches" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+      <div id="bg-swatches" class="settings-swatches"></div>
       <div class="settings-subsection-label">Колір виділення</div>
-      <div id="accent-swatches" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+      <div id="accent-swatches" class="settings-swatches"></div>
     </div>
-    
     <div class="settings-section">
-      <div class="settings-section-title">Вигляд</div>
-      <label class="settings-toggle">
-        <input type="checkbox" id="poster-bg-toggle" onchange="onPosterBgToggle(this.checked)">
-        <span>Постер як фон на картці тайтлу</span>
-      </label>
+      <div class="settings-section-title">Картка тайтлу</div>
       <label class="settings-toggle">
         <input type="checkbox" id="status-badge-toggle" onchange="onStatusBadgeToggle(this.checked)">
         <span>Статус тайтлу (бейджі на постерах)</span>
       </label>
+      <label class="settings-toggle">
+        <input type="checkbox" id="poster-bg-toggle" onchange="onPosterBgToggle(this.checked)">
+        <span>Постер як фон на картці тайтлу</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- ── Онлайн ── -->
+<div id="settings-online-modal" class="settings-modal settings-group-modal">
+  <div class="settings-box">
+    <div class="settings-header">
+      <button class="settings-back" onclick="openSettingsMenu()" aria-label="Назад до налаштувань">←</button>
+      <h2>Онлайн</h2>
+      <button class="settings-close" onclick="closeSettings()" aria-label="Закрити">✕</button>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Спосіб перегляду</div>
+      <label class="settings-toggle">
+        <input type="checkbox" id="streams-enable-toggle">
+        <span>Дивитись на UAKINO</span>
+      </label>
+      <label class="settings-toggle">
+        <input type="checkbox" id="network-enable-toggle">
+        <span>Дивитись по мережі</span>
+      </label>
     </div>
 
+    <div class="settings-section" id="online-network-fields">
+      <div class="settings-section-title">Підключення по мережі</div>
+      <label class="settings-field-label" for="room-url">URL кімнати</label>
+      <input id="room-url" class="settings-field" placeholder="http://192.168.x.x:8082/room.html" autocomplete="off">
+      <label class="settings-field-label" for="room-parser-url">URL парсеру</label>
+      <input id="room-parser-url" class="settings-field" autocomplete="off">
+      <label class="settings-field-label" for="room-parser-api">API парсеру</label>
+      <input id="room-parser-api" class="settings-field" autocomplete="off">
+      <label class="settings-field-label" for="room-server-url">Посилання на сервер</label>
+      <input id="room-server-url" class="settings-field" autocomplete="off">
+      <div class="settings-field-actions">
+        <button class="settings-btn" id="room-save">Зберегти</button>
+        <button class="settings-btn" id="room-check" type="button">Перевірити кімнату</button>
+        <button class="settings-btn" id="room-default" type="button">Стандартна</button>
+      </div>
+      <div id="room-status" class="settings-field-status"></div>
+      <div class="notes-hint">Дані зберігаються в хмарі акаунта (при вході) і передаються в кімнату при відкритті.</div>
+    </div>
 
     <div class="settings-section">
-      <div class="settings-section-title">Релізи</div>
+      <div class="settings-section-title">Фільтри релізів</div>
       <label class="settings-toggle">
         <input type="checkbox" id="digital-only-toggle" onchange="onDigitalOnlyToggle(this.checked)">
         <span>Тільки те, що вже вийшло в цифрі</span>
@@ -155,11 +216,33 @@
         <input type="checkbox" id="streaming-ua-toggle" onchange="onStreamingUAToggle(this.checked)">
         <span>Тільки доступне на стрімінгу в UA</span>
       </label>
-      <div class="notes-hint" style="font-size:12px;padding:0 4px">Фільтрує рекомендації та загальні підбірки. Впливає тільки на тайтли без даних у бібліотеці — відкрий картку, щоб підтягнути метадані.</div>
+      <div class="notes-hint">Фільтрує рекомендації та загальні підбірки. Впливає тільки на тайтли без даних у бібліотеці — відкрий картку, щоб підтягнути метадані.</div>
     </div>
+  </div>
+</div>
 
+<!-- ── Додаткові функції ── -->
+<div id="settings-extra-modal" class="settings-modal settings-group-modal">
+  <div class="settings-box">
+    <div class="settings-header">
+      <button class="settings-back" onclick="openSettingsMenu()" aria-label="Назад до налаштувань">←</button>
+      <h2>Додаткові функції</h2>
+      <button class="settings-close" onclick="closeSettings()" aria-label="Закрити">✕</button>
+    </div>
+    <!-- AI-помічник, проксі та керування клавіатурою додаються скриптами -->
+  </div>
+</div>
+
+<!-- ── Дані ── -->
+<div id="settings-data-modal" class="settings-modal settings-group-modal">
+  <div class="settings-box">
+    <div class="settings-header">
+      <button class="settings-back" onclick="openSettingsMenu()" aria-label="Назад до налаштувань">←</button>
+      <h2>Дані</h2>
+      <button class="settings-close" onclick="closeSettings()" aria-label="Закрити">✕</button>
+    </div>
     <div class="settings-section">
-      <div class="settings-section-title">Дані</div>
+      <div class="settings-section-title">Бібліотека та синхронізація</div>
       <button class="settings-btn" onclick="exportLibrary()">Експорт бібліотеки</button>
       <button class="settings-btn" onclick="importLibrary()">Імпорт бібліотеки</button>
       <button class="settings-btn" onclick="syncFromSettings()">Синхронізувати з хмарою</button>

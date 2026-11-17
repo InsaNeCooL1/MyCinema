@@ -68,7 +68,24 @@ document.body.innerHTML = `
   <div id="sync-indicator"></div>
   <div id="poster-zoom"><img alt="" /></div>
   <div id="auth-modal"></div>
-  <div id="settings-modal"></div>
+  <div id="settings-modal" class="settings-modal"><div class="settings-box">
+    <button class="settings-group-btn" data-group="view">Вигляд</button>
+    <button class="settings-group-btn" data-group="online">Онлайн</button>
+    <button class="settings-group-btn" data-group="extra">Додаткові функції</button>
+    <button class="settings-group-btn" data-group="data">Дані</button>
+  </div></div>
+  <div id="settings-view-modal" class="settings-modal settings-group-modal"><div class="settings-box"></div></div>
+  <div id="settings-online-modal" class="settings-modal settings-group-modal"><div class="settings-box">
+    <input type="checkbox" id="streams-enable-toggle">
+    <input type="checkbox" id="network-enable-toggle">
+    <div id="online-network-fields">
+      <input id="room-url"><input id="room-parser-url"><input id="room-parser-api"><input id="room-server-url">
+      <button id="room-save" type="button"></button><button id="room-check" type="button"></button><button id="room-default" type="button"></button>
+      <div id="room-status"></div>
+    </div>
+  </div></div>
+  <div id="settings-extra-modal" class="settings-modal settings-group-modal"><div class="settings-box"></div></div>
+  <div id="settings-data-modal" class="settings-modal settings-group-modal"><div class="settings-box"></div></div>
   <input type="file" id="import-file" />
   <div id="onboarding-modal">
     <div id="onb-scroll"></div>
@@ -95,6 +112,7 @@ loadScript('src/core.js');
 loadScript('src/recs-math.js');
 loadScript('src/imdb-ratings.js');
 loadScript('src/stats.js');
+loadScript('src/room.js');
 loadScript('src/settings.js');
 loadScript('src/home.js');
 

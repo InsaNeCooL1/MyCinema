@@ -59,25 +59,35 @@ function isExcludedFromTaste(x, avg) {
   return false;
 }
 
-// Одноразовий backfill IMDb для всієї бібліотеки — має завершитися ДО getSeeds().
+// Одноразовий backfill IMDb для бібліотеки — має завершитися ДО getSeeds().
 async function ensureLibraryImdb() {
   if (typeof imdbLoadFor !== 'function') return { ok: false, total: 0 };
   const movies = [], tv = [];
   for (const x of Object.values(lib || {})) {
     if (!x || !x.id) continue;
+    // imdbRef реально читається тільки для оцінених/улюблених/сильних сідів.
+    // Неоцінені «Планую»/watching не впливають на математику — не шлемо їх.
+    const avg = computeItemRating(x).avg;
+    const cast = getItemCastRating(x);
+    const elo = typeof x.elo === 'number' ? x.elo : ELO_START;
+    const highElo = (x.eloGames || 0) > 0 && elo >= 1530;
+    if (avg <= 0 && cast <= 0 && !x.favorite && !highElo) continue;
+
     const t = (x.type === 'tv') ? 'tv' : 'movie';
     if (typeof imdbLookup === 'function' && imdbLookup(t, x.id)) continue;
+    if (typeof imdbIsKnownMissing === 'function' && imdbIsKnownMissing(t, x.id)) continue;
     (t === 'tv' ? tv : movies).push(x.id);
   }
-  let ok = true;
   const groups = [];
   for (const [t, arr] of [['movie', movies], ['tv', tv]]) {
     for (let i = 0; i < arr.length; i += 400) groups.push([t, arr.slice(i, i + 400)]);
   }
-  for (const [t, arr] of groups) {
-    const res = (t === 'tv') ? await imdbLoadFor([], arr) : await imdbLoadFor(arr, []);
-    if (!res.ok) ok = false;
-  }
+  // Групи незалежні — паралельно, а не послідовний for ... await.
+  const results = await Promise.all(groups.map(([t, arr]) => {
+    const p = (t === 'tv') ? imdbLoadFor([], arr) : imdbLoadFor(arr, []);
+    return p.catch(() => ({ ok: false }));
+  }));
+  const ok = results.every(res => res.ok);
   return { ok, total: movies.length + tv.length };
 }
 
@@ -1345,14 +1355,21 @@ function computeRecsSignature(seeds) {
 
 async function loadHome() {
   if (state.tab !== 'home') return;
-  if (!state.home.mode || !window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches) state.home.mode = 'balance';
+  // FIX-MOBILE-MODES: старий matchMedia щоразу скидав gems/fresh на balance
+  // на вузьких екранах (APK/телефон), хоча кнопки режимів показуються скрізь.
+  if (!state.home.mode) state.home.mode = 'balance';
+
+  const taste = computeTasteVector();
+  // Показуємо скелетон до мережевого backfill: інакше екран висить порожнім,
+  // навіть коли рекомендації вже лежать у кеші. Якщо стан уже свіжий — не моргаємо.
+  const preSig = computeRecsSignature(getSeeds());
+  if (!(state.home.recs && state.home.sig === preSig)) renderHomeSkeleton(taste);
 
   // Спочатку підтягуємо IMDb для бібліотеки, бо getSeeds() і профілі акторів
   // вже рахують residual на його основі. При помилці — тихий TMDB-фольбек.
   try { await ensureLibraryImdb(); } catch (e) { console.warn('[MyCinema/IMDb] library backfill fail:', e); }
 
   const seeds = getSeeds();
-  const taste = computeTasteVector();
   const sig = computeRecsSignature(seeds);
   const critical = computeCriticalSig(); /* FIX-RECS-CACHE-V2 */
 

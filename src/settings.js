@@ -1,22 +1,79 @@
 'use strict';
 
 // ========== SETTINGS ==========
+var SETTINGS_GROUPS = {
+  view: 'settings-view-modal',
+  online: 'settings-online-modal',
+  extra: 'settings-extra-modal',
+  data: 'settings-data-modal'
+};
+
 function openSettings() {
   closeSidebar();
   renderSettingsSwatches();
-  document.getElementById('poster-bg-toggle').checked = settings.posterBg;
-  /* FIX-RELEASE-HANDLERS */
-  var _d = document.getElementById('digital-only-toggle');
-  if (_d) _d.checked = !!settings.digitalOnly;
-  var _s = document.getElementById('streaming-ua-toggle');
-  if (_s) _s.checked = !!settings.streamingOnlyUA;
-  var _sb = document.getElementById('status-badge-toggle'); /* FIX-STATUS-TOGGLE */
-  if (_sb) _sb.checked = settings.showStatusBadges !== false;
   injectSnowToggle();
-  injectKbdNavToggle();
+  injectExtraSettings();
   if (typeof injectDismissedReset === 'function') injectDismissedReset();
   if (typeof injectApkUpdateButton === 'function') injectApkUpdateButton();
-  document.getElementById('settings-modal').classList.add('open');
+  openSettingsMenu();
+}
+
+function openSettingsMenu() {
+  closeAllSettingsModals();
+  refreshSettingsControls();
+  var menu = document.getElementById('settings-modal');
+  if (menu) menu.classList.add('open');
+}
+
+function openSettingsGroup(name) {
+  var id = SETTINGS_GROUPS[name];
+  if (!id) return;
+  closeAllSettingsModals();
+  refreshSettingsControls();
+  var modal = document.getElementById(id);
+  if (modal) modal.classList.add('open');
+}
+
+function closeAllSettingsModals() {
+  var modals = document.querySelectorAll('.settings-modal');
+  for (var i = 0; i < modals.length; i++) modals[i].classList.remove('open');
+}
+
+// Повернення назад: з групи → в меню, з меню → закриття. Використовуємо
+// і для кнопки «←», і для системної кнопки Back / Escape.
+function handleSettingsBack() {
+  if (document.querySelector('.settings-group-modal.open')) {
+    openSettingsMenu();
+    return true;
+  }
+  var menu = document.getElementById('settings-modal');
+  if (menu && menu.classList.contains('open')) {
+    closeSettings();
+    return true;
+  }
+  return false;
+}
+
+function refreshSettingsControls() {
+  var set = function (id, value) {
+    var el = document.getElementById(id);
+    if (el && el.type === 'checkbox') el.checked = !!value;
+  };
+  set('poster-bg-toggle', settings.posterBg);
+  set('status-badge-toggle', settings.showStatusBadges !== false);
+  set('digital-only-toggle', settings.digitalOnly);
+  set('streaming-ua-toggle', settings.streamingOnlyUA);
+  set('snow-toggle', typeof SnowFeature !== 'undefined' ? SnowFeature.isEnabled() : true);
+  set('kbd-nav-toggle', typeof isKbdNavEnabled === 'function' ? isKbdNavEnabled() : false);
+  set('streams-enable-toggle', settings.enableStreams !== false);
+
+  // «Дивитись по мережі»: за замовчуванням увімкнено, якщо вже є URL кімнати.
+  var online = typeof getOnlineConfig === 'function' ? getOnlineConfig() : {};
+  var networkOn = online.networkEnabled !== undefined ? !!online.networkEnabled : !!online.roomUrl;
+  set('network-enable-toggle', networkOn);
+  var fields = document.getElementById('online-network-fields');
+  if (fields) fields.hidden = !networkOn;
+  if (typeof syncRoomFields === 'function') syncRoomFields();
 }
 
 /* FIX-RELEASE-HANDLERS-2 */
@@ -49,8 +106,8 @@ function onStatusBadgeToggle(on) {
   if (state.tab === 'home') refresh();
 }
 
-function closeSettings() { 
-  document.getElementById('settings-modal').classList.remove('open'); 
+function closeSettings() {
+  closeAllSettingsModals();
 }
 
 function onPosterBgToggle(on) {
@@ -251,16 +308,11 @@ function skipOnboarding() {
 
 // ========== SNOW TOGGLE (injected dynamically, no HTML in index.html) ==========
 function injectSnowToggle() {
-  const modal = document.getElementById('settings-modal');
+  const modal = document.getElementById('settings-view-modal');
   if (!modal) return;
   if (modal.querySelector('#snow-toggle')) return;
 
-  const sections = modal.querySelectorAll('.settings-section');
-  let target = null;
-  sections.forEach(function (sec) {
-    const title = sec.querySelector('.settings-section-title');
-    if (title && /Вигляд/i.test(title.textContent)) target = sec;
-  });
+  const target = modal.querySelector('.settings-box');
   if (!target) return;
 
   const label = document.createElement('label');
@@ -284,14 +336,9 @@ function injectSnowToggle() {
 
 // ========== RESET DISMISSED ==========
 function injectDismissedReset() {
-  const modal = document.getElementById('settings-modal');
+  const modal = document.getElementById('settings-data-modal');
   if (!modal) return;
-  const sections = modal.querySelectorAll('.settings-section');
-  let target = null;
-  sections.forEach((sec) => {
-    const title = sec.querySelector('.settings-section-title');
-    if (title && /Дані/i.test(title.textContent)) target = sec;
-  });
+  const target = modal.querySelector('.settings-box');
   if (!target) return;
 
   const getCount = () => (typeof dismissedRecs === 'object' && dismissedRecs) ? Object.keys(dismissedRecs).length : 0;
@@ -321,14 +368,9 @@ function injectDismissedReset() {
 function injectApkUpdateButton() {
   const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   if (!isNative) return;
-  const modal = document.getElementById('settings-modal');
+  const modal = document.getElementById('settings-data-modal');
   if (!modal || modal.querySelector('#apk-update-btn')) return;
-  const sections = modal.querySelectorAll('.settings-section');
-  let target = null;
-  sections.forEach((sec) => {
-    const title = sec.querySelector('.settings-section-title');
-    if (title && /Дані/i.test(title.textContent)) target = sec;
-  });
+  const target = modal.querySelector('.settings-box');
   if (!target) return;
   const btn = document.createElement('button');
   btn.id = 'apk-update-btn';
@@ -379,30 +421,20 @@ function injectApkUpdateButton() {
   target.appendChild(btn);
 }
 
-// ========== KEYBOARD NAV TOGGLE (local-only, no cloud sync) ==========
-function injectKbdNavToggle() {
-  const modal = document.getElementById('settings-modal');
+// ========== ДОДАТКОВІ ФУНКЦІЇ (local-only, без хмарної синхронізації) ==========
+function injectExtraSettings() {
+  const modal = document.getElementById('settings-extra-modal');
   if (!modal) return;
-  const existing = modal.querySelector('#kbd-nav-toggle');
-  if (existing) {
-    existing.checked = typeof isKbdNavEnabled === 'function' ? isKbdNavEnabled() : false;
-    return;
-  }
+  const box = modal.querySelector('.settings-box');
+  if (!box || box.querySelector('#kbd-nav-toggle')) return;
 
-  const sections = modal.querySelectorAll('.settings-section');
-  let target = null;
-  sections.forEach(function (sec) {
-    const title = sec.querySelector('.settings-section-title');
-    if (title && /Дані/i.test(title.textContent)) target = sec;
-  });
-
+  // Керування клавіатурою
   const sec = document.createElement('div');
   sec.className = 'settings-section';
-  sec.appendChild(el('div', 'settings-section-title', 'Управління'));
+  sec.appendChild(el('div', 'settings-section-title', 'Керування'));
 
   const label = document.createElement('label');
   label.className = 'settings-toggle';
-
   const input = document.createElement('input');
   input.type = 'checkbox';
   input.id = 'kbd-nav-toggle';
@@ -411,45 +443,44 @@ function injectKbdNavToggle() {
     if (typeof setKbdNavEnabled === 'function') setKbdNavEnabled(this.checked);
     showSyncToast(this.checked ? '⌨️ Клавіатура увімкнена' : '👆 Сенсорне керування');
   });
+  label.append(input, el('span', '', 'Керування клавіатурою (стрілки / Tab)'));
+  sec.append(label, el('div', 'notes-hint', 'Локальне налаштування тільки для цього пристрою.'));
+  box.appendChild(sec);
 
-  const span = document.createElement('span');
-  span.textContent = 'Керування клавіатурою (стрілки / Tab)';
+  // Проксі — звичайні поля замість prompt()
+  const proxySec = document.createElement('div');
+  proxySec.className = 'settings-section';
+  proxySec.appendChild(el('div', 'settings-section-title', 'Проксі'));
 
-  label.appendChild(input);
-  label.appendChild(span);
-  sec.appendChild(label);
+  function proxyField(id, storageKey, text, placeholder) {
+    proxySec.appendChild(el('label', 'settings-field-label', text));
+    const inp = document.createElement('input');
+    inp.id = id;
+    inp.className = 'settings-field';
+    inp.placeholder = placeholder || 'https://…';
+    inp.autocomplete = 'off';
+    inp.value = localStorage.getItem(storageKey) || '';
+    inp.addEventListener('change', function () {
+      var v = inp.value.trim().replace(/\/+$/, '');
+      if (v && !/^https?:\/\//i.test(v)) {
+        alert('Невірний URL');
+        inp.value = localStorage.getItem(storageKey) || '';
+        return;
+      }
+      if (v) localStorage.setItem(storageKey, v);
+      else localStorage.removeItem(storageKey);
+      if (storageKey === 'mycinema.tmdbProxy' && typeof DEFAULT_PROXY_URL !== 'undefined') {
+        PROXY_URL = v || DEFAULT_PROXY_URL;
+      }
+      showSyncToast('✅ ' + text + ' збережено');
+    });
+    proxySec.appendChild(inp);
+  }
 
-  const hint = el('div', 'notes-hint', 'Локальне налаштування тільки для цього пристрою.');
-  hint.style.cssText = 'font-size:12px;padding:0 4px;margin-top:0;';
-  sec.appendChild(hint);
-
-  const pxBtn = document.createElement('button');
-  pxBtn.className = 'settings-btn';
-  pxBtn.type = 'button';
-  pxBtn.textContent = '🌐 Проксі-сервери (TMDB / Потік)';
-  pxBtn.addEventListener('click', () => {
-    const curTmdb = localStorage.getItem('mycinema.tmdbProxy') || '';
-    const nextTmdb = prompt('URL проксі для TMDB (порожньо = стандартний):', curTmdb);
-    if (nextTmdb !== null) {
-      const cleanT = nextTmdb.trim().replace(/\/+$/, '');
-      if (cleanT && !/^https?:\/\//i.test(cleanT)) { alert('Невірний URL'); return; }
-      if (cleanT) { localStorage.setItem('mycinema.tmdbProxy', cleanT); PROXY_URL = cleanT; }
-      else { localStorage.removeItem('mycinema.tmdbProxy'); if (typeof DEFAULT_PROXY_URL !== 'undefined') PROXY_URL = DEFAULT_PROXY_URL; }
-    }
-    const curStream = localStorage.getItem('mycinema.proxy') || '';
-    const nextStream = prompt('URL проксі для балансерів (порожньо = стандартний):', curStream);
-    if (nextStream !== null) {
-      const cleanS = nextStream.trim().replace(/\/+$/, '');
-      if (cleanS && !/^https?:\/\//i.test(cleanS)) { alert('Невірний URL'); return; }
-      if (cleanS) localStorage.setItem('mycinema.proxy', cleanS);
-      else localStorage.removeItem('mycinema.proxy');
-    }
-    showSyncToast('✅ Налаштування проксі збережено');
-  });
-  sec.appendChild(pxBtn);
-
-  if (target && target.parentNode) target.parentNode.insertBefore(sec, target);
-  else modal.querySelector('.settings-box')?.appendChild(sec);
+  proxyField('tmdb-proxy-input', 'mycinema.tmdbProxy', 'TMDB проксі', 'порожньо = стандартний');
+  proxyField('stream-proxy-input', 'mycinema.proxy', 'Проксі балансерів', 'порожньо = стандартний');
+  proxySec.appendChild(el('div', 'notes-hint', 'Порожнє поле = стандартний адрес. Зміни застосовуються після втрати фокусу.'));
+  box.appendChild(proxySec);
 }
 
 

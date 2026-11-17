@@ -9,7 +9,8 @@
 // ════════════════════════════════════════════════════════════════
 
 const IMDB_CACHE_KEY = 'mycinema.imdbRatings.v1';
-const IMDB_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 днів
+const IMDB_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 днів (позитивні записи)
+const IMDB_MISS_TTL = 24 * 60 * 60 * 1000;      // 1 доба (негативний кеш промахів)
 const IMDB_CACHE_MAX = 3000;                    // стеля записів у кеші
 const IMDB_SEND_MAX = 400;                      // стеля ID на тип за запит
 
@@ -46,6 +47,15 @@ function imdbWriteCache(cache) {
   } catch (_) { /* кеш не критичний */ }
 }
 
+function imdbEntryFrom(val, now) {
+  return {
+    imdbId: val.imdbId || null,
+    imdbRating: Number(val.imdbRating),
+    imdbVotes: Math.max(0, Number(val.imdbVotes) || 0),
+    ts: now || Date.now(),
+  };
+}
+
 /** Синхронний lookup. Повертає entry або null, якщо даних немає/прострочені. */
 function imdbLookup(type, id) {
   const key = imdbKey(type, id);
@@ -54,6 +64,14 @@ function imdbLookup(type, id) {
   if (!entry || !(Number(entry.imdbRating) > 0)) return null;
   if (Date.now() - (entry.ts || 0) > IMDB_CACHE_TTL) return null;
   return entry;
+}
+
+/** Негативний кеш: відомий промах MDBList, ще не прострочений. */
+function imdbIsKnownMissing(type, id) {
+  const key = imdbKey(type, id);
+  if (!key || key.endsWith(':0')) return false;
+  const entry = imdbReadCache()[key];
+  return !!(entry && entry.miss && (Date.now() - (entry.ts || 0)) < IMDB_MISS_TTL);
 }
 
 function imdbStore(data, want) {
@@ -70,12 +88,32 @@ function imdbStore(data, want) {
       if (allowed && !allowed.has(String(id))) continue;
       const key = imdbKey(type, id);
       if (key.endsWith(':0')) continue;
-      cache[key] = {
-        imdbId: val.imdbId || null,
-        imdbRating: Number(val.imdbRating),
-        imdbVotes: Math.max(0, Number(val.imdbVotes) || 0),
-        ts: now,
-      };
+      cache[key] = imdbEntryFrom(val, now);
+      added++;
+    }
+  }
+  if (added) imdbWriteCache(cache);
+  return added;
+}
+
+/** Кешує підтверджені воркером промахи, щоб не спамити MDBList при кожному старті. */
+function imdbStoreMissing(missing, want) {
+  if (!missing || typeof missing !== 'object') return 0;
+  const cache = imdbReadCache();
+  const now = Date.now();
+  let added = 0;
+  for (const type of ['movie', 'tv']) {
+    const ids = missing[type];
+    if (!Array.isArray(ids)) continue;
+    const allowed = want && want[type] ? new Set(want[type].map(String)) : null;
+    for (const id of ids) {
+      if (allowed && !allowed.has(String(id))) continue;
+      const key = imdbKey(type, id);
+      if (key.endsWith(':0')) continue;
+      const old = cache[key];
+      // Не перетираємо свіжий позитивний запис помилковим «missing».
+      if (old && Number(old.imdbRating) > 0 && (now - (old.ts || 0)) < IMDB_CACHE_TTL) continue;
+      cache[key] = { miss: true, ts: now };
       added++;
     }
   }
@@ -142,29 +180,60 @@ async function imdbFetchBatch(movies, tv) {
 async function imdbLoadFor(movies, tv) {
   const want = { movie: imdbCleanIds(movies), tv: imdbCleanIds(tv) };
   const todo = { movie: [], tv: [] };
+  const knownMissing = { movie: [], tv: [] };
   const data = {};
 
   for (const type of ['movie', 'tv']) {
     for (const id of want[type]) {
       const hit = imdbLookup(type, id);
       if (hit) data[imdbKey(type, id)] = hit;
+      else if (imdbIsKnownMissing(type, id)) knownMissing[type].push(id);
       else todo[type].push(id);
     }
   }
 
   if (!todo.movie.length && !todo.tv.length) {
-    return { ok: true, fallback: false, data, missing: { movie: [], tv: [] }, errors: [], fetched: 0 };
+    return { ok: true, fallback: false, data, missing: knownMissing, errors: [], fetched: 0 };
   }
 
   const res = await imdbFetchBatch(todo.movie, todo.tv);
   const fetched = imdbStore(res.data, want);
+
+  // FIX-IMDB-RETURN: imdbStore пише в кеш, але результат мав повертати
+  // щойно завантажені елементи й при холодному старті (fetched > 0, data: {}).
+  const now = Date.now();
+  for (const type of ['movie', 'tv']) {
+    const bucket = res.data && res.data[type];
+    if (!bucket || typeof bucket !== 'object') continue;
+    const allowed = want[type] ? new Set(want[type].map(String)) : null;
+    for (const [id, val] of Object.entries(bucket)) {
+      if (!val || !(Number(val.imdbRating) > 0)) continue;
+      if (allowed && !allowed.has(String(id))) continue;
+      const key = imdbKey(type, id);
+      if (key.endsWith(':0')) continue;
+      data[key] = imdbEntryFrom(val, now);
+    }
+  }
+
+  // Промахи кешуємо тільки для валідної відповіді воркера: при ok:false
+  // (квота/мережа) res.missing = усе, що не вдалося з'ясувати — не підтвердження.
+  if (res.ok !== false) imdbStoreMissing(res.missing, want);
+
+  const missing = { movie: [...knownMissing.movie], tv: [...knownMissing.tv] };
+  for (const type of ['movie', 'tv']) {
+    const ids = res.missing && res.missing[type];
+    if (!Array.isArray(ids)) continue;
+    for (const id of ids) {
+      if (!missing[type].includes(id)) missing[type].push(id);
+    }
+  }
 
   return {
     ok: res.ok,
     fallback: !res.ok,
     data,
     raw: res.data,
-    missing: res.missing,
+    missing,
     errors: res.errors,
     meta: res.meta,
     error: res.error,
@@ -218,10 +287,13 @@ function imdbClearCache() {
 }
 
 // Публічний API (classic script + зручно для тестів)
+window.IMDB_CACHE_KEY = IMDB_CACHE_KEY;
 window.IMDB_CACHE_TTL = IMDB_CACHE_TTL;
+window.IMDB_MISS_TTL = IMDB_MISS_TTL;
 window.imdbType = imdbType;
 window.imdbKey = imdbKey;
 window.imdbLookup = imdbLookup;
+window.imdbIsKnownMissing = imdbIsKnownMissing;
 window.imdbFetchBatch = imdbFetchBatch;
 window.imdbLoadFor = imdbLoadFor;
 window.imdbRef = imdbRef;

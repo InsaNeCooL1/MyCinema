@@ -10,7 +10,10 @@ const _IDB_KEYS = [
   'mycinema.metaCache.v2',
   'mycinema.colCache.v1',
   'mycinema.companyCache.v1',
-  'mycinema.releaseCache.v1'
+  'mycinema.releaseCache.v1',
+  // FIX-IMDB-IDB: mcCacheSet() пише цей ключ в IndexedDB і чистить localStorage.
+  // Без нього у списку завантаження 7-денний IMDb-кеш гине при кожному старті.
+  'mycinema.imdbRatings.v1'
 ];
 let _idbDbPromise = null;
 
@@ -26,6 +29,9 @@ function _openIdb() {
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
+      // Інакше mcCacheReady може висіти назавжди (наприклад, blocked upgrade),
+      // і startAppWithIdbCache ніколи не викличе boot().
+      req.onblocked = () => resolve(null);
     } catch { resolve(null); }
   });
   return _idbDbPromise;
@@ -108,6 +114,7 @@ window.mcCacheReady = (function initIdbCache() {
         });
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
       } catch { resolve(); }
     });
   });
@@ -686,7 +693,7 @@ let libTombstones = (() => { try { return JSON.parse(localStorage.getItem(LS_DEL
 
 function evictHeavyCaches() {
   const legacy = ['mycinema.recs.v4', 'mycinema.home.general.v6', 'mycinema.metaCache.v1'];
-  const expendable = [RECS_CACHE, 'mycinema.home.general.v7', 'mycinema.metaCache.v2', 'mycinema.companyCache.v1', 'mycinema.colCache.v1', 'mycinema.releaseCache.v1'];
+  const expendable = [RECS_CACHE, 'mycinema.home.general.v7', 'mycinema.metaCache.v2', 'mycinema.companyCache.v1', 'mycinema.colCache.v1', 'mycinema.releaseCache.v1', 'mycinema.imdbRatings.v1'];
   legacy.forEach(k => { try { localStorage.removeItem(k); } catch {} });
   expendable.forEach(k => mcCacheDel(k));
 }

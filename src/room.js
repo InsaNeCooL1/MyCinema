@@ -41,7 +41,7 @@
     return next;
   }
   function getUrl() { return String(getOnline().roomUrl || DEFAULT_ROOM_URL); }
-  function enabled() { return !!getUrl(); }
+  function enabled() { return !!getUrl() && isNetworkEnabled(); }
   function serviceConfig() {
     var o = getOnline();
     var proxy = '';
@@ -60,44 +60,35 @@
   }
 
   /* ---------- Налаштування (Онлайн) ---------- */
-  function buildOnlineSettings() {
-    if (document.getElementById('online-settings')) return;
-    var titles = document.querySelectorAll('#settings-modal .settings-section-title');
-    var anchor = null;
-    for (var i = 0; i < titles.length; i++) {
-      if (titles[i].textContent.trim() === 'Дані') { anchor = titles[i].parentNode; break; }
-    }
-    if (!anchor) return;
-    var sec = document.createElement('div');
-    sec.className = 'settings-section';
-    sec.id = 'online-settings';
-    sec.innerHTML =
-      '<div class="settings-section-title">Онлайн</div>' +
-      '<details open style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:600;opacity:.95;list-style:revert">Вбудований перегляд</summary>' +
-        '<label class="settings-toggle" style="margin-top:8px"><input type="checkbox" id="streams-enable-toggle"><span>Вбудований перегляд (UA KINO)</span></label>' +
-      '</details>' +
-      '<details open><summary style="cursor:pointer;font-weight:600;opacity:.95;list-style:revert">По мережі</summary>' +
-        '<div style="display:grid;gap:8px;margin-top:8px">' +
-          '<label style="font-size:12px;opacity:.8">URL кімнати</label>' +
-          '<input id="room-url" placeholder="http://192.168.x.x:8082/room.html" autocomplete="off" style="width:100%;padding:8px 10px;box-sizing:border-box;background:transparent;color:inherit;border:1px solid rgba(255,255,255,.18);border-radius:8px">' +
-          '<label style="font-size:12px;opacity:.8">URL парсеру</label>' +
-          '<input id="room-parser-url" autocomplete="off" style="width:100%;padding:8px 10px;box-sizing:border-box;background:transparent;color:inherit;border:1px solid rgba(255,255,255,.18);border-radius:8px">' +
-          '<label style="font-size:12px;opacity:.8">API парсеру</label>' +
-          '<input id="room-parser-api" autocomplete="off" style="width:100%;padding:8px 10px;box-sizing:border-box;background:transparent;color:inherit;border:1px solid rgba(255,255,255,.18);border-radius:8px">' +
-          '<label style="font-size:12px;opacity:.8">Посилання на сервер</label>' +
-          '<input id="room-server-url" autocomplete="off" style="width:100%;padding:8px 10px;box-sizing:border-box;background:transparent;color:inherit;border:1px solid rgba(255,255,255,.18);border-radius:8px">' +
-          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' +
-            '<button class="settings-btn" id="room-save">Зберегти</button>' +
-            '<button class="settings-btn" id="room-check" type="button">Перевірити кімнату</button>' +
-            '<button class="settings-btn" id="room-default" type="button">Стандартна</button>' +
-          '</div>' +
-          '<div id="room-status" style="font-size:12px;opacity:.85;min-height:1.2em"></div>' +
-          '<div style="font-size:12px;opacity:.7">Дані зберігаються в хмарі акаунта (при вході) і передаються в кімнату при відкритті.</div>' +
-        '</div>' +
-      '</details>';
-    anchor.parentNode.insertBefore(sec, anchor);
+  // Прапорець лежить у загальному онлайн-конфігу (синхронізується з хмарою).
+  // Для старих профілів, де його немає, вважаємо мережу увімкненою, якщо є URL кімнати.
+  function isNetworkEnabled() {
+    var o = getOnline();
+    return o.networkEnabled !== undefined ? !!o.networkEnabled : !!o.roomUrl;
+  }
 
+  function syncRoomFields() {
+    var inpUrl = document.getElementById('room-url');
+    if (!inpUrl) return;
+    var o = getOnline();
+    inpUrl.value = o.roomUrl || DEFAULT_ROOM_URL;
+    var p = document.getElementById('room-parser-url');
+    var a = document.getElementById('room-parser-api');
+    var s = document.getElementById('room-server-url');
+    if (p) p.value = o.parserUrl || '';
+    if (a) a.value = o.parserApi || '';
+    if (s) s.value = o.serverUrl || '';
+    var fields = document.getElementById('online-network-fields');
+    if (fields) fields.hidden = !isNetworkEnabled();
+  }
+
+  function buildOnlineSettings() {
     var stInp = document.getElementById('streams-enable-toggle');
+    var netInp = document.getElementById('network-enable-toggle');
+    var inpUrl = document.getElementById('room-url');
+    if (!stInp || !netInp || !inpUrl || inpUrl.dataset.bound) return;
+    inpUrl.dataset.bound = '1';
+
     stInp.checked = settings.enableStreams !== false;
     stInp.addEventListener('change', function () {
       settings.enableStreams = !!this.checked;
@@ -106,16 +97,21 @@
       toast(this.checked ? '▶️ UA KINO увімкнено' : '🙈 UA KINO вимкнено');
     });
 
-    var inpUrl = document.getElementById('room-url');
+    netInp.checked = isNetworkEnabled();
+    netInp.addEventListener('change', function () {
+      setOnline({ networkEnabled: !!this.checked });
+      var fields = document.getElementById('online-network-fields');
+      if (fields) fields.hidden = !this.checked;
+      if (typeof cardStack !== 'undefined' && cardStack.length && typeof renderCard === 'function') renderCard(true);
+      toast(this.checked ? '🌐 Перегляд по мережі увімкнено' : '🙈 Перегляд по мережі вимкнено');
+    });
+
+    syncRoomFields();
+
     var inpP = document.getElementById('room-parser-url');
     var inpA = document.getElementById('room-parser-api');
     var inpS = document.getElementById('room-server-url');
     var st = document.getElementById('room-status');
-    var o = getOnline();
-    inpUrl.value = o.roomUrl || DEFAULT_ROOM_URL;
-    inpP.value = o.parserUrl || '';
-    inpA.value = o.parserApi || '';
-    inpS.value = o.serverUrl || '';
 
     document.getElementById('room-save').onclick = function () {
       var raw = inpUrl.value.trim();
@@ -318,5 +314,10 @@
     else if (m.type === 'close') close();
   });
 
-  window.mcRoom = { open: open, close: close, handleBack: handleBack, enabled: enabled, getUrl: getUrl, normalizeUrl: normalizeUrl, check: check };
+  window.mcRoom = {
+    open: open, close: close, handleBack: handleBack, enabled: enabled,
+    getUrl: getUrl, normalizeUrl: normalizeUrl, check: check,
+    isNetworkEnabled: isNetworkEnabled, syncRoomFields: syncRoomFields,
+    injectSettings: injectSettings
+  };
 })();

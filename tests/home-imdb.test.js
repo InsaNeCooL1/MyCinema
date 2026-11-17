@@ -100,6 +100,41 @@ describe('Home recommendations на IMDb (big bang)', () => {
     expect(res.items.length).toBeGreaterThan(0);
   });
 
+  it('ensureLibraryImdb: пропускає неоцінені planned/watching', async () => {
+    const f = vi.fn().mockResolvedValue(workerResponse({
+      movie: { 278: { imdbId: 'tt0111161', imdbRating: 9.3, imdbVotes: 1000 } },
+      tv: {},
+    }));
+    global.fetch = f;
+    window.lib = {
+      'movie-278': makeItem(), // оцінений
+      'movie-999': makeItem({ key: 'movie-999', id: 999, status: 'planned', ratings: null, tmdbRating: 0 }),
+      'movie-888': makeItem({ key: 'movie-888', id: 888, status: 'watching', ratings: null }),
+    };
+
+    const res = await window.ensureLibraryImdb();
+    expect(res.ok).toBe(true);
+    expect(res.total).toBe(1);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(f.mock.calls[0][1].body).movies).toEqual([278]);
+  });
+
+  it('ensureLibraryImdb: не шле ID зі свіжим негативним кешем', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true, data: { movie: {}, tv: {} }, missing: { movie: [777], tv: [] }, errors: [] }),
+    });
+    await window.imdbLoadFor([777], []);
+    expect(window.imdbIsKnownMissing('movie', 777)).toBe(true);
+
+    const f2 = vi.fn().mockResolvedValue(workerResponse({ movie: {}, tv: {} }));
+    global.fetch = f2;
+    window.lib = { 'movie-777': makeItem({ key: 'movie-777', id: 777 }) };
+    const res = await window.ensureLibraryImdb();
+    expect(res.total).toBe(0);
+    expect(f2).not.toHaveBeenCalled();
+  });
+
   it('computeActorProfiles: globalRefAvg береться з IMDb', async () => {
     global.fetch = vi.fn().mockResolvedValue(workerResponse({
       movie: {

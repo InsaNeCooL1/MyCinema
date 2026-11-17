@@ -115,4 +115,60 @@ describe('IMDb ratings client (imdb-ratings)', () => {
     expect(body.movies[0]).toBe(1);
     expect(body.movies).not.toContain(-5);
   });
+
+  it('IMDB_CACHE_KEY доступний з window (браузер/APK)', () => {
+    expect(window.IMDB_CACHE_KEY).toBe('mycinema.imdbRatings.v1');
+    expect(window.IMDB_MISS_TTL).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it('imdbLoadFor: холодний кеш повертає щойно завантажені дані в data', async () => {
+    global.fetch = vi.fn().mockResolvedValue(okResponse(IMDbData));
+    const first = await window.imdbLoadFor([278], [1396]);
+    expect(first.fetched).toBe(2);
+    expect(first.data[window.imdbKey('movie', 278)].imdbRating).toBe(9.3);
+    expect(first.data[window.imdbKey('tv', 1396)].imdbVotes).toBe(2705323);
+  });
+
+  it('негативний кеш: missing не шлеться повторно, поки не сплив TTL', async () => {
+    const f = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        ok: true,
+        data: { movie: {}, tv: {} },
+        missing: { movie: [999], tv: [] },
+        errors: [],
+      }),
+    });
+    global.fetch = f;
+
+    const first = await window.imdbLoadFor([999, 278], []);
+    expect(first.missing.movie).toContain(999);
+    expect(window.imdbIsKnownMissing('movie', 999)).toBe(true);
+    expect(f).toHaveBeenCalledTimes(1);
+
+    const second = await window.imdbLoadFor([999], []);
+    expect(f).toHaveBeenCalledTimes(1); // промах більше не йде в мережу
+    expect(second.fetched).toBe(0);
+    expect(second.missing.movie).toContain(999);
+    expect(second.data[window.imdbKey('movie', 999)]).toBeUndefined();
+
+    // Після спливу 24 год знову пробуємо MDBList.
+    const key = window.IMDB_CACHE_KEY;
+    const cache = JSON.parse(localStorage.getItem(key) || '{}');
+    cache[window.imdbKey('movie', 999)].ts = Date.now() - window.IMDB_MISS_TTL - 1000;
+    localStorage.setItem(key, JSON.stringify(cache));
+    expect(window.imdbIsKnownMissing('movie', 999)).toBe(false);
+    await window.imdbLoadFor([999], []);
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  it('негативний кеш не отруюється при ok:false (квота/мережа)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: false, error: 'quota', data: { movie: {}, tv: {} }, missing: { movie: [555], tv: [] }, errors: [] }),
+    });
+    const res = await window.imdbLoadFor([555], []);
+    expect(res.fallback).toBe(true);
+    expect(window.imdbIsKnownMissing('movie', 555)).toBe(false);
+  });
 });

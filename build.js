@@ -31,6 +31,7 @@ const SRC_FILES = [
   'src/settings.js',
   'src/calendar.js',
   'src/spatial-nav.js',
+  'src/chat.js',
   'src/app.js',
   'src/snow.js',
 ];
@@ -48,6 +49,7 @@ const CSS_FILES = [
   'styles/60-perf-home.css',
   'styles/70-fixes-settings.css',
   'styles/80-notes-card.css',
+  'styles/85-chat.css',
   'styles/90-layout-safe.css',
   'styles/95-layout-a11y.css',
   'styles/97-modals.css',

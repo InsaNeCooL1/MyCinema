@@ -215,7 +215,10 @@ history.replaceState({ mc: 0 }, '', location.pathname + location.search + _initi
     if (_initialHash) routeFromHash();
   }
   if (window.mcCacheReady && typeof window.mcCacheReady.then === 'function') {
-    Promise.race([window.mcCacheReady, new Promise(function (res) { setTimeout(res, 150); })]).then(boot, boot);
+    // FIX-IMDB-IDB: чекаємо повного завантаження IndexedDB, інакше перший
+    // loadHome() бачить порожній mcCacheGet і йде в мережу навіть при теплому кеші.
+    // mcCacheReady завжди резолвиться (див. onblocked/onerror в core.js).
+    window.mcCacheReady.then(boot, boot);
   } else {
     boot();
   }
@@ -263,7 +266,10 @@ if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getIte
     const exitDlg = document.getElementById('exit-confirm-modal');
     if (exitDlg) { exitDlg.remove(); return; }
 
-    // 0.1. Плеєр / балансери (відео -> кроки назад -> закриття)
+    // 0.1. AI-помічник
+    if (window.mcChat && window.mcChat.handleBack()) return;
+
+    // 0.2. Плеєр / балансери (відео -> кроки назад -> закриття)
     if (window.mcRoom && window.mcRoom.handleBack()) return;
     if (typeof window.handleStreamsBack === 'function' && window.handleStreamsBack()) return;
 
@@ -273,7 +279,7 @@ if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getIte
 
     // 1. Модальні вікна та оверлеї
     if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
-    if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
+    if (typeof handleSettingsBack === 'function' && handleSettingsBack()) return;
     if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }
 
     // 2. Бокове меню
@@ -321,7 +327,7 @@ document.addEventListener('keydown', (e) => {
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === 'TEXTAREA' || tag === 'INPUT') return;
   if (document.getElementById('poster-zoom').classList.contains('open')) { closeImageZoom(); return; }
-  if (document.getElementById('settings-modal').classList.contains('open')) { closeSettings(); return; }
+  if (typeof handleSettingsBack === 'function' && handleSettingsBack()) return;
   if (document.getElementById('auth-modal').style.display === 'flex') { closeAuthModal(); return; }
   if (overlay.classList.contains('open') && cardStack.length) { history.back(); return; }
 });
@@ -339,8 +345,10 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Закриття модалок по кліку на темний фон
-document.getElementById('settings-modal')?.addEventListener('click', (e) => {
-  if (e.target.id === 'settings-modal') closeSettings();
+document.querySelectorAll('.settings-modal').forEach((m) => {
+  m.addEventListener('click', (e) => {
+    if (e.target === m) closeSettings();
+  });
 });
 document.getElementById('auth-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'auth-modal') closeAuthModal();
@@ -350,7 +358,8 @@ document.getElementById('auth-modal')?.addEventListener('click', (e) => {
 /* FIX-FOCUS-TRAP — Tab wrap inside open modals */
 (function initFocusTrap() {
   function openModals() {
-    var ids = ['settings-modal', 'auth-modal', 'onboarding-modal'];
+    var ids = ['settings-modal', 'settings-view-modal', 'settings-online-modal',
+      'settings-extra-modal', 'settings-data-modal', 'auth-modal', 'onboarding-modal'];
     var out = [];
     for (var i = 0; i < ids.length; i++) {
       var m = document.getElementById(ids[i]);

@@ -43,6 +43,50 @@
 .rec-badge.stream { color: var(--coral); border-color: rgba(255, 123, 92, .5); }
 
 
+/* SETTINGS-GROUPS — меню з 4 пунктів і 4 окремі модалки */
+.settings-modal.open { display: flex; }
+.settings-group-modal .settings-box { max-width: 560px; }
+.settings-group-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  padding: 14px 16px;
+}
+.settings-group-icon { font-size: 18px; width: 24px; text-align: center; }
+.settings-group-arrow { margin-left: auto; font-size: 22px; line-height: 1; color: var(--text-muted); }
+.settings-back {
+  background: var(--bg-3);
+  border: 0;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.settings-back:hover { background: var(--bg-4); color: var(--accent); }
+.settings-swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.settings-field-label { font-size: 12px; color: var(--text-muted); margin-bottom: -6px; }
+.settings-field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  background: var(--bg-3);
+  color: var(--text);
+  border: 1px solid rgba(var(--white-rgb), .12);
+  border-radius: var(--r-sm);
+  font: 13px/1.4 var(--mono);
+  outline: none;
+}
+.settings-field:focus { border-color: var(--accent); }
+.settings-field-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-field-actions .settings-btn { width: auto; flex: 1 1 140px; }
+.settings-field-status { font-size: 12px; min-height: 1.2em; color: var(--text-muted); }
+/* display:flex на .settings-section перекриває звичайний [hidden] */
+.settings-section[hidden], .mc-chat-api-block[hidden] { display: none !important; }
+
 /* FIX-SETTINGS-REORG — шрифти, підзаголовки, account-menu, lang-btn */
 .settings-box {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
