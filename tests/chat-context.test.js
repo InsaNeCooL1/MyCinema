@@ -428,7 +428,7 @@ describe('chat UI', () => {
   });
 });
 
-describe('chat BYOK — ключ, каскад Gemini, автоматичний даунгрейд', () => {
+describe('chat BYOK — ключ, ручний вибір моделі, локальні обмеження', () => {
   it('ключ зберігається локально, без ключа не пускає, новий ключ скидає блокування', () => {
     localStorage.setItem('mycinema.geminiQuota', JSON.stringify({ 'gemini-4-hydrogen': Date.now() + 60000 }));
     global.fetch = vi.fn();
@@ -457,7 +457,7 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     expect(global.fetch.mock.calls[0][1].headers['x-goog-api-key']).toBe('AIza-abc');
     expect(result.models).toEqual(CHAIN_IDS);
     await vi.waitFor(() => {
-      expect(document.querySelector('#mc-chat-model-status').textContent).toMatch(/Авто → Gemini 4 Hydrogen/);
+      expect(document.querySelector('#mc-chat-model-status').textContent).toMatch(/Модель: Gemini 4 Hydrogen/);
     }, { timeout: 2000 });
   });
 
@@ -469,7 +469,7 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     expect(document.querySelector('#mc-chat-model-status').textContent).toMatch(/401/);
   });
 
-  it('у налаштуваннях немає вибору моделі — тільки Auto і п’ять запасних', () => {
+  it('у налаштуваннях можна вибрати конкретну модель для тестування', () => {
     const box = document.querySelector('#settings-extra-modal .settings-box');
     const section = box.querySelector('#mc-chat-settings');
     expect(section.querySelector('.settings-section-title').textContent).toBe('AI-помічник');
@@ -479,11 +479,15 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     expect(keyInput.placeholder).toMatch(/AIza/);
     expect(section.querySelector('.mc-chat-api-link').getAttribute('href')).toBe('https://aistudio.google.com/apikey');
     expect(section.querySelector('.mc-chat-settings-hint').textContent).toContain('Gemini API');
-    expect(section.querySelector('#mc-chat-api-model')).toBeNull();
+    const select = section.querySelector('#mc-chat-api-model');
+    expect(select).toBeTruthy();
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(CHAIN_IDS);
+    expect(select.value).toBe('gemini-4-hydrogen');
+    expect(window.mcChat.getModel()).toBe('gemini-4-hydrogen');
 
     const note = section.querySelector('.mc-chat-model-note').textContent;
     CHAIN_IDS.forEach((id) => expect(note).toContain(id));
-    expect(note).toMatch(/1060/);
+    expect(note).toMatch(/mycinema\.geminiModel/);
 
     const show = section.querySelector('.mc-chat-api-show');
     expect(show.classList.contains('settings-btn')).toBe(false);
@@ -511,95 +515,95 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     }, { timeout: 2000 });
   });
 
+  it('вибрана модель зберігається локально і знімає її блокування', () => {
+    expect(window.mcChat.setModel('gemini-3.5-flash-lite')).toBe('gemini-3.5-flash-lite');
+    expect(localStorage.getItem('mycinema.geminiModel')).toBe('gemini-3.5-flash-lite');
+    expect(window.mcChat._debug.requestModels()).toEqual(['gemini-3.5-flash-lite']);
+
+    window.mcChat._debug.blockModel('gemini-3.5-flash-lite', 60000);
+    expect(window.mcChat._debug.buildChain()).not.toContain('gemini-3.5-flash-lite');
+    window.mcChat.setModel('gemini-3.5-flash-lite');
+    expect(window.mcChat._debug.buildChain()).toContain('gemini-3.5-flash-lite');
+
+    const select = document.querySelector('#mc-chat-api-model');
+    select.value = 'gemini-3.8-flash';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(window.mcChat.getModel()).toBe('gemini-3.8-flash');
+  });
+
   it('каскад побудовано від Hydrogen до 3.1 Flash-Lite', () => {
     expect(window.mcChat._debug.chain()).toEqual(CHAIN_IDS);
     expect(window.mcChat._debug.buildChain()).toEqual(CHAIN_IDS);
   });
 
-  it('429 тихо переводить запит на наступну модель того самого каскаду', async () => {
+  it('429 на обраній моделі показує повідомлення й не перемикає модель', async () => {
     window.mcChat.setApiKey('AIza-abc');
     window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(quotaResponse('43s'))
-      .mockResolvedValueOnce(jsonResponse({
-        candidates: [{ content: { parts: [{ text: 'Раджу «Дюну»' }] } }],
-      }));
+    global.fetch = vi.fn(async () => quotaResponse('43s'));
 
     submitChat('Що подивитись?');
     await vi.waitFor(() => {
-      expect(document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble').textContent).toContain('Раджу «Дюну»');
+      expect(document.querySelector('.mc-chat-error')).toBeTruthy();
     }, { timeout: 3000 });
 
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
-    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.8-flash');
-    expect(document.querySelector('.mc-chat-error')).toBeNull();
-    expect(document.querySelector('.mc-chat-messages').textContent).not.toMatch(/429/);
+    expect(document.querySelector('.mc-chat-error-text').textContent).toMatch(/Ліміт обраної моделі/);
 
     const quota = JSON.parse(localStorage.getItem('mycinema.geminiQuota'));
     expect(Number(quota['gemini-4-hydrogen'])).toBeGreaterThan(Date.now());
   });
 
-  it('500/503 тихо переводить запит на наступну модель каскаду', async () => {
+  it('503 на обраній моделі показує дружнє повідомлення без автоперемикання', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     window.mcChat.setApiKey('AIza-abc');
     window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(serverResponse(503))
-      .mockResolvedValueOnce(jsonResponse({
-        candidates: [{ content: { parts: [{ text: 'Раджу «Дюну»' }] } }],
-      }));
+    global.fetch = vi.fn(async () => serverResponse(503));
 
     submitChat('Порадь серіал на кілька вечорів');
     await vi.waitFor(() => {
-      expect(document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble').textContent).toContain('Раджу «Дюну»');
+      expect(document.querySelector('.mc-chat-error')).toBeTruthy();
     }, { timeout: 3000 });
 
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
-    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.8-flash');
-    expect(document.querySelector('.mc-chat-error')).toBeNull();
+    expect(document.querySelector('.mc-chat-error-text').textContent).toMatch(/тимчасово недоступний/);
     expect(window.mcChat._state.lastApiError).toMatchObject({ model: 'gemini-4-hydrogen', status: 503 });
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
 
-  it('моделі, яких немає в /models, пропускаються без помилки користувачу', async () => {
+  it('якщо обрана модель недоступна для ключа — запит не йде', async () => {
     window.mcChat.setApiKey('AIza-abc');
-    const available = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'];
-    window.mcChat._state.health = { ok: true, status: 200, models: available };
-    expect(window.mcChat._debug.buildChain()).toEqual(available);
-
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(quotaResponse('5s'))
-      .mockResolvedValueOnce(jsonResponse({
-        candidates: [{ content: { parts: [{ text: 'Раджу «Прибуття»' }] } }],
-      }));
-
-    submitChat('Що подивитись?');
-    await vi.waitFor(() => {
-      expect(document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble').textContent).toContain('Раджу «Прибуття»');
-    }, { timeout: 3000 });
-
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
-    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.1-flash-lite');
-    expect(document.querySelector('.mc-chat-error')).toBeNull();
-  });
-
-  it('коли всі моделі заблоковані, показується одне дружнє повідомлення', async () => {
-    window.mcChat.setApiKey('AIza-abc');
-    window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
-    CHAIN_IDS.forEach((id) => window.mcChat._debug.blockModel(id, 60000));
+    window.mcChat.setModel('gemini-4-hydrogen');
+    window.mcChat._state.health = { ok: true, status: 200, models: ['gemini-3.1-flash-lite'] };
     global.fetch = vi.fn();
 
-    submitChat('Привіт');
+    submitChat('Що подивитись?');
     await vi.waitFor(() => {
       expect(document.querySelector('.mc-chat-error')).toBeTruthy();
     }, { timeout: 2000 });
 
     expect(global.fetch).not.toHaveBeenCalled();
-    expect(document.querySelector('.mc-chat-error-text').textContent).toMatch(/вичерпані|Зачекайте/);
+    expect(document.querySelector('.mc-chat-error-text').textContent).toMatch(/Обрана модель недоступна/);
+  });
+
+  it('локальне блокування не заважає ручному запиту до обраної моделі', async () => {
+    window.mcChat.setApiKey('AIza-abc');
+    window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
+    window.mcChat._debug.blockModel('gemini-4-hydrogen', 60000);
+    global.fetch = vi.fn(async () => jsonResponse({
+      candidates: [{ content: { parts: [{ text: 'Раджу «Дюну»' }] } }],
+    }));
+
+    submitChat('Що подивитись?');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble').textContent).toContain('Раджу «Дюну»');
+    }, { timeout: 3000 });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
+    expect(document.querySelector('.mc-chat-error')).toBeNull();
   });
 
   it('retryDelay з Google розбирається в мілісекунди, а без нього — до півночі PT', () => {
@@ -632,7 +636,7 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
   });
 
-  it('порожня thought-only відповідь тихо бере наступну модель, не повторюючи ту саму', async () => {
+  it('порожня thought-only відповідь не повторює обрану модель', async () => {
     window.mcChat.setApiKey('AIza-abc');
     window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
     global.fetch = vi.fn()
@@ -645,15 +649,12 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
 
     submitChat('Порадь серіал на кілька вечорів');
     await vi.waitFor(() => {
-      expect(document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble').textContent).toContain('Раджу «Дюну»');
+      expect(document.querySelector('.mc-chat-error')).toBeTruthy();
     }, { timeout: 3000 });
 
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
-    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.8-flash');
     expect(requestBodyAt(0).generationConfig.maxOutputTokens).toBe(8192);
-    expect(requestBodyAt(1).generationConfig.maxOutputTokens).toBe(8192);
-    expect(document.querySelector('.mc-chat-error')).toBeNull();
   });
 
   it('не показує thought і не пересилає thoughtSignature у наступному запиті', async () => {

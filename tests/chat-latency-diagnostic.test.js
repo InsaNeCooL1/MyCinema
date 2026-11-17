@@ -92,6 +92,7 @@ describe('діагностика повільного Gemini 4 — тільки 
 
     for (const id of CHAIN_IDS) {
       window.mcChat.clear(true);
+      window.mcChat.setModel(id);
       window.mcChat._state.health = { ok: true, status: 200, models: [id] };
       global.fetch = vi.fn(async () => jsonResponse({
         candidates: [{ content: { parts: [{ text: 'Ок' }] } }],
@@ -159,7 +160,7 @@ describe('діагностика повільного Gemini 4 — тільки 
     console.info('[diag][history] contents:', contentsSize, 'символів; еталон чистої історії:', plainSize, 'символів; усе тіло:', raw.length);
   });
 
-  it('3. thought-only відповідь більше не повторює ту саму модель', async () => {
+  it('3. thought-only відповідь не повторює обрану модель', async () => {
     window.mcChat.setApiKey('AIza-diag');
     window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
     global.fetch = vi.fn()
@@ -172,16 +173,14 @@ describe('діагностика повільного Gemini 4 — тільки 
 
     submitChat('Порадь серіал на кілька вечорів');
     await vi.waitFor(() => {
-      expect(document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble').textContent).toContain('Раджу «Дюну»');
+      expect(document.querySelector('.mc-chat-error')).toBeTruthy();
     }, { timeout: 3000 });
 
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
-    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.8-flash');
     expect(requestBodyAt(0).generationConfig.maxOutputTokens).toBe(8192);
-    expect(requestBodyAt(1).generationConfig.maxOutputTokens).toBe(8192);
 
-    console.info('[diag][retry] запитів:', global.fetch.mock.calls.length, 'ліміт в обох:', 8192);
+    console.info('[diag][retry] запитів:', global.fetch.mock.calls.length, 'ліміт:', 8192);
   });
 
   it('4. телеметрія збирає usageMetadata, finishReason і таймінги', async () => {

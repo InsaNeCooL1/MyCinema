@@ -13,6 +13,7 @@
   var MC_CHAT_ENABLED_KEY = 'mycinema.aiEnabled';
   var MC_AI_KEY_KEY = 'mycinema.geminiKey';
   var MC_AI_QUOTA_KEY = 'mycinema.geminiQuota';
+  var MC_AI_MODEL_KEY = 'mycinema.geminiModel';
   var MC_AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
   // Ліміти з AI Studio → Rate limit (RPD на проєкт): 20+20+20+500+500 = 1060.
@@ -203,6 +204,45 @@
     // Блокування моделей належать проєкту, але новий ключ = новий початок.
     if (changed) mcClearQuota();
     return clean;
+  }
+
+  // ── ручний вибір моделі (для тестування) ───────────────────────
+  function mcGetSelectedModel() {
+    try {
+      var id = String(localStorage.getItem(MC_AI_MODEL_KEY) || '').trim();
+      if (id) {
+        for (var i = 0; i < MC_AI_CHAIN.length; i++) {
+          if (MC_AI_CHAIN[i].id === id) return id;
+        }
+      }
+    } catch (_) {}
+    return MC_AI_CHAIN[0].id;
+  }
+
+  function mcSaveSelectedModel(id) {
+    var valid = false;
+    for (var i = 0; i < MC_AI_CHAIN.length; i++) {
+      if (MC_AI_CHAIN[i].id === id) { valid = true; break; }
+    }
+    try {
+      if (valid) localStorage.setItem(MC_AI_MODEL_KEY, id);
+      else localStorage.removeItem(MC_AI_MODEL_KEY);
+    } catch (_) {}
+    if (valid) {
+      // Новий вибір = новий початок для цієї моделі.
+      var quota = mcLoadQuota();
+      if (quota[id]) { delete quota[id]; mcSaveQuota(quota); }
+    }
+    mcUpdateSettingsStatus();
+    return mcGetSelectedModel();
+  }
+
+  // Автокаскад тимчасово вимкнено: запит іде тільки на обрану модель.
+  function mcRequestModels() {
+    var id = mcGetSelectedModel();
+    var known = mcChat.health && mcChat.health.models;
+    if (Array.isArray(known) && known.length && known.indexOf(id) === -1) return [];
+    return [id];
   }
 
   // ── каскад і квоти ──────────────────────────────────────────────
@@ -721,8 +761,23 @@
     return MC_AI_CHAIN.filter(function (m) { return !known || known.indexOf(m.id) !== -1; });
   }
 
+  function mcRefreshModelSelect() {
+    var sel = document.getElementById('mc-chat-api-model');
+    if (!sel) return;
+    var known = mcChat.health && mcChat.health.models;
+    var available = Array.isArray(known) && known.length ? known : null;
+    for (var i = 0; i < sel.options.length; i++) {
+      var opt = sel.options[i];
+      var ok = !available || available.indexOf(opt.value) !== -1;
+      opt.disabled = !ok;
+      opt.textContent = mcModelName(opt.value) + (ok ? '' : ' — недоступна');
+    }
+    sel.value = mcGetSelectedModel();
+  }
+
   function mcUpdateSettingsStatus() {
     var node = document.getElementById('mc-chat-model-status');
+    mcRefreshModelSelect();
     if (!node) return;
 
     if (!mcGetKey()) {
@@ -735,17 +790,17 @@
     if (h.ok === true) {
       var available = mcAvailableModels();
       if (!available.length) {
-        node.textContent = '⚠ Жодна модель каскаду недоступна для цього ключа.';
+        node.textContent = '⚠ Жодна з моделей недоступна для цього ключа.';
         node.className = 'mc-chat-settings-status warn';
         return;
       }
-      var active = mcBuildChain();
-      if (!active.length) {
-        node.textContent = '● Ключ працює · усі моделі на паузі до скидання квоти';
-        node.className = 'mc-chat-settings-status';
+      var selected = mcGetSelectedModel();
+      if (mcRequestModels().length === 0) {
+        node.textContent = '⚠ Обрана модель недоступна для цього ключа. Виберіть іншу.';
+        node.className = 'mc-chat-settings-status warn';
         return;
       }
-      node.textContent = '● Ключ працює · Авто → ' + mcModelName(active[0]) +
+      node.textContent = '● Ключ працює · Модель: ' + mcModelName(selected) +
         (available.length < MC_AI_CHAIN.length ? ' · доступно ' + available.length + '/' + MC_AI_CHAIN.length : '');
       node.className = 'mc-chat-settings-status ok';
       return;
@@ -1357,11 +1412,11 @@
       mcChat.messages.push({ role: 'user', content: text, ts: Date.now() });
     }
 
-    var chain = mcBuildChain();
+    var chain = mcRequestModels();
     if (!chain.length) {
       mcSaveHistory();
       mcRenderMessages();
-      mcShowError('Сьогодні безкоштовні ліміти Gemini вичерпані для всіх моделей. Зачекайте трохи — я повернуся.', true);
+      mcShowError('Обрана модель недоступна для цього ключа. Відкрийте Налаштування → AI-помічник і виберіть іншу.', true);
       return;
     }
 
@@ -1485,9 +1540,9 @@
 
       if (!done) {
         throw mcApiError(0, null, quotaHit
-          ? 'Сьогодні безкоштовні ліміти Gemini вичерпані для всіх моделей. Зачекайте трохи — я повернуся.'
+          ? 'Ліміт обраної моделі вичерпано. Спробуйте пізніше або виберіть іншу модель у налаштуваннях.'
           : (unavailable
-            ? 'Наразі жодна з моделей Gemini недоступна. Спробуйте пізніше.'
+            ? 'Обрана модель недоступна. Виберіть іншу в Налаштуваннях → AI-помічник.'
             : (serverHit
               ? 'Gemini API тимчасово недоступний. Спробуйте ще раз пізніше.'
               : 'Не вдалося отримати відповідь. Спробуйте ще раз.')));
@@ -1611,12 +1666,26 @@
     link.rel = 'noopener noreferrer';
     link.textContent = 'Де взяти ключ: aistudio.google.com/apikey ↗';
 
+    var modelLabel = mcEl('label', 'mc-chat-api-label', 'Модель Gemini (для тестування)');
+    modelLabel.setAttribute('for', 'mc-chat-api-model');
+
+    var modelSelect = document.createElement('select');
+    modelSelect.id = 'mc-chat-api-model';
+    modelSelect.className = 'mc-chat-model-select';
+    modelSelect.setAttribute('aria-label', 'Модель Gemini');
+    MC_AI_CHAIN.forEach(function (m) {
+      var opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      modelSelect.appendChild(opt);
+    });
+    modelSelect.value = mcGetSelectedModel();
+
     var modelNote = mcEl('div', 'notes-hint mc-chat-model-note',
-      'Модель обирається автоматично (режим Auto): Gemini 4 Hydrogen (gemini-4-hydrogen) → ' +
-      'Gemini 3.8 Flash (gemini-3.8-flash) → Gemini 3.6 Flash (gemini-3.6-flash) → ' +
-      'Gemini 3.5 Flash-Lite (gemini-3.5-flash-lite) → Gemini 3.1 Flash-Lite (gemini-3.1-flash-lite). ' +
-      'Якщо безкоштовний ліміт моделі вичерпано, бот тихо переходить до наступної. ' +
-      'Разом до ~1060 запитів/день на проєкт Gemini (дані AI Studio → Rate limit).');
+      'Автокаскад тимчасово вимкнено: всі запити йдуть тільки на обрану модель. ' +
+      'Доступні: Gemini 4 Hydrogen (gemini-4-hydrogen), Gemini 3.8 Flash (gemini-3.8-flash), ' +
+      'Gemini 3.6 Flash (gemini-3.6-flash), Gemini 3.5 Flash-Lite (gemini-3.5-flash-lite), ' +
+      'Gemini 3.1 Flash-Lite (gemini-3.1-flash-lite). Вибір зберігається локально в mycinema.geminiModel.');
 
     var saveBtn = mcEl('button', 'settings-btn mc-chat-api-save', '💾 Зберегти ключ');
     saveBtn.type = 'button';
@@ -1631,7 +1700,7 @@
     clear.type = 'button';
     actions.append(check, clear);
 
-    apiBlock.append(hint, keyLabel, keyRow, link, modelNote, saveBtn, status, actions);
+    apiBlock.append(hint, keyLabel, keyRow, link, modelLabel, modelSelect, modelNote, saveBtn, status, actions);
     section.append(title, toggleLabel, apiBlock);
     box.appendChild(section);
 
@@ -1653,6 +1722,10 @@
       showBtn.textContent = toPassword ? '🙈' : '👁';
     });
     saveBtn.addEventListener('click', mcSaveFromSettings);
+    modelSelect.addEventListener('change', function () {
+      mcSaveSelectedModel(modelSelect.value);
+      modelSelect.value = mcGetSelectedModel();
+    });
     keyInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); mcSaveFromSettings(); }
     });
@@ -1726,10 +1799,14 @@
     setApiKey: function (key) { return mcSaveKey(key); },
     hasKey: function () { return !!mcGetKey(); },
     checkKey: mcCheckKey,
+    getModel: mcGetSelectedModel,
+    setModel: mcSaveSelectedModel,
     _state: mcChat,
     _debug: {
       chain: function () { return MC_AI_CHAIN.map(function (m) { return m.id; }); },
       buildChain: mcBuildChain,
+      requestModels: mcRequestModels,
+      selectedModel: mcGetSelectedModel,
       blockModel: mcBlockModel,
       retryDelayMs: mcRetryDelayMs,
       cleanParts: mcCleanParts,
