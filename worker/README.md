@@ -195,10 +195,14 @@ AI-частина винесена **зі воркера в застосунок
 - Кнопка «Перевірити ключ» робить `GET /v1beta/models` — перевіряє ключ і доступні
   моделі, не витрачаючи токенів.
 - Запит іде на `POST /v1beta/models/{model}:streamGenerateContent?alt=sse`
-  з `generationConfig: { thinkingConfig: { thinkingLevel: 'low' }, maxOutputTokens: 4096 }`.
-  Якщо відповідь вийшла порожньою після thinking, той самий запит тихо
-  повторюється з `maxOutputTokens: 8192`. Сирі `parts` (з `thoughtSignature`)
-  повертаються в `contents` наступних запитів.
+  з `generationConfig: { thinkingConfig: { thinkingLevel: 'low' }, maxOutputTokens: 8192 }`.
+  Один запит на модель: порожня thought-only відповідь більше не викликає
+  повтор до тіє самої моделі — каскад одразу бере наступну.
+- У текстовому чаті немає function calling, тому thought-частини й підписи
+  не пересилаються назад в `contents`: історія містить тільки чистий текст.
+  Відповідь обрізається до 6 речень / 900 символів як страхувальник промту.
+- Для діагностики швидкості збираються таймінги, `usageMetadata` і `finishReason`:
+  `window.mcChat._state.lastTiming` та `.timings` (останні 20 спроб).
 - У Cloudflare жодних AI-секретів, KV для ліміту чи додаткових маршрутів не потрібно.
 
 ## Наступні кроки (поки не робив)

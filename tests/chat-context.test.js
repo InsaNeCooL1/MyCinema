@@ -416,7 +416,7 @@ describe('chat UI', () => {
     });
     expect(captured.body.generationConfig).toEqual({
       thinkingConfig: { thinkingLevel: 'low' },
-      maxOutputTokens: 4096,
+      maxOutputTokens: 8192,
     });
 
     const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
@@ -624,7 +624,7 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     const body = requestBodyAt(0);
     expect(body.generationConfig).toEqual({
       thinkingConfig: { thinkingLevel: 'low' },
-      maxOutputTokens: 4096,
+      maxOutputTokens: 8192,
     });
     expect(body.generationConfig).not.toHaveProperty('thinkingLevel');
     expect(body.generationConfig).not.toHaveProperty('temperature');
@@ -632,7 +632,7 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
   });
 
-  it('порожню thought-only відповідь повторює з більшим лімітом токенів', async () => {
+  it('порожня thought-only відповідь тихо бере наступну модель, не повторюючи ту саму', async () => {
     window.mcChat.setApiKey('AIza-abc');
     window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
     global.fetch = vi.fn()
@@ -650,13 +650,13 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
-    expect(global.fetch.mock.calls[1][0]).toContain('gemini-4-hydrogen');
-    expect(requestBodyAt(0).generationConfig.maxOutputTokens).toBe(4096);
+    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.8-flash');
+    expect(requestBodyAt(0).generationConfig.maxOutputTokens).toBe(8192);
     expect(requestBodyAt(1).generationConfig.maxOutputTokens).toBe(8192);
     expect(document.querySelector('.mc-chat-error')).toBeNull();
   });
 
-  it('не показує thought, але повертає thoughtSignature у наступному запиті', async () => {
+  it('не показує thought і не пересилає thoughtSignature у наступному запиті', async () => {
     window.mcChat.setApiKey('AIza-abc');
     window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
     let calls = 0;
@@ -682,12 +682,14 @@ describe('chat BYOK — ключ, каскад Gemini, автоматичний 
     }, { timeout: 3000 });
 
     const stored = window.mcChat._state.messages.filter((m) => m.role === 'assistant').pop();
-    expect(stored.parts.some((p) => p.thoughtSignature === 'sig-123')).toBe(true);
+    expect(stored.parts).toEqual([]);
+    expect(JSON.stringify(stored)).not.toContain('sig-123');
 
     submitChat('А ще?');
     await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2), { timeout: 3000 });
     const secondBody = requestBodyAt(1);
-    expect(JSON.stringify(secondBody.contents)).toContain('sig-123');
+    expect(JSON.stringify(secondBody.contents)).not.toContain('sig-123');
+    expect(JSON.stringify(secondBody.contents)).not.toContain('Внутрішній ланцюг');
   });
 
   it('у клієнті не лишилося OpenRouter і Gemma 4', () => {
