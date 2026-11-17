@@ -1,22 +1,28 @@
-/* CHAT-v2 — AI-помічник MyCinema (BYOK: власний ключ Gemini API в налаштуваннях)
+/* CHAT-v3 — AI-помічник MyCinema (BYOK: власний ключ Gemini API в налаштуваннях)
    Запит іде напряму з пристрою в Google Gemini API, без проміжного сервера.
    Контекст: поточна картка + алгоритмічні рекомендації + профіль смаку.
-   Тільки діалог: без tool calling і без змін у бібліотеці. */
+   Тільки діалог: без tool calling і без змін у бібліотеці.
+
+   Каскад моделей: від найсильнішої до найслабшої. Коли Google повертає 429,
+   модель тихо блокується на retryDelay, а запит повторюється з наступною.
+   Локальний лічильник запитів не ведемо — квота рахується на проєкт Gemini. */
 (function () {
   'use strict';
 
   var MC_CHAT_HISTORY_KEY = 'mycinema.chat.v1';
   var MC_CHAT_ENABLED_KEY = 'mycinema.aiEnabled';
   var MC_AI_KEY_KEY = 'mycinema.geminiKey';
-  var MC_AI_MODEL_KEY = 'mycinema.geminiModel';
+  var MC_AI_QUOTA_KEY = 'mycinema.geminiQuota';
   var MC_AI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-  var MC_AI_MODEL_DEFAULT = 'gemma-4-31b-it';
 
-  // Дві моделі безкоштовного плану Gemini API. Gemma 4 доступна тільки через
-  // рідний ендпоінт Google (:streamGenerateContent), OpenAI-сумісний її не приймає.
-  var MC_AI_MODELS = [
-    { id: 'gemma-4-31b-it', name: 'Gemma 4 31B', hint: 'основна · до 14 400 запитів/день' },
-    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite', hint: 'швидка · 500 запитів/день' }
+  // Ліміти з AI Studio → Rate limit (RPD на проєкт): 20+20+20+500+500 = 1060.
+  // Усі п'ять підтримують thinking_level 'low' і рідний streamGenerateContent.
+  var MC_AI_CHAIN = [
+    { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', rpd: 20 },
+    { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', rpd: 20 },
+    { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', rpd: 20 },
+    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite', rpd: 500 },
+    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite', rpd: 500 }
   ];
 
   var MC_CHAT_MAX_STORED = 80;
@@ -94,12 +100,52 @@
     try { localStorage.setItem(MC_CHAT_ENABLED_KEY, on ? 'true' : 'false'); } catch (_) {}
   }
 
+  // Сирі parts відповіді треба зберігати разом із текстом: у Gemini 3/4
+  // thought-підписи є частиною стану діалогу, і їх треба повертати в кожному
+  // наступному запиті, інакше багатоходовий чат падає з 400.
+  function mcCleanParts(parts) {
+    if (!Array.isArray(parts)) return null;
+    var out = [];
+    for (var i = 0; i < parts.length && out.length < 40; i++) {
+      var p = parts[i];
+      if (!p || typeof p !== 'object') continue;
+      var clean = {};
+      if (typeof p.text === 'string') clean.text = p.text.slice(0, 12000);
+      if (p.thought) clean.thought = true;
+      if (typeof p.thoughtSignature === 'string') clean.thoughtSignature = p.thoughtSignature;
+      if (typeof p.functionCall === 'object' && p.functionCall) clean.functionCall = p.functionCall;
+      if (Object.keys(clean).length) out.push(clean);
+    }
+    return out.length ? out : null;
+  }
+
+  // Стрімінг віддає текст шматками: зливаємо сусідні текстові частини, але
+  // thoughtSignature і thought-частини лишаємо окремо й недоторканими.
+  function mcAppendPart(list, raw) {
+    var clean = mcCleanParts([raw]);
+    if (!clean || !clean.length) return;
+    var part = clean[0];
+    var last = list[list.length - 1];
+    var plain = part.text != null && !part.thought && !part.thoughtSignature && !part.functionCall;
+    var lastPlain = last && last.text != null && !last.thought && !last.thoughtSignature && !last.functionCall;
+    if (plain && lastPlain && last.text.length + part.text.length <= 12000) {
+      last.text += part.text;
+      return;
+    }
+    list.push(part);
+  }
+
   function mcNormalizeStoredMessage(m) {
     if (!m || typeof m !== 'object') return null;
     var role = m.role === 'assistant' ? 'assistant' : (m.role === 'user' ? 'user' : null);
     var content = typeof m.content === 'string' ? m.content.trim() : '';
     if (!role || !content) return null;
-    return { role: role, content: content.slice(0, 12000), ts: Number(m.ts) || Date.now() };
+    var out = { role: role, content: content.slice(0, 12000), ts: Number(m.ts) || Date.now() };
+    if (role === 'assistant') {
+      var parts = mcCleanParts(m.parts);
+      if (parts) out.parts = parts;
+    }
+    return out;
   }
 
   function mcLoadHistory() {
@@ -115,7 +161,14 @@
       var list = mcChat.messages
         .filter(function (m) { return m && m.content && String(m.content).trim(); })
         .slice(-MC_CHAT_MAX_STORED)
-        .map(function (m) { return { role: m.role, content: String(m.content).slice(0, 12000), ts: m.ts || Date.now() }; });
+        .map(function (m) {
+          var out = { role: m.role, content: String(m.content).slice(0, 12000), ts: m.ts || Date.now() };
+          if (m.role === 'assistant') {
+            var parts = mcCleanParts(m.parts);
+            if (parts) out.parts = parts;
+          }
+          return out;
+        });
       if (!list.length) {
         localStorage.removeItem(MC_CHAT_HISTORY_KEY);
         return;
@@ -130,50 +183,111 @@
 
   function mcSaveKey(value) {
     var clean = String(value == null ? '' : value).replace(/\s+/g, '').trim();
+    var changed = clean !== mcGetKey();
     try {
       if (clean) localStorage.setItem(MC_AI_KEY_KEY, clean);
       else localStorage.removeItem(MC_AI_KEY_KEY);
     } catch (_) {}
     mcChat.health = null;
     mcChat.healthTs = 0;
+    // Блокування моделей належать проєкту, але новий ключ = новий початок.
+    if (changed) mcClearQuota();
     return clean;
   }
 
-  function mcGetModel() {
-    try { return String(localStorage.getItem(MC_AI_MODEL_KEY) || '').trim() || MC_AI_MODEL_DEFAULT; }
-    catch (_) { return MC_AI_MODEL_DEFAULT; }
-  }
-
-  function mcSaveModel(value) {
-    var clean = String(value == null ? '' : value).trim().slice(0, 120) || MC_AI_MODEL_DEFAULT;
+  // ── каскад і квоти ──────────────────────────────────────────────
+  function mcLoadQuota() {
     try {
-      if (clean === MC_AI_MODEL_DEFAULT) localStorage.removeItem(MC_AI_MODEL_KEY);
-      else localStorage.setItem(MC_AI_MODEL_KEY, clean);
-    } catch (_) {}
-    mcChat.health = null;
-    mcChat.healthTs = 0;
-    mcSyncModelSelect();
-    return clean;
+      var raw = JSON.parse(localStorage.getItem(MC_AI_QUOTA_KEY) || '{}');
+      return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    } catch (_) { return {}; }
   }
 
-  // Тримаємо <select> у синхроні зі збереженою моделлю, навіть якщо її
-  // змінили ззовні (наприклад, через window.mcChat.setModel).
-  function mcSyncModelSelect() {
-    var sel = document.getElementById('mc-chat-api-model');
-    if (!sel) return;
-    var val = mcGetModel();
-    if (sel.value === val) return;
-    var known = false;
-    for (var i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === val) { known = true; break; }
+  function mcSaveQuota(quota) {
+    try { localStorage.setItem(MC_AI_QUOTA_KEY, JSON.stringify(quota)); } catch (_) {}
+  }
+
+  function mcClearQuota() {
+    try { localStorage.removeItem(MC_AI_QUOTA_KEY); } catch (_) {}
+  }
+
+  function mcBlockModel(id, delayMs) {
+    var quota = mcLoadQuota();
+    quota[id] = Date.now() + Math.max(1000, Number(delayMs) || 0);
+    mcSaveQuota(quota);
+    mcUpdateSettingsStatus();
+  }
+
+  // Моделі, які зараз можна пробувати: доступні для ключа й не заблоковані.
+  function mcBuildChain() {
+    var now = Date.now();
+    var quota = mcLoadQuota();
+    var list = mcChat.health && mcChat.health.models;
+    var known = Array.isArray(list) && list.length ? list : null;
+    var chain = [];
+    for (var i = 0; i < MC_AI_CHAIN.length; i++) {
+      var id = MC_AI_CHAIN[i].id;
+      if (known && known.indexOf(id) === -1) continue;
+      if ((Number(quota[id]) || 0) > now) continue;
+      chain.push(id);
     }
-    if (!known) {
-      var opt = document.createElement('option');
-      opt.value = val;
-      opt.textContent = 'Інша: ' + val;
-      sel.append(opt);
+    return chain;
+  }
+
+  function mcModelName(id) {
+    for (var i = 0; i < MC_AI_CHAIN.length; i++) {
+      if (MC_AI_CHAIN[i].id === id) return MC_AI_CHAIN[i].name;
     }
-    sel.value = val;
+    return id;
+  }
+
+  // Google повертає RetryInfo у вигляді "43s", "2m", "1h". Якщо поля немає —
+  // вважаємо, що це добова квота, і блокуємо до півночі за PT (коли вона скидається).
+  function mcDurationMs(value) {
+    var str = String(value == null ? '' : value);
+    var re = /(\d+(?:\.\d+)?)(ms|s|m|h)/g;
+    var total = 0;
+    var m;
+    var found = false;
+    while ((m = re.exec(str))) {
+      var n = Number(m[1]);
+      var per = m[2] === 'ms' ? 1 : (m[2] === 's' ? 1000 : (m[2] === 'm' ? 60000 : 3600000));
+      total += n * per;
+      found = true;
+    }
+    return found ? Math.round(total) : 0;
+  }
+
+  // Google скидає RPD о 00:00 America/Los_Angeles. Рахуємо до найближчої
+  // півночі в цьому часовому поясі без власного лічильника запитів.
+  function mcMsUntilPacificMidnight() {
+    try {
+      var now = new Date();
+      var parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+      }).formatToParts(now);
+      var values = {};
+      for (var i = 0; i < parts.length; i++) values[parts[i].type] = parts[i].value;
+      var hour = Number(values.hour) || 0;
+      var minute = Number(values.minute) || 0;
+      var second = Number(values.second) || 0;
+      var left = (24 - hour) * 3600000 - minute * 60000 - second * 1000 - now.getMilliseconds();
+      return Math.max(60000, left);
+    } catch (_) { return 12 * 3600000; }
+  }
+
+  function mcRetryDelayMs(data) {
+    var details = data && data.error && data.error.details;
+    if (!Array.isArray(details)) details = data && data.details;
+    if (Array.isArray(details)) {
+      for (var i = 0; i < details.length; i++) {
+        var d = details[i] || {};
+        var ms = mcDurationMs(d.retryDelay || d.delay);
+        if (ms >= 1000) return ms;
+      }
+    }
+    return mcMsUntilPacificMidnight();
   }
 
   function mcGenreName(id) {
@@ -591,10 +705,10 @@
   }
 
   // ── перевірка ключа (без витрати токенів) ──────────────────────
-  function mcModelAvailable(h) {
-    var list = h && h.models;
-    if (!Array.isArray(list) || !list.length) return true;
-    return list.indexOf(mcGetModel()) !== -1;
+  function mcAvailableModels() {
+    var list = mcChat.health && mcChat.health.models;
+    var known = Array.isArray(list) && list.length ? list : null;
+    return MC_AI_CHAIN.filter(function (m) { return !known || known.indexOf(m.id) !== -1; });
   }
 
   function mcUpdateSettingsStatus() {
@@ -608,13 +722,21 @@
     }
     var h = mcChat.health;
     if (!h) { node.textContent = 'Ключ є. Перевіряю…'; node.className = 'mc-chat-settings-status'; return; }
-    if (h.ok === true && !mcModelAvailable(h)) {
-      node.textContent = '⚠ Ця модель недоступна для ключа. Виберіть іншу модель у списку.';
-      node.className = 'mc-chat-settings-status warn';
-      return;
-    }
     if (h.ok === true) {
-      node.textContent = '● Ключ працює · ' + mcGetModel();
+      var available = mcAvailableModels();
+      if (!available.length) {
+        node.textContent = '⚠ Жодна модель каскаду недоступна для цього ключа.';
+        node.className = 'mc-chat-settings-status warn';
+        return;
+      }
+      var active = mcBuildChain();
+      if (!active.length) {
+        node.textContent = '● Ключ працює · усі моделі на паузі до скидання квоти';
+        node.className = 'mc-chat-settings-status';
+        return;
+      }
+      node.textContent = '● Ключ працює · Авто → ' + mcModelName(active[0]) +
+        (available.length < MC_AI_CHAIN.length ? ' · доступно ' + available.length + '/' + MC_AI_CHAIN.length : '');
       node.className = 'mc-chat-settings-status ok';
       return;
     }
@@ -981,45 +1103,66 @@
   }
 
   // ── мережа / стрімінг ──────────────────────────────────────────
-  function mcErrorText(status, data) {
-    if (status === 400) return 'Gemini API відхилив запит (400). Перевірте ключ і вибрану модель.';
-    if (status === 401) return 'Gemini API не визнав ключ (401). Відкрийте Налаштування → AI-помічник і вставте ключ повністю.';
-    if (status === 403) return 'Доступ заборонено (403). Перевірте ключ або спробуйте іншу мережу.';
-    if (status === 404) return 'Модель не знайдена (404). Виберіть іншу модель у налаштуваннях.';
-    if (status === 429) return 'Ліміт безкоштовного плану Gemini вичерпано (429). Зачекайте або змініть модель.';
+  function mcIsQuotaError(status, data) {
+    var err = data && data.error;
+    var code = err && (err.code != null ? err.code : err.status);
+    return status === 429 || code === 429 || String(code) === '429' || String(code) === 'RESOURCE_EXHAUSTED';
+  }
+
+  function mcErrorText(status, data, fallback) {
+    if (mcIsQuotaError(status, data)) {
+      return 'Безкоштовні ліміти Gemini на сьогодні вичерпані. Зачекайте трохи — я повернуся, як тільки з’явиться вільна модель.';
+    }
+    if (fallback) return fallback;
+    if (status === 400) return 'Gemini API відхилив запит. Спробуйте перефразувати питання.';
+    if (status === 401) return 'Gemini API не визнав ключ. Відкрийте Налаштування → AI-помічник і вставте ключ повністю.';
+    if (status === 403) return 'Доступ заборонено. Перевірте ключ або спробуйте іншу мережу.';
+    if (status === 404) return 'Наразі жодна з моделей недоступна. Спробуйте пізніше.';
     if (status >= 500) return 'Gemini API тимчасово недоступний. Спробуйте ще раз пізніше.';
-    var detail = data && data.error && (data.error.message || data.error);
-    if (!detail) detail = data && data.message;
-    if (detail) return String(detail).slice(0, 240);
     return 'Не вдалося отримати відповідь. Спробуйте ще раз.';
   }
 
+  function mcApiError(status, data, fallback) {
+    var e = new Error(mcErrorText(status, data, fallback));
+    e.status = status;
+    e.data = data;
+    e.rateLimited = mcIsQuotaError(status, data);
+    return e;
+  }
+
   // Рідний формат Google: candidates[0].content.parts[].text.
-  // Частини з thought:true — внутрішнє міркування моделі, не показуємо його.
-  function mcGeminiDelta(obj, onDelta) {
+  // Частини з thought:true — внутрішнє міркування моделі, не показуємо його,
+  // але зберігаємо сирі parts (з thoughtSignature) для наступного запиту.
+  function mcGeminiDelta(obj, onDelta, onPart) {
     if (!obj) return;
-    if (obj.error) throw new Error(String((obj.error && obj.error.message) || obj.error));
+    if (obj.error) {
+      var err = obj.error;
+      throw mcApiError(err.status || err.code, obj, 'Gemini повернув помилку під час відповіді. Спробуйте ще раз.');
+    }
     var cand = obj.candidates && obj.candidates[0];
     var parts = cand && cand.content && cand.content.parts;
     if (!Array.isArray(parts)) return;
     for (var i = 0; i < parts.length; i++) {
-      if (parts[i] && parts[i].thought) continue;
-      var text = parts[i] && parts[i].text;
+      var part = parts[i];
+      if (!part || typeof part !== 'object') continue;
+      if (typeof onPart === 'function') onPart(part);
+      if (part.thought) continue;
+      var text = part.text;
       if (typeof text === 'string' && text) onDelta(text);
     }
   }
 
-  function mcGeminiReply(json) {
+  function mcGeminiReply(json, onPart) {
     var out = '';
-    mcGeminiDelta(json, function (text) { out += text; });
+    mcGeminiDelta(json, function (text) { out += text; }, onPart);
     return out;
   }
 
-  function mcHandleSseObject(obj, onDelta, parse) {
-    (parse || mcGeminiDelta)(obj, onDelta);
+  function mcHandleSseObject(obj, onDelta, parse, onPart) {
+    (parse || mcGeminiDelta)(obj, onDelta, onPart);
   }
 
-  function mcReadSse(res, onDelta, parse) {
+  function mcReadSse(res, onDelta, parse, onPart) {
     var reader = res.body.getReader();
     var decoder = new TextDecoder();
     var buffer = '';
@@ -1031,7 +1174,7 @@
       if (!payload || payload === '[DONE]') return;
       var obj;
       try { obj = JSON.parse(payload); } catch (_) { return; }
-      mcHandleSseObject(obj, onDelta, parse);
+      mcHandleSseObject(obj, onDelta, parse, onPart);
     }
 
     return (async function () {
@@ -1051,7 +1194,7 @@
     })();
   }
 
-  function mcReadSseText(text, onDelta, parse) {
+  function mcReadSseText(text, onDelta, parse, onPart) {
     var lines = String(text || '').split(/\r?\n/);
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
@@ -1060,15 +1203,24 @@
       if (!payload || payload === '[DONE]') continue;
       var obj;
       try { obj = JSON.parse(payload); } catch (_) { continue; }
-      mcHandleSseObject(obj, onDelta, parse);
+      mcHandleSseObject(obj, onDelta, parse, onPart);
     }
   }
 
-  function mcBuildRequestHistory() {
+  // Для асистента повертаємо сирі parts (у тому числі thoughtSignature),
+  // бо Gemini 3/4 вимагає їх у кожному наступному повідомленні.
+  function mcBuildContents() {
     return mcChat.messages
       .filter(function (m) { return m && m.role && m.content && String(m.content).trim(); })
       .slice(-MC_CHAT_MAX_REQUEST_HISTORY)
-      .map(function (m) { return { role: m.role, content: String(m.content) }; });
+      .map(function (m) {
+        var role = m.role === 'assistant' ? 'model' : 'user';
+        if (m.role === 'assistant') {
+          var parts = mcCleanParts(m.parts);
+          if (parts) return { role: role, parts: parts };
+        }
+        return { role: role, parts: [{ text: String(m.content) }] };
+      });
   }
 
   async function mcSend(text, opts) {
@@ -1093,7 +1245,17 @@
     if (!(opts && opts.keepUserMessage)) {
       mcChat.messages.push({ role: 'user', content: text, ts: Date.now() });
     }
-    var assistant = { role: 'assistant', content: '', ts: Date.now(), streaming: true };
+
+    var chain = mcBuildChain();
+    if (!chain.length) {
+      mcSaveHistory();
+      mcRenderMessages();
+      mcShowError('Сьогодні безкоштовні ліміти Gemini вичерпані для всіх моделей. Зачекайте трохи — я повернуся.', true);
+      return;
+    }
+
+    var contents = mcBuildContents();
+    var assistant = { role: 'assistant', content: '', parts: [], ts: Date.now(), streaming: true };
     mcChat.messages.push(assistant);
     mcChat.streamMessage = assistant;
     mcSaveHistory();
@@ -1103,20 +1265,11 @@
     var lastRow = rows[rows.length - 1];
     mcChat.streamBubble = lastRow ? lastRow.querySelector('.mc-chat-bubble') : null;
 
-    var history = mcBuildRequestHistory().filter(function (m) { return m.content.trim(); });
-    // Останнє повідомлення — це порожній assistant, його не відправляємо.
-    if (history.length && history[history.length - 1].role === 'assistant') history.pop();
-
-    // Рідний формат Gemini: роль асистента називається 'model', системний
-    // промпт іде окремим полем system_instruction (підтримується й Gemma 4).
-    var contents = history.map(function (m) {
-      return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] };
-    });
     var context = mcBuildContext();
     var body = {
       system_instruction: { parts: [{ text: MC_AI_SYSTEM_PROMPT + '\n\nCONTEXT_JSON:\n' + JSON.stringify(context) }] },
       contents: contents,
-      generationConfig: { temperature: 0.7, topP: 0.9, maxOutputTokens: 800 }
+      generationConfig: { thinkingLevel: 'low', maxOutputTokens: 1024 }
     };
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     mcChat.abort = ctrl;
@@ -1127,46 +1280,85 @@
     }, MC_CHAT_TIMEOUT_MS) : null;
 
     try {
-      var url = MC_AI_BASE + '/models/' + encodeURIComponent(mcGetModel()) + ':streamGenerateContent?alt=sse';
-      var res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'x-goog-api-key': apiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body),
-        signal: ctrl ? ctrl.signal : undefined
-      });
+      var done = false;
+      var quotaHit = false;
+      var unavailable = false;
 
-      if (!res.ok) {
-        var data = null;
-        try { data = await res.json(); } catch (_) {}
-        throw new Error(mcErrorText(res.status, data));
+      for (var ci = 0; ci < chain.length && !done; ci++) {
+        var model = chain[ci];
+        assistant.content = '';
+        assistant.parts = [];
+        if (mcChat.streamBubble) mcRenderStreamBubble(assistant);
+
+        var collected = [];
+        var onPart = function (raw) { mcAppendPart(collected, raw); };
+        var onDelta = function (delta) {
+          assistant.content += delta;
+          mcRenderStreamBubble(assistant);
+        };
+
+        try {
+          var url = MC_AI_BASE + '/models/' + encodeURIComponent(model) + ':streamGenerateContent?alt=sse';
+          var res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'x-goog-api-key': apiKey,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body),
+            signal: ctrl ? ctrl.signal : undefined
+          });
+
+          if (!res.ok) {
+            var data = null;
+            try { data = await res.json(); } catch (_) {}
+            throw mcApiError(res.status, data);
+          }
+
+          var ctype = (res.headers.get('Content-Type') || '').toLowerCase();
+          var canStream = !!(res.body && typeof res.body.getReader === 'function');
+          if (ctype.indexOf('text/event-stream') >= 0) {
+            if (canStream) await mcReadSse(res, onDelta, mcGeminiDelta, onPart);
+            else mcReadSseText(await res.text(), onDelta, mcGeminiDelta, onPart);
+          } else if (ctype.indexOf('application/json') >= 0 || !canStream) {
+            var json = await res.json();
+            var reply = mcGeminiReply(json, onPart);
+            if (!reply) throw mcApiError(0, json, 'Помічник повернув порожню відповідь. Спробуйте ще раз.');
+            assistant.content = reply;
+            mcRenderStreamBubble(assistant);
+          } else {
+            await mcReadSse(res, onDelta, mcGeminiDelta, onPart);
+          }
+
+          if (!assistant.content.trim()) throw mcApiError(0, null, 'Помічник повернув порожню відповідь. Спробуйте ще раз.');
+          assistant.parts = mcCleanParts(collected) || [];
+          assistant.streaming = false;
+          mcSaveHistory();
+          mcRenderStreamBubble(assistant);
+          done = true;
+        } catch (err) {
+          // 429 — тихий даунгрейд: ховаємо модель до retryDelay і беремо
+          // наступну з каскаду в тому самому запиті користувача.
+          if (err && err.rateLimited) {
+            mcBlockModel(model, mcRetryDelayMs(err.data));
+            quotaHit = true;
+            continue;
+          }
+          if (err && err.status === 404) {
+            unavailable = true;
+            continue;
+          }
+          throw err;
+        }
       }
 
-      var ctype = (res.headers.get('Content-Type') || '').toLowerCase();
-      var canStream = !!(res.body && typeof res.body.getReader === 'function');
-      var onDelta = function (delta) {
-        assistant.content += delta;
-        mcRenderStreamBubble(assistant);
-      };
-      if (ctype.indexOf('text/event-stream') >= 0) {
-        if (canStream) await mcReadSse(res, onDelta, mcGeminiDelta);
-        else mcReadSseText(await res.text(), onDelta, mcGeminiDelta);
-      } else if (ctype.indexOf('application/json') >= 0 || !canStream) {
-        var json = await res.json();
-        var reply = mcGeminiReply(json);
-        if (!reply) throw new Error((json && json.error && json.error.message) || 'Порожня відповідь помічника.');
-        assistant.content = reply;
-        mcRenderStreamBubble(assistant);
-      } else {
-        await mcReadSse(res, onDelta, mcGeminiDelta);
+      if (!done) {
+        throw mcApiError(0, null, quotaHit
+          ? 'Сьогодні безкоштовні ліміти Gemini вичерпані для всіх моделей. Зачекайте трохи — я повернуся.'
+          : (unavailable
+            ? 'Наразі жодна з моделей Gemini недоступна. Спробуйте пізніше.'
+            : 'Не вдалося отримати відповідь. Спробуйте ще раз.'));
       }
-
-      if (!assistant.content.trim()) throw new Error('Помічник повернув порожню відповідь. Спробуйте ще раз.');
-      assistant.streaming = false;
-      mcSaveHistory();
-      mcRenderStreamBubble(assistant);
     } catch (e) {
       assistant.streaming = false;
       var aborted = e && (e.name === 'AbortError' || String(e.message || '').toLowerCase().indexOf('abort') >= 0);
@@ -1286,37 +1478,12 @@
     link.rel = 'noopener noreferrer';
     link.textContent = 'Де взяти ключ: aistudio.google.com/apikey ↗';
 
-    var modelLabel = mcEl('label', 'mc-chat-api-label', 'Модель');
-    modelLabel.setAttribute('for', 'mc-chat-api-model');
-
-    var modelInput = document.createElement('select');
-    modelInput.id = 'mc-chat-api-model';
-    modelInput.className = 'mc-chat-model-select';
-    modelInput.setAttribute('aria-label', 'Модель Gemini API');
-    var savedModel = mcGetModel();
-    var modelKnown = false;
-    for (var mi = 0; mi < MC_AI_MODELS.length; mi++) {
-      if (MC_AI_MODELS[mi].id === savedModel) modelKnown = true;
-    }
-    // Якщо користувач раніше вписав свою модель вручну — не губиме її.
-    if (!modelKnown) {
-      var customOption = document.createElement('option');
-      customOption.value = savedModel;
-      customOption.textContent = 'Поточна: ' + savedModel;
-      modelInput.append(customOption);
-    }
-    for (var mj = 0; mj < MC_AI_MODELS.length; mj++) {
-      var m = MC_AI_MODELS[mj];
-      var option = document.createElement('option');
-      option.value = m.id;
-      option.textContent = m.name + ' · ' + m.hint;
-      modelInput.append(option);
-    }
-    modelInput.value = savedModel;
-
     var modelNote = mcEl('div', 'notes-hint mc-chat-model-note',
-      'Безкоштовний план Gemini API. Ліміти залежать від акаунта: Gemma 4 — до 14 400 запитів/день, ' +
-      'Gemini 3.5 Flash-Lite — 500. Точні цифри дивіться в AI Studio.');
+      'Модель обирається автоматично (режим Auto): Gemini 4 Hydrogen (gemini-4-hydrogen) → ' +
+      'Gemini 3.8 Flash (gemini-3.8-flash) → Gemini 3.6 Flash (gemini-3.6-flash) → ' +
+      'Gemini 3.5 Flash-Lite (gemini-3.5-flash-lite) → Gemini 3.1 Flash-Lite (gemini-3.1-flash-lite). ' +
+      'Якщо безкоштовний ліміт моделі вичерпано, бот тихо переходить до наступної. ' +
+      'Разом до ~1060 запитів/день на проєкт Gemini (дані AI Studio → Rate limit).');
 
     var saveBtn = mcEl('button', 'settings-btn mc-chat-api-save', '💾 Зберегти ключ');
     saveBtn.type = 'button';
@@ -1331,13 +1498,12 @@
     clear.type = 'button';
     actions.append(check, clear);
 
-    apiBlock.append(hint, keyLabel, keyRow, link, modelLabel, modelInput, modelNote, saveBtn, status, actions);
+    apiBlock.append(hint, keyLabel, keyRow, link, modelNote, saveBtn, status, actions);
     section.append(title, toggleLabel, apiBlock);
     box.appendChild(section);
 
     function mcSaveFromSettings() {
       keyInput.value = mcSaveKey(keyInput.value);
-      modelInput.value = mcSaveModel(modelInput.value);
       status.textContent = 'Перевіряю ключ…';
       mcCheckKey(true).then(function () {
         if (typeof showSyncToast === 'function') {
@@ -1352,15 +1518,6 @@
       var toPassword = keyInput.type === 'password';
       keyInput.type = toPassword ? 'text' : 'password';
       showBtn.textContent = toPassword ? '🙈' : '👁';
-    });
-    modelInput.addEventListener('change', function () {
-      mcSaveModel(modelInput.value);
-      if (mcGetKey()) {
-        status.textContent = 'Перевіряю ключ…';
-        mcCheckKey(true);
-      } else {
-        mcUpdateSettingsStatus();
-      }
     });
     saveBtn.addEventListener('click', mcSaveFromSettings);
     keyInput.addEventListener('keydown', function (e) {
@@ -1434,10 +1591,18 @@
     buildContext: mcBuildContext,
     markdown: mcMarkdown,
     setApiKey: function (key) { return mcSaveKey(key); },
-    setModel: function (model) { return mcSaveModel(model); },
     hasKey: function () { return !!mcGetKey(); },
     checkKey: mcCheckKey,
-    _state: mcChat
+    _state: mcChat,
+    _debug: {
+      chain: function () { return MC_AI_CHAIN.map(function (m) { return m.id; }); },
+      buildChain: mcBuildChain,
+      blockModel: mcBlockModel,
+      retryDelayMs: mcRetryDelayMs,
+      cleanParts: mcCleanParts,
+      parse: mcGeminiDelta,
+      error: mcApiError
+    }
   };
   // Для тестів і контекстного білдера з інших модулів.
   window.mcChatBuildContext = mcBuildContext;
