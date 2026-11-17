@@ -1902,11 +1902,6 @@ input#q::-webkit-search-cancel-button {
 /* ========================================================= */
 
 /* Запобіжник для контейнера */
-.mood-section {
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-    max-width: 100% !important;
-}
 .mood-pills {
     max-width: 100% !important;
     box-sizing: border-box !important;
@@ -1938,10 +1933,6 @@ input#q::-webkit-search-cancel-button {
 
 /* Десктоп: один рядок, поступове зменшення відступів */
 @media (min-width: 900px) and (min-height: 600px) {
-    body #results > .mood-section {
-        overflow: hidden !important;
-        min-width: 0 !important;
-    }
     body #results .mood-pills {
         flex-wrap: nowrap !important; /* СУВОРО ОДИН РЯДОК */
         height: 44px !important;
@@ -1966,32 +1957,6 @@ input#q::-webkit-search-cancel-button {
         gap: clamp(2px, 0.5vw, 6px) !important;
         flex-shrink: 0 !important; /* Не стискаємо самі плитки, але вони самі зменшуються */
     }
-}
-
-
-/* FIX-CARD-HERO-STOP */
-.card-hero-stop {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-sm);
-  background: rgba(0, 0, 0, .7);
-  color: #fff;
-  border: 1px solid rgba(var(--white-rgb), .2);
-  font-size: 16px;
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 5;
-  cursor: pointer;
-  transition: background .15s, transform .15s;
-}
-.card-hero-stop:hover {
-  background: var(--danger);
-  transform: scale(1.05);
 }
 
 
@@ -2446,16 +2411,6 @@ input#q::-webkit-search-cancel-button {
   /* Ховаємо таби в правій колонці, бо контент деталей вже зліва */
   /* Але залишаємо акторів та нотатки */
   
-  .desktop-block-title {
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-muted);
-    margin-bottom: 12px;
-    margin-top: 0;
-  }
 
   .desktop-details-block {
     background: var(--bg-1);
@@ -2487,18 +2442,6 @@ input#q::-webkit-search-cancel-button {
   .desktop-details-block .detail-value {
     font-size: 14.3px; /* 13px + 10% */
     text-align: right;
-  }
-
-  .desktop-similar-block {
-    background: var(--bg-1);
-    padding: 16px;
-    border-radius: var(--r-md);
-    border: 1px solid rgba(var(--white-rgb), .04);
-  }
-  
-  .desktop-similar-block .similar-grid {
-    margin-top: 0;
-    grid-template-columns: repeat(4, 1fr); /* Рівно 4 постери в ряд */
   }
 
   /* Стилі для правої колонки (трохи більші шрифти) */
@@ -2645,7 +2588,7 @@ input#q::-webkit-search-cancel-button {
     margin: 0;
   }
   
-  .home-wrap, .mood-section, .taste-summary-container, .game-container, .filter-bar, #type-filter {
+  .home-wrap, .taste-summary-container, .game-container, .filter-bar, #type-filter {
     max-width: 100%;
     width: 100%;
     padding-left: 0;

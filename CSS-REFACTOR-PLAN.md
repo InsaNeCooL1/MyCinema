@@ -80,4 +80,9 @@
   - Перевірено: жоден JS inline-стиль не перекриває ці правила; у пізніших модулях (97, 99) немає правил із тим самим селектором+властивістю.
   - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
   - ⚠️ Потрібен візуальний smoke-тест на десктопі/APK (■ неможливо перевірити статично).
-- [ ] Етап B, крок 4: мертві класи (`mood-section`, `card-hero-stop`, `desktop-block-title`, `desktop-similar-block`)
+- [x] Етап B, крок 4: видалено 4 мертві класи (`mood-section`, `card-hero-stop`, `desktop-block-title`, `desktop-similar-block`)
+  - Усі чотири зустрічалися **тільки в CSS**, ані в `index.html`, ані в `src/**/*.js`.
+  - `mood-section` — контейнер більше не рендериться (`renderMoodPills()` створює лише `mood-pills` / `mood-pill`); прибрано з `60-perf-home.css` і з групи селекторів у `95-layout-a11y.css`.
+  - `lvl-1…4` свідомо **не чіпав** — вони генеруються динамічно в `src/stats.js`.
+  - `.similar-grid` залишено — він реально використовується (`10-card.css`, `src/card/tabs.js`).
+  - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.

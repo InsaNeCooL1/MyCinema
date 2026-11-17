@@ -40,16 +40,6 @@
   /* Ховаємо таби в правій колонці, бо контент деталей вже зліва */
   /* Але залишаємо акторів та нотатки */
   
-  .desktop-block-title {
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-muted);
-    margin-bottom: 12px;
-    margin-top: 0;
-  }
 
   .desktop-details-block {
     background: var(--bg-1);
@@ -81,18 +71,6 @@
   .desktop-details-block .detail-value {
     font-size: 14.3px; /* 13px + 10% */
     text-align: right;
-  }
-
-  .desktop-similar-block {
-    background: var(--bg-1);
-    padding: 16px;
-    border-radius: var(--r-md);
-    border: 1px solid rgba(var(--white-rgb), .04);
-  }
-  
-  .desktop-similar-block .similar-grid {
-    margin-top: 0;
-    grid-template-columns: repeat(4, 1fr); /* Рівно 4 постери в ряд */
   }
 
   /* Стилі для правої колонки (трохи більші шрифти) */

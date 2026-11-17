@@ -108,7 +108,7 @@
     margin: 0;
   }
   
-  .home-wrap, .mood-section, .taste-summary-container, .game-container, .filter-bar, #type-filter {
+  .home-wrap, .taste-summary-container, .game-container, .filter-bar, #type-filter {
     max-width: 100%;
     width: 100%;
     padding-left: 0;

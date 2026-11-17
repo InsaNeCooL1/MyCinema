@@ -151,11 +151,6 @@ input#q::-webkit-search-cancel-button {
 /* ========================================================= */
 
 /* Запобіжник для контейнера */
-.mood-section {
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-    max-width: 100% !important;
-}
 .mood-pills {
     max-width: 100% !important;
     box-sizing: border-box !important;
@@ -187,10 +182,6 @@ input#q::-webkit-search-cancel-button {
 
 /* Десктоп: один рядок, поступове зменшення відступів */
 @media (min-width: 900px) and (min-height: 600px) {
-    body #results > .mood-section {
-        overflow: hidden !important;
-        min-width: 0 !important;
-    }
     body #results .mood-pills {
         flex-wrap: nowrap !important; /* СУВОРО ОДИН РЯДОК */
         height: 44px !important;
