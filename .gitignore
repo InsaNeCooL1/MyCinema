@@ -32,3 +32,6 @@ Thumbs.db
 *.log
 coverage/
 .vitest/
+
+# Cloudflare Worker local copy (contains MDBList API key — do NOT commit)
+worker/index.js
