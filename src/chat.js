@@ -1637,6 +1637,7 @@
       }
     } finally {
       if (timer) clearTimeout(timer);
+      mcFlushStreamBubble();
       mcChat.abort = null;
       mcChat.streamBubble = null;
       mcChat.streamMessage = null;
@@ -1645,14 +1646,49 @@
     }
   }
 
+  // SSE-шматки приходять частіше, ніж браузер встигає малювати кадри.
+  // Перебудовуємо DOM максимум один раз на кадр замість кожного дельти —
+  // інакше на Android WebView стрім з'їдає FPS.
+  var mcStreamRaf = 0;
+  var mcStreamEl = null;
+  var mcStreamText = '';
+
+  function mcScheduleFrame(fn) {
+    if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(fn);
+    return setTimeout(fn, 16);
+  }
+
+  function mcCancelFrame(id) {
+    if (!id) return;
+    if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(id);
+    else clearTimeout(id);
+  }
+
+  function mcPaintStreamBubble() {
+    var el = mcStreamEl;
+    if (!el || !el.isConnected) return; // історію вже перемальовано — малювати нічого
+    el.innerHTML = mcStreamText
+      ? mcMarkdown(mcStreamText)
+      : '<span class="mc-chat-typing"><i></i><i></i><i></i></span>';
+    mcScrollToBottom(false);
+  }
+
+  function mcFlushStreamBubble() {
+    if (!mcStreamRaf) return;
+    mcCancelFrame(mcStreamRaf);
+    mcStreamRaf = 0;
+    mcPaintStreamBubble();
+  }
+
   function mcRenderStreamBubble(msg) {
     if (!mcChat.streamBubble) return;
-    if (!msg.content) {
-      mcChat.streamBubble.innerHTML = '<span class="mc-chat-typing"><i></i><i></i><i></i></span>';
-    } else {
-      mcChat.streamBubble.innerHTML = mcMarkdown(msg.content);
-    }
-    mcScrollToBottom(false);
+    mcStreamEl = mcChat.streamBubble;
+    mcStreamText = msg.content || '';
+    if (mcStreamRaf) return; // вже заплановано — оновимо текст у наступному кадрі
+    mcStreamRaf = mcScheduleFrame(function () {
+      mcStreamRaf = 0;
+      mcPaintStreamBubble();
+    });
   }
 
   function mcStop() {

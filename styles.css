@@ -2470,13 +2470,15 @@ input#q::-webkit-search-cancel-button {
 .mc-chat-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, .55);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  /* Без backdrop-filter: на Android WebView повноекранне розмиття малюється
+     плитками й постійно перекомпонується — були артефакти й просадка FPS. */
+  background: rgba(0, 0, 0, .62);
   opacity: 0;
   visibility: hidden;
   transition: opacity .2s ease, visibility 0s linear .2s;
 }
+/* Поки панель відкрита, сніг під нею — зайві animate-шари в композиторі. */
+body.mc-chat-open #snow-layer { display: none; }
 .mc-chat-root.open .mc-chat-backdrop {
   opacity: 1;
   visibility: visible;
@@ -2510,7 +2512,9 @@ input#q::-webkit-search-cancel-button {
   visibility: visible;
   pointer-events: auto;
   transform: none;
-  transition: opacity .2s ease, transform .24s cubic-bezier(.22, 1, .36, 1), visibility 0s;
+  /* visibility — одразу, без transition: інакше WebView встигає показати
+     проміжний стан «половина панелі» під час відкриття. */
+  transition: opacity .2s ease, transform .24s cubic-bezier(.22, 1, .36, 1);
 }
 
 /* ── шапка ───────────────────────────────────────────────────── */
