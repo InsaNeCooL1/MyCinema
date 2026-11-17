@@ -18,6 +18,7 @@ const SRC_FILES = [
   'src/stats.js',
   'src/game.js',
   'src/streams.js',
+  'src/room.js',
   'src/card/engine.js',
   'src/card/tabs.js',
   'src/card/mobile.js',

@@ -281,6 +281,22 @@
       };
       wrap.append(uakinoBtn);
     }
+    if (window.mcRoom && window.mcRoom.enabled()) {
+      const roomBtn = el('button', 'btn-uakino');
+      roomBtn.innerHTML = '<span class="uakino-grad-text">Кімната</span>';
+      roomBtn.onclick = () => {
+        const tvSeasons = (d.seasons || []).filter(x => x.season_number !== 0);
+        const selSeason = (ctx.seasonState && ctx.seasonState.selectedSeason) ||
+          (tvSeasons[0] && tvSeasons[0].season_number) || '';
+        window.mcRoom.open({
+          key: r.key, tmdbId: r.id, type: uaType, title: uaTitle, origTitle: uaOrigTitle,
+          year: uaYear, imdbId: uaImdb,
+          season: uaType === 'tv' ? selSeason : '',
+          episode: ''
+        });
+      };
+      wrap.append(roomBtn);
+    }
 
     const isWatched = s.status === 'watched';
     const isDropped = s.status === 'dropped';

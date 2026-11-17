@@ -264,6 +264,7 @@ if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getIte
     if (exitDlg) { exitDlg.remove(); return; }
 
     // 0.1. Плеєр / балансери (відео -> кроки назад -> закриття)
+    if (window.mcRoom && window.mcRoom.handleBack()) return;
     if (typeof window.handleStreamsBack === 'function' && window.handleStreamsBack()) return;
 
     // 0.2. Поверхневі модалки картки та обсерваторії

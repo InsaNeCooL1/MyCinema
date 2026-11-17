@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import org.json.JSONObject;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -16,9 +17,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 public class ExternalPlayerPlugin extends Plugin {
 
     private static final String[][] PLAYERS = {
-        {"org.videolan.vlc", "org.videolan.vlc.gui.video.VideoPlayerActivity"},
-        {"com.mxtech.videoplayer.ad", "com.mxtech.videoplayer.ad.ActivityScreen"},
-        {"com.mxtech.videoplayer.pro", "com.mxtech.videoplayer.ActivityScreen"}
+        {"org.videolan.vlc", "org.videolan.vlc.gui.video.VideoPlayerActivity", "VLC"},
+        {"com.mxtech.videoplayer.ad", "com.mxtech.videoplayer.ad.ActivityScreen", "MX Player"},
+        {"com.mxtech.videoplayer.pro", "com.mxtech.videoplayer.ActivityScreen", "MX Player Pro"}
     };
 
     private Intent base(Uri uri, String title) {
@@ -36,15 +37,56 @@ public class ExternalPlayerPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void listPlayers(PluginCall call) {
+        JSArray arr = new JSArray();
+        PackageManager pm = getContext().getPackageManager();
+        for (String[] p : PLAYERS) {
+            try {
+                pm.getPackageInfo(p[0], 0);
+                JSObject o = new JSObject();
+                o.put("id", p[0]);
+                o.put("name", p.length > 2 ? p[2] : p[0]);
+                o.put("package", p[0]);
+                arr.put(o);
+            } catch (PackageManager.NameNotFoundException ignored) {}
+        }
+        JSObject r = new JSObject();
+        r.put("players", arr);
+        call.resolve(r);
+    }
+
+    @PluginMethod
     public void open(PluginCall call) {
         String url = call.getString("url");
         String title = call.getString("title", "");
+        String player = call.getString("player", "");
 
         if (url == null || url.isEmpty()) {
             call.reject("URL is required");
             return;
         }
         Uri uri = Uri.parse(url);
+
+        // 0. Явно обраний плеєр (якщо передано)
+        if (player != null && !player.isEmpty()) {
+            for (String[] p : PLAYERS) {
+                if (!p[0].equals(player)) continue;
+                try {
+                    Intent i = base(uri, title);
+                    i.setComponent(new ComponentName(p[0], p[1]));
+                    getActivity().startActivity(i);
+                    done(call, "component:" + p[0]);
+                    return;
+                } catch (ActivityNotFoundException | SecurityException ignored) {}
+                try {
+                    Intent i = base(uri, title);
+                    i.setPackage(p[0]);
+                    getActivity().startActivity(i);
+                    done(call, "package:" + p[0]);
+                    return;
+                } catch (ActivityNotFoundException | SecurityException ignored) {}
+            }
+        }
 
         // 1. Явний компонент (найнадійніше для ChromeOS)
         for (String[] p : PLAYERS) {

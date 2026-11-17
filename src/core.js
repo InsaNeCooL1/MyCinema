@@ -816,6 +816,7 @@ function mergeCloudExtras(cloud) {
   }
 
   if (cloud.appearance) applyCloudAppearance(cloud.appearance);
+  if (cloud.online) { if (applyCloudOnline(cloud.online)) changed = true; }
 
   return changed;
 }
@@ -849,6 +850,48 @@ function touchAppearance() {
   try { localStorage.setItem(LS_APP_TS, String(Date.now())); } catch {}
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(saveToCloud, 800);
+}
+
+const LS_ONLINE = 'mycinema.online';
+function getOnlineConfig() {
+  try {
+    var o = JSON.parse(localStorage.getItem(LS_ONLINE) || '{}') || {};
+    if (!o.roomUrl) {
+      try { var old = JSON.parse(localStorage.getItem('mycinema.room') || '{}') || {}; if (old.url) o.roomUrl = String(old.url); } catch (e2) {}
+    }
+    return o;
+  } catch (e) { return {}; }
+}
+function setOnlineConfig(patch, opts) {
+  opts = opts || {};
+  var cur = getOnlineConfig();
+  var next = Object.assign({}, cur, patch || {});
+  if (!opts.keepTs) next.ts = Date.now();
+  try { localStorage.setItem(LS_ONLINE, JSON.stringify(next)); } catch (e) {}
+  if (next.roomUrl != null) {
+    try { localStorage.setItem('mycinema.room', JSON.stringify({ url: String(next.roomUrl || '') })); } catch (e) {}
+  }
+  if (!opts.skipSync) {
+    clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(function(){ if (typeof saveToCloud === 'function') saveToCloud().catch(function(e){ console.warn('[saveToCloud]', e); }); }, 800);
+  }
+  return next;
+}
+function applyCloudOnline(c) {
+  if (!c || typeof c !== 'object') return false;
+  var local = getOnlineConfig();
+  var cTs = Number(c.ts) || 0, lTs = Number(local.ts) || 0;
+  if (cTs <= lTs) return false;
+  var next = {
+    roomUrl: String(c.roomUrl || ''),
+    parserUrl: String(c.parserUrl || ''),
+    parserApi: String(c.parserApi || ''),
+    serverUrl: String(c.serverUrl || ''),
+    ts: cTs
+  };
+  try { localStorage.setItem(LS_ONLINE, JSON.stringify(next)); } catch (e) {}
+  try { localStorage.setItem('mycinema.room', JSON.stringify({ url: next.roomUrl })); } catch (e) {}
+  return true;
 }
 
 function applyCloudAppearance(app) {
@@ -959,7 +1002,8 @@ async function reconcileWithCloud() {
       actorAdjust,
       actorAdjustTs,
       appearance: getAppearancePayload(),
-      deleted: libTombstones
+      deleted: libTombstones,
+      online: getOnlineConfig()
     },
     updated_at: new Date().toISOString()
   });
