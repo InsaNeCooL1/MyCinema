@@ -86,3 +86,7 @@
   - `lvl-1…4` свідомо **не чіпав** — вони генеруються динамічно в `src/stats.js`.
   - `.similar-grid` залишено — він реально використовується (`10-card.css`, `src/card/tabs.js`).
   - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
+- [x] Етап B, крок 5 (перевірка): 3 «повторні декларації» з аудиту — **свідомо залишені**, це не помилка, а fallback-и:
+  - `#sidebar`: `height: 100vh` → `height: 100dvh` (резерв для старих WebView).
+  - `.search-container`: `background`/`border` спочатку `rgba(...)`, потім `color-mix(...)` (резерв, якщо `color-mix` не підтримується).
+  - Видалення будь-якого з них знизило б сумісність APK/WebView. Порожніх правил немає.
