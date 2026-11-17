@@ -50,20 +50,67 @@ async function main() {
     return pts;
   }
 
+  // Контури, що перетинають 180° довготи (Росія, Фіджі, Антарктида),
+  // в сирій проєкції дають сегмент через всю карту — звідси «смуги».
+  // Розрізаємо такий контур на антимеридіані й замикаємо кожну частину біля краю.
+  function splitAtSeam(xy) {
+    const ring = xy.slice(0, -1); // остання точка дублює першу
+    const n = ring.length;
+    const isJump = (a, b) => Math.abs(b[0] - a[0]) > 500;
+    let j0 = -1;
+    for (let i = 0; i < n; i++) {
+      if (isJump(ring[i], ring[(i + 1) % n])) { j0 = i; break; }
+    }
+    if (j0 < 0) return [xy];
+
+    // Починаємо одразу після розриву, щоб замикаюче ребро теж було розривом.
+    const start = (j0 + 1) % n;
+    const rot = [];
+    for (let k = 0; k < n; k++) rot.push(ring[(start + k) % n]);
+
+    function edgePoint(a, b, entry) {
+      const edge = entry ? (b[0] < 500 ? 0 : 1000) : (a[0] > 500 ? 1000 : 0);
+      const t = (edge - a[0]) / (b[0] - a[0]);
+      return [edge, a[1] + t * (b[1] - a[1])];
+    }
+
+    const runs = [];
+    let cur = [rot[0]];
+    for (let i = 1; i < n; i++) {
+      const a = rot[i - 1], b = rot[i];
+      if (isJump(a, b)) {
+        cur.push(edgePoint(a, b, false));
+        runs.push(cur);
+        cur = [edgePoint(a, b, true)];
+      } else {
+        cur.push(b);
+      }
+    }
+    // Останнє ребро (остання → перша точка) — теж розрив.
+    // Замикаємо по вихідному краю: цей шлях уже на протилежній стороні,
+    // а західний шлях замикається сам на собі на початку цілого кола.
+    cur.push(edgePoint(rot[n - 1], rot[0], false));
+    runs.push(cur);
+    return runs.filter(r => r.length >= 3);
+  }
+
   function toPath(geom) {
     const polys = geom.type === 'Polygon' ? [geom.arcs] : geom.type === 'MultiPolygon' ? geom.arcs : [];
     const parts = [];
     for (const poly of polys) for (const ring of poly) {
       const pts = ringPoints(ring);
       if (pts.length < 3) continue;
-      let d = 'M';
-      for (let i = 0; i < pts.length; i++) {
-        const [lon, lat] = pts[i];
-        const x = ((lon + 180) * (1000 / 360)).toFixed(1);
-        const y = ((90 - lat) * (500 / 180)).toFixed(1);
-        d += (i ? 'L' : '') + x + ',' + y;
+      const xy = pts.map(([lon, lat]) => [
+        (lon + 180) * (1000 / 360),
+        (90 - lat) * (500 / 180)
+      ]);
+      for (const run of splitAtSeam(xy)) {
+        let d = 'M';
+        for (let i = 0; i < run.length; i++) {
+          d += (i ? 'L' : '') + run[i][0].toFixed(1) + ',' + run[i][1].toFixed(1);
+        }
+        parts.push(d + 'Z');
       }
-      parts.push(d + 'Z');
     }
     return parts.join('');
   }
@@ -78,6 +125,7 @@ async function main() {
   }
 
   const paths = topo.objects.countries.geometries
+    .filter(g => Number(g.id) !== 10) // Антарктида обрізана viewBox — не возимо її в бандлі
     .map(g => {
       const n = Number(g.id);
       let d = toPath(g);

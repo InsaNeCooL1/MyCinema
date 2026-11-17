@@ -65,4 +65,18 @@ describe('Stage 2 & 3: Directors, Wrapped & World Map', () => {
     expect(Math.max(...ys)).toBeGreaterThan(126);
     expect((ua.d.match(/M/g) || []).length).toBeGreaterThanOrEqual(2); // материк + Крим
   });
+
+  it('контури не мають сегментів через всю карту (артефакт 180° довготи)', () => {
+    let bad = 0;
+    for (const p of window.MC_WORLD_PATHS) {
+      for (const sub of p.d.split(/(?=M)/).filter(Boolean)) {
+        const pts = [...sub.matchAll(/(\d+\.\d),(\d+\.\d)/g)].map(m => [Number(m[1]), Number(m[2])]);
+        for (let i = 1; i <= pts.length; i++) {
+          const a = pts[i - 1], b = pts[i % pts.length]; // включно з неявним Z
+          if (Math.abs(b[0] - a[0]) > 500) bad++;
+        }
+      }
+    }
+    expect(bad).toBe(0);
+  });
 });
