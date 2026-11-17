@@ -411,13 +411,16 @@ describe('chat UI', () => {
     expect(system).toContain('Рамки');
     // Рекомендації — підказки, а не жорсткий список: картка й запит важливіші.
     expect(system).not.toContain('насамперед бери з context.recommendations.items');
-    expect(system).toContain('Пріоритетними є тайтли зі стрічки');
-    expect(system).toContain('Уявляй кожен тайтл із короткими тегами');
-    expect(system).toContain('окремо подивись на елементи з type: "tv"');
-    expect(system).toContain('Не ради нічого з taste.libraryTitles');
-    expect(system).toContain('почни з короткої живої реакції');
+    expect(system).toContain('Пріоритетні тайтли зі стрічки');
+    expect(system).toContain('Подумки зіставляй кожен тайтл за суттю');
+    expect(system).toContain('окремо перевір усі елементи з type: "tv"');
+    expect(system).toContain('Не радь нічого з taste.libraryTitles');
+    expect(system).toContain('не керуєш застосунком');
+    expect(system).toContain('available: false');
+    expect(system).toContain('спочатку коротка жива реакція');
+    expect(system).toContain('кожен із нового рядка');
     expect(system).toContain('Доктора Хауса');
-    expect(system).toContain('Бігущого по лезу');
+    expect(system).toContain('Той, хто біжить по лезу');
     expect(captured.body.contents[captured.body.contents.length - 1]).toEqual({
       role: 'user',
       parts: [{ text: 'Що подивитись на вечір?' }],
