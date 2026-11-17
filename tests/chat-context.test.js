@@ -421,6 +421,14 @@ describe('chat BYOK — ключ у налаштуваннях', () => {
     }, { timeout: 2000 });
   });
 
+  it('вікно чату лежить поверх картки на десктопі', () => {
+    const css = fs.readFileSync('styles/85-chat.css', 'utf-8');
+    const m = css.match(/\.mc-chat-root\s*\{[^}]*z-index:\s*(\d+)/);
+    expect(m).toBeTruthy();
+    // У styles/95-layout-a11y.css десктопний #overlay має z-index: 1100.
+    expect(Number(m[1])).toBeGreaterThan(1100);
+  });
+
   it('вибір моделі зі списку зберігається одразу', async () => {
     global.fetch = vi.fn(async () => ({ ok: true, status: 200 }));
     window.mcChat.setApiKey('sk-or-v1-abc');

@@ -2423,7 +2423,8 @@ input#q::-webkit-search-cancel-button {
 
 .mc-chat-root {
   position: relative;
-  z-index: 900;
+  /* На десктопі #overlay (картка) має z-index:1100 — чат має бути поверх неї. */
+  z-index: 5000;
   font-family: var(--sans);
 }
 
