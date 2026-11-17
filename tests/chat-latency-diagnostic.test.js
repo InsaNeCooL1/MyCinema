@@ -1,13 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Діагностичний набір: НЕ змінює поведінку застосунку, лише фіксує
-// механізми, через які Gemini 4 може бути повільним і довгим.
+// механізми, через які відповідь може бути повільною і довгою.
 window.loadScript('src/chat.js');
 
 const CHAIN_IDS = [
-  'gemini-4-hydrogen',
-  'gemini-3.8-flash',
-  'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
 ];
@@ -86,7 +83,7 @@ afterEach(() => {
 });
 
 describe('діагностика повільного Gemini 4 — тільки тести', () => {
-  it('1. усі п’ять моделей каскаду зараз мають thinkingLevel: low', async () => {
+  it('1. обидві моделі мають thinkingLevel: low', async () => {
     window.mcChat.setApiKey('AIza-diag');
     const seen = [];
 
@@ -110,7 +107,7 @@ describe('діагностика повільного Gemini 4 — тільки 
     }
 
     console.info('[diag][thinking]', seen.join(' | '));
-    expect(seen).toHaveLength(5);
+    expect(seen).toHaveLength(CHAIN_IDS.length);
   });
 
   it('2. історія з thought-частин роздуває тіло запиту в рази', async () => {
@@ -177,7 +174,7 @@ describe('діагностика повільного Gemini 4 — тільки 
     }, { timeout: 3000 });
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch.mock.calls[0][0]).toContain('gemini-4-hydrogen');
+    expect(global.fetch.mock.calls[0][0]).toContain('gemini-3.5-flash-lite');
     expect(requestBodyAt(0).generationConfig.maxOutputTokens).toBe(8192);
 
     console.info('[diag][retry] запитів:', global.fetch.mock.calls.length, 'ліміт:', 8192);
@@ -185,7 +182,7 @@ describe('діагностика повільного Gemini 4 — тільки 
 
   it('4. телеметрія збирає usageMetadata, finishReason і таймінги', async () => {
     window.mcChat.setApiKey('AIza-diag');
-    window.mcChat._state.health = { ok: true, status: 200, models: ['gemini-4-hydrogen'] };
+    window.mcChat._state.health = { ok: true, status: 200, models: ['gemini-3.5-flash-lite'] };
     global.fetch = vi.fn(async () => sseResponse([
       sseChunk(
         [{ text: 'Міркую…', thought: true }, { text: 'Раджу «Дюну»' }],
@@ -208,7 +205,7 @@ describe('діагностика повільного Gemini 4 — тільки 
 
     const t = window.mcChat._state.lastTiming;
     expect(t).toBeTruthy();
-    expect(t.model).toBe('gemini-4-hydrogen');
+    expect(t.model).toBe('gemini-3.5-flash-lite');
     expect(t.status).toBe(200);
     expect(t.maxOutputTokens).toBe(8192);
     expect(t.usage).toMatchObject({
