@@ -66,6 +66,9 @@
   - Конкатенація до рефакторингу збіглася з оригіналом **байт-у-байт** (SHA-256 `72b2f0d6…`).
   - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
   - `styles.css` тепер генерований: у шапці є попередження `Do not edit`.
-- [ ] Етап B: токени
-- [ ] Етап B: `!important`
-- [ ] Етап B: мертві класи/змінні
+- [x] Етап B, крок 1: прибрано 6 невикористаних токенів (`--rose`, `--tmdb`, `--imdb`, `--rt`, `--shadow`, `--r-full`) і замінено literal `#ff5c5c` на `var(--danger)` у 3 місцях
+  - `npm run build` — OK, `lightningcss` — 0 warnings, `npm test` — 64 passed.
+  - Візуальних змін немає: `--danger` має те саме значення.
+- [ ] Етап B, крок 2: білі overlay-кольори → токени (`--white-04`, `--white-08` тощо)
+- [ ] Етап B, крок 3: `!important` у desktop-media
+- [ ] Етап B, крок 4: мертві класи (`mood-section`, `card-hero-stop`, `desktop-block-title`, `desktop-similar-block`)

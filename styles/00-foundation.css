@@ -6,20 +6,17 @@
   --bg-sidebar: #06050a; --bg-query: #040308;
   --accent: #ffb86c; --accent-hover: #ffc98a; --accent-fg: #1a1207;
   --accent-rgb: 255, 184, 108;
-  --mint: #9de5c3; --coral: #ff7b5c; --violet: #c5a3ff; --rose: #ff6b9d;
+  --mint: #9de5c3; --coral: #ff7b5c; --violet: #c5a3ff;
   --text: #f2eee9; --text-secondary: #cfc8c0; --text-muted: #8d877f; --text-dim: #575349;
   --danger: #ff5c5c; --success: #9de5c3; --warning: #ffb86c;
-  --tmdb: #01b4e4; --imdb: #f5c518; --rt: #fa320a;
   --serif: 'Georgia', 'Playfair Display', serif;
   --sans: system-ui, -apple-system, 'Inter', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
-  --shadow: 0 1px 3px rgba(0,0,0,0.4);
   /* FIX-RADIUS-TOKENS */
   --r-xs: 6px;    /* chips, badges, tiny close */
   --r-sm: 8px;    /* buttons, pills, tabs, inputs */
   --r-md: 12px;   /* medium containers, cards */
   --r-lg: 16px;   /* large cards, modals */
-  --r-full: 9999px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

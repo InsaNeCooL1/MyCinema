@@ -43,7 +43,7 @@
 .btn-tags:hover { background: var(--bg-3); color: var(--text); border-color: var(--text-muted); }
 .genres-right { flex-shrink: 0; display: flex; align-items: center; }
 .age-badge { font-family: var(--mono); font-size: 11px; font-weight: 800; padding: 2px 6px; border-radius: var(--r-xs); letter-spacing: 0.5px; }
-.age-badge.age-red { color: #ff5c5c; background: rgba(255,92,92,0.15); border: 1px solid rgba(255,92,92,0.4); }
+.age-badge.age-red { color: var(--danger); background: rgba(255,92,92,0.15); border: 1px solid rgba(255,92,92,0.4); }
 .age-badge.age-yellow { color: var(--accent); background: rgba(var(--accent-rgb),0.15); border: 1px solid rgba(var(--accent-rgb),0.4); }
 .age-badge.age-green { color: var(--mint); background: rgba(157,229,195,0.15); border: 1px solid rgba(157,229,195,0.4); }
 .age-badge.age-default { color: var(--text-muted); background: var(--bg-2); border: 1px solid rgba(255,255,255,0.15); }
@@ -75,7 +75,7 @@
 .btn-watched { flex: 0 0 44px; background: transparent; border: 1px solid var(--text-muted); border-radius: var(--r-sm); color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: .2s; }
 .btn-watched:hover { background: var(--bg-3); color: var(--text); border-color: var(--text); }
 .btn-watched.active { background: rgba(0,255,136,0.15); border-color: #00ff88; color: #00ff88; box-shadow: 0 0 12px rgba(0,255,136,0.6); }
-.btn-watched.dropped { background: rgba(255,92,92,0.15); border-color: #ff5c5c; color: #ff5c5c; box-shadow: 0 0 12px rgba(255,92,92,0.6); }
+.btn-watched.dropped { background: rgba(255,92,92,0.15); border-color: var(--danger); color: var(--danger); box-shadow: 0 0 12px rgba(255,92,92,0.6); }
 
 /* --- Statuses --- */
 .mobile-statuses { display: flex; gap: 6px; width: 100%; }
