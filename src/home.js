@@ -213,18 +213,6 @@ function getDominantCriterion(taste) {
   return null;
 }
 
-function minMaxNorm(arr) {
-  if (!arr.length) return [];
-  let min = Infinity, max = -Infinity;
-  for (const v of arr) {
-    if (v < min) min = v;
-    if (v > max) max = v;
-  }
-  const span = max - min;
-  if (span <= 1e-9) return arr.map(() => 0);
-  return arr.map(v => (v - min) / span);
-}
-
 async function buildSmartRecommendations(seeds, mood, mode) {
   mode = mode || 'balance';
   if (!seeds.length) return { items: [], seeds: 0, mood, mode };
@@ -556,7 +544,8 @@ async function buildSmartRecommendations(seeds, mood, mode) {
     if (mode === 'gems' && (entry.votes > 2500 || entry.tmdbRating < 7.0)) continue;
     if (mode === 'fresh' && ((parseInt(entry.year) || 0) < currentYear - 2)) continue;
 
-    let baseRaw = entry.tmdbRating / 10;
+    // Байєсовське стиснення: 8.5 при 40 голосах < 8.5 при 4000 голосах
+    let baseRaw = recBayesRating(entry.tmdbRating, entry.votes);
     if (mode === 'gems') baseRaw += clampNum((2500 - entry.votes) / 2500, 0, 0.3);
     else if (mode === 'fresh') baseRaw += clampNum(((parseInt(entry.year) || currentYear - 2) - (currentYear - 2)) * 0.15, 0, 0.3);
     else baseRaw += Math.min(entry.popularity / 250, 0.2);
@@ -705,16 +694,11 @@ async function buildSmartRecommendations(seeds, mood, mode) {
         finalizeReasons(entry);
       }
 
-      const baseNorm = minMaxNorm(enriched.map(x => x._baseRaw));
-      const sourceNorm = minMaxNorm(enriched.map(x => Math.min(x._sourceRaw, 3)));
-      const profileNorm = minMaxNorm(enriched.map(x => x._profileRaw));
-      const eloNorm = minMaxNorm(enriched.map(x => x._eloRaw));
-
-      enriched.forEach((entry, i) => {
-        const total = 0.35 * baseNorm[i] + 0.30 * sourceNorm[i] + 0.25 * profileNorm[i] + 0.10 * eloNorm[i] - entry._antiPenalty;
-        entry._score = total;
-        /* FIX-MOOD-WEIGHT-ENR */
-        entry._sortScore = total + Math.min(0.40, entry._moodBoost || 0) + (rnd() - 0.5) * 0.08; /* FIX-MOOD-AGGR-SORT */
+      // Абсолютне логістичне нормування (без min-max по поточному пулу),
+      // щоб скор не «їхав» при зміні складу кандидатів між оновленнями.
+      // Настрій входить один раз як п'ята ознака, а не додається вдруге зверху.
+      enriched.forEach((entry) => {
+        entry._sortScore = recRankScore(entry, (rnd() - 0.5) * 0.08);
         /* FIX-RELEASE-COPY-META — copy before delete for poster badges */
         entry.digitalReleaseDate = (entry._meta && entry._meta.digitalDate) || null;
         entry.streamingUA = (entry._meta && entry._meta.providersUA) || [];
@@ -747,23 +731,27 @@ async function buildSmartRecommendations(seeds, mood, mode) {
           leadSeen[leadId] = (leadSeen[leadId] || 0) + 1;
           if (leadSeen[leadId] > 2) leadPen = Math.min(0.15, 0.05 * (leadSeen[leadId] - 2));
         }
-        const divPen = Math.min(0.28, Math.max(colPen, dirPen + leadPen)); /* FIX-MOOD-AGGR-DIV */
+        // max, а не dirPen + leadPen: інакше режисер і актор з одного фільму
+        // подвійно каралися б за той самий «заліт».
+        const divPen = Math.min(0.28, Math.max(colPen, dirPen, leadPen));
         if (divPen > 0) entry._sortScore -= divPen;
       });
-      enriched.sort((a, b) => b._sortScore - a._sortScore);
+      // Фінальне пересортування робимо після злиття з rest (див. нижче).
     }
 
     for (const entry of rest) {
       finalizeReasons(entry);
-      /* FIX-MOOD-WEIGHT-REST */
-      entry._sortScore = entry._preScore + Math.min(0.40, (entry._moodBoost || 0) * 0.5); /* FIX-MOOD-AGGR-REST */
+      // Ті самі ваги, що й для «збагачених»: інакше кандидат без метаданих
+      // завжди опинявся б нижче, навіть якщо він об'єктивно кращий.
+      entry._profileRaw = entry._genreMatch || 0;
+      entry._antiPenalty = entry._antiGenre || 0;
+      entry._sortScore = recRankScore(entry, 0);
       delete entry._seenTags;
       delete entry._meta;
       delete entry._moodBoost;
     }
-    rest.sort((a, b) => b._preScore - a._preScore);
 
-    return [...enriched, ...rest].slice(0, 80);
+    return [...enriched, ...rest].sort((a, b) => b._sortScore - a._sortScore).slice(0, 80);
   };
 
   return {

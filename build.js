@@ -11,6 +11,7 @@ const SRC_FILES = [
   'src/ui.js',
   'src/facts.js',
   'src/search.js',
+  'src/recs-math.js',
   'src/home.js',
   'src/library.js',
   'src/share.js',
