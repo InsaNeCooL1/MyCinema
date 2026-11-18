@@ -6,7 +6,7 @@ function syncNavActive() {
   document.querySelectorAll(".nav-group").forEach(g => {
     const hasActive = !!g.querySelector('.nav-item.active');
     g.classList.toggle('has-active', hasActive);
-    if (window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches) {
+    if (isDesktopLayout()) {
       g.classList.remove('open');
     } else if (hasActive) {
       g.classList.add('open');
@@ -58,6 +58,19 @@ function setTab(t, opts) {
   refresh();
 }
 
+/* [LAYOUT] Кнопка «Твій смак»: відкриває Обсерваторію з будь-якого меню,
+   повторний клік повертає на попередню сторінку. */
+function toggleObservatory() {
+  if (state.tab === 'statistics') {
+    const back = window._mcObsPrevTab || 'home';
+    window._mcObsPrevTab = null;
+    setTab(back);
+  } else {
+    window._mcObsPrevTab = state.tab;
+    setTab('statistics');
+  }
+}
+
 document.querySelectorAll(".filter-btn").forEach(b => b.addEventListener("click", () => setTypeFilter(b.dataset.filter)));
 
 function setTypeFilter(f) {
@@ -71,6 +84,9 @@ function refresh() {
   else if (state.tab === "filter") renderFilter();
   else if (state.tab === "game") renderGame();
   else if (state.tab === "statistics") renderStatistics();
+  else if (state.tab === "collections") renderCollections();
+  else if (state.tab === "tops") renderTops();
+  else if (state.tab === "streamings") renderStreamings();
   else if (state.tab === "notes") renderNotesList();
   else if (state.tab === "calendar") renderCalendar();
   else if (state.tab === "activity" && typeof renderActivityLog === 'function') renderActivityLog();
@@ -211,6 +227,8 @@ history.replaceState({ mc: 0 }, '', location.pathname + location.search + _initi
   function boot() {
     if (booted) return;
     booted = true;
+    /* [LAYOUT] Верхній блок «Твій смак» має дані й на інших стартових вкладках. */
+    if (typeof updateTopTasteButton === 'function') updateTopTasteButton();
     refresh();
     if (_initialHash) routeFromHash();
   }

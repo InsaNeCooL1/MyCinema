@@ -19,6 +19,8 @@
   --r-sm: 8px;    /* buttons, pills, tabs, inputs */
   --r-md: 12px;   /* medium containers, cards */
   --r-lg: 16px;   /* large cards, modals */
+  /* [LAYOUT] Бічні відступи контенту головної (десктоп перевизначає). */
+  --mc-home-pad: 0;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -97,6 +99,12 @@ input#q::placeholder { color: var(--text-dim); }
 .sidebar-header { padding: 26px 22px 22px; border-bottom: 1px solid rgba(var(--white-rgb), .05); flex-shrink: 0; }
 .sidebar-logo { font-family: var(--serif); font-size: 26px; font-weight: 800; font-style: italic; color: var(--accent); margin-bottom: 4px; letter-spacing: -.5px; }
 .sidebar-email { font-size: 11px; color: var(--text-muted); word-break: break-all; font-family: var(--mono); letter-spacing: .3px; }
+/* [LAYOUT] Іконка пошуку існує лише у десктопній верхній панелі. */
+.desktop-search-toggle { display: none; }
+/* [LAYOUT] Підказка над рядком — десктоп показує її окремим рядком. */
+.search-hint { display: none; }
+/* [LAYOUT] Блок «Твій смак» на верхній панелі — лише десктоп. */
+.taste-top-btn { display: none; }
 
 .sidebar-nav {
   flex: 1 1 auto;
@@ -272,6 +280,8 @@ input#q::placeholder { color: var(--text-dim); }
 .title-header-row { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
 .tv-icon-badge { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: var(--r-sm); background: var(--bg-2); border: 1px solid rgba(var(--white-rgb), .1); font-family: var(--mono); font-weight: 800; font-size: 18px; color: var(--text-muted); flex-shrink: 0; }
 .tv-icon-badge-logo { padding: 5px; }
+.tv-icon-badge-clickable { cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.tv-icon-badge-clickable:hover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), .2); transform: translateY(-1px); }
 /* Логотип стрімінгу на білій плашці: темні логотипи з TMDB інакше
    зливаються з карткою. Літерний фолбек лишаємо акцентним. */
 .tv-icon-badge.tv-icon-badge-logo:not(.tv-icon-badge-letter) {
@@ -382,15 +392,15 @@ input#q::placeholder { color: var(--text-dim); }
 .card-tab:hover { color: var(--text); }
 .card-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 800; }
 .card-tab-content { padding-bottom: 20px; animation: mcTabFade .14s ease-out; }
-.card-tab-content.no-fade { animation: none !important; }
+.card-tab-content.no-fade { animation: none; }
 
 /* FIX-EXIT-AND-FS-CSS */
 html.streams-lock, body.streams-lock {
-  overflow: hidden !important;
+  overflow: hidden;
 }
 body.mc-fs {
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .exit-confirm-overlay {
   position: fixed;
@@ -549,6 +559,10 @@ body.mc-fs {
 @media (max-width: 899px), (max-height: 599px) {
   #sidebar .nav-group-btn { display: none; }
   #sidebar .nav-dropdown { display: flex; flex-direction: column; padding-left: 0; gap: 3px; }
+  /* [LAYOUT] «Топи» — один пункт із розкривним списком, а не россып підпунктів. */
+  #sidebar .nav-group[data-group="tops"] .nav-group-btn { display: flex; }
+  #sidebar .nav-group[data-group="tops"] .nav-dropdown { display: none; }
+  #sidebar .nav-group[data-group="tops"].open .nav-dropdown { display: flex; }
   #sidebar .sidebar-nav { padding: 12px 10px; gap: 3px; }
   #sidebar .nav-group { gap: 3px; }
   #sidebar .nav-item {
@@ -565,7 +579,7 @@ body.mc-fs {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; line-height: 1;
   }
   #sidebar .sidebar-footer { padding: 12px 14px; gap: 8px; }
-  #sidebar #sidebar-top-btn { display: none !important; }
+  #sidebar #sidebar-top-btn { display: none; }
   #sidebar .login-btn-side, #sidebar .logout-btn-side {
     height: 44px; min-height: 44px; padding: 0 14px;
     display: flex; align-items: center; justify-content: center; box-sizing: border-box;
@@ -675,7 +689,7 @@ html.mc-kbd .streams-ep-btn:focus-visible, html.mc-kbd .streams-prov-btn:focus-v
 html.mc-kbd .streams-chip:focus-visible, html.mc-kbd .streams-play-btn:focus-visible,
 html.mc-kbd .episode-body:focus-visible, html.mc-kbd .home-view-pill:focus-visible,
 html.mc-kbd .home-inline-pill:focus-visible {
-  outline: 2px solid var(--accent) !important; outline-offset: 2px !important;
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
 /* --- Tab Contents (збережені зі старого коду) --- */
@@ -1107,13 +1121,13 @@ html.mc-kbd .home-inline-pill:focus-visible {
   letter-spacing: .5px;
 }
 .ac-history {
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-  color: var(--text-secondary) !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
 }
 .ac-history:hover {
-  color: var(--text) !important;
+  color: var(--text);
 }
 .ac-history svg {
   opacity: .6;
@@ -1261,10 +1275,10 @@ html.mc-kbd .home-inline-pill:focus-visible {
 }
 .filter-dropdown.hidden { display: none; }
 .filter-dropdown-panel {
-  margin-bottom: 0 !important;
-  background: transparent !important;
-  border: 0 !important;
-  padding: 14px 16px !important;
+  margin-bottom: 0;
+  background: transparent;
+  border: 0;
+  padding: 14px 16px;
 }
 .filter-dropdown-head {
   display: flex;
@@ -1430,6 +1444,15 @@ html.mc-kbd .home-inline-pill:focus-visible {
   }
   .nav-caret { margin-left: 2px; }
 
+  /* [LAYOUT] Невидимий місток між кнопкою та меню — курсор не «випадає» у проміжку. */
+  .nav-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    right: 0;
+    height: 12px;
+  }
   .nav-dropdown {
     position: absolute;
     top: calc(100% + 10px);
@@ -1493,7 +1516,7 @@ html.mc-kbd .home-inline-pill:focus-visible {
     border-radius: var(--r-sm);
     flex-shrink: 0;
   }
-  .sidebar-footer .icon-compact-btn .btn-label { display: none !important; }
+  .sidebar-footer .icon-compact-btn .btn-label { display: none; }
   .sidebar-footer .login-btn-side.icon-compact-btn {
     background: rgba(var(--accent-rgb), .14);
     color: var(--accent);
@@ -1514,22 +1537,29 @@ html.mc-kbd .home-inline-pill:focus-visible {
     color: #fff;
   }
   .sidebar-footer .settings-compact-btn {
-    border: 1px solid rgba(var(--white-rgb), .12) !important;
-    color: var(--text-secondary) !important;
-    background: rgba(var(--white-rgb), .04) !important;
+    border: 1px solid rgba(var(--white-rgb), .12);
+    color: var(--text-secondary);
+    background: rgba(var(--white-rgb), .04);
   }
   .sidebar-footer .settings-compact-btn:hover {
-    border-color: var(--accent) !important;
-    color: var(--accent) !important;
-    background: rgba(var(--accent-rgb), .12) !important;
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), .12);
   }
 
   /* Дропдаун фільтра справа під пошуком */
   .filter-dropdown {
-    left: auto !important;
-    right: 0 !important;
-    width: min(460px, 100%) !important;
+    left: auto;
+    right: 0;
+    width: min(460px, 100%);
   }
+}
+
+/* [LAYOUT] Колишній інлайн-стиль кнопки налаштувань перенесено сюди,
+   щоб десктоп-правила покладалися лише на каскад. Мобайл виглядає як раніше. */
+html[data-layout="mobile"] .settings-compact-btn {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ========================================================= */
@@ -1764,24 +1794,25 @@ html.mc-kbd .home-inline-pill:focus-visible {
 /* PERF OPTIMIZATION (FPS & MOBILE WEBVIEW)                  */
 /* ========================================================= */
 .rec-dismiss {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  background: rgba(8, 7, 10, .78) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(8, 7, 10, .78);
 }
 
 .timeline-items .item {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  background: var(--bg-1) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--bg-1);
 }
 
 
 
 
 
+/* [LAYOUT] Десктоп-стиль: явно обмежений атрибутом, щоб не впливати на мобайл. */
 @media (min-width: 900px) {
-  #overlay #card.is-person .card-scroll {
-    padding: 72px 40px 40px !important;
+  html[data-layout="desktop"] #overlay #card.is-person .card-scroll {
+    padding: 72px 40px 40px;
   }
 }
 
@@ -1900,10 +1931,11 @@ input#q::-webkit-search-cancel-button {
   appearance: none;
 }
 
+/* [LAYOUT] Десктоп-стиль: явно обмежений атрибутом, щоб не впливати на мобайл. */
 @media (min-width: 900px) {
-  body #results > .taste-summary-container.is-expanded {
-    flex: 0 0 100% !important;
-    max-width: 100% !important;
+  html[data-layout="desktop"] body #results > .taste-summary-container.is-expanded {
+    flex: 0 0 100%;
+    max-width: 100%;
   }
 }
 
@@ -1914,22 +1946,22 @@ input#q::-webkit-search-cancel-button {
 
 /* Запобіжник для контейнера */
 .mood-pills {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 /* Мобільний: горизонтальний скрол + видимий скролбар */
 @media (max-width: 899px) {
-    .mood-pills {
-        overflow-x: auto !important;
-        overflow-y: hidden !important;
+    html[data-layout="mobile"] .mood-pills {
+        overflow-x: auto;
+        overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
-        padding-bottom: 8px !important;
-        scrollbar-width: thin !important;
-        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05) !important;
+        padding-bottom: 8px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05);
     }
-    .mood-pills::-webkit-scrollbar {
-        display: block !important;
+    html[data-layout="mobile"] .mood-pills::-webkit-scrollbar {
+        display: block;
         height: 4px;
     }
     .mood-pills::-webkit-scrollbar-thumb {
@@ -1945,28 +1977,28 @@ input#q::-webkit-search-cancel-button {
 /* Десктоп: один рядок, поступове зменшення відступів */
 @media (min-width: 900px) and (min-height: 600px) {
     body #results .mood-pills {
-        flex-wrap: nowrap !important; /* СУВОРО ОДИН РЯДОК */
-        height: 44px !important;
-        max-height: 44px !important;
-        overflow-x: auto !important; /* Якщо не влазить - горизонтальний скрол */
-        overflow-y: hidden !important;
-        padding: 4px !important;
-        align-items: center !important;
-        scrollbar-width: thin !important;
-        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05) !important;
+        flex-wrap: nowrap; /* СУВОРО ОДИН РЯДОК */
+        height: 44px;
+        max-height: 44px;
+        overflow-x: auto; /* Якщо не влазить - горизонтальний скрол */
+        overflow-y: hidden;
+        padding: 4px;
+        align-items: center;
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05);
     }
     /* Прибираємо скролбар-смужку, бо на десктопі вона зайва (скролимо мишкою/тачем) */
     body #results .mood-pills::-webkit-scrollbar {
-        height: 0px !important;
-        display: none !important;
+        height: 0px;
+        display: none;
     }
     body #results .mood-pill {
-        height: 34px !important;
+        height: 34px;
         /* Поступове зменшення відступів та шрифту */
-        padding: 0 clamp(6px, 1vw, 16px) !important;
-        font-size: clamp(11px, 1vw, 13px) !important;
-        gap: clamp(2px, 0.5vw, 6px) !important;
-        flex-shrink: 0 !important; /* Не стискаємо самі плитки, але вони самі зменшуються */
+        padding: 0 clamp(6px, 1vw, 16px);
+        font-size: clamp(11px, 1vw, 13px);
+        gap: clamp(2px, 0.5vw, 6px);
+        flex-shrink: 0; /* Не стискаємо самі плитки, але вони самі зменшуються */
     }
 }
 
@@ -1982,10 +2014,10 @@ input#q::-webkit-search-cancel-button {
 /* FIX-SEARCH-GLASS-THEME — color follows current theme (bg-1 at 65%, text at 8%) */
 @media (min-width: 900px) and (min-height: 600px) {
   .search-container {
-    background: rgba(15, 14, 19, 0.65) !important; /* fallback: navy */
-    background: color-mix(in srgb, var(--bg-1) 65%, transparent) !important;
-    border: 1px solid rgba(var(--white-rgb), .08) !important; /* fallback */
-    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent) !important;
+    background: rgba(15, 14, 19, 0.65); /* fallback: navy */
+    background: color-mix(in srgb, var(--bg-1) 65%, transparent);
+    border: 1px solid rgba(var(--white-rgb), .08); /* fallback */
+    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
   }
 }
 
@@ -2058,7 +2090,7 @@ input#q::-webkit-search-cancel-button {
 .settings-field-actions .settings-btn { width: auto; flex: 1 1 140px; }
 .settings-field-status { font-size: 12px; min-height: 1.2em; color: var(--text-muted); }
 /* display:flex на .settings-section перекриває звичайний [hidden] */
-.settings-section[hidden], .mc-chat-api-block[hidden] { display: none !important; }
+.settings-section[hidden], .mc-chat-api-block[hidden] { display: none; }
 
 /* FIX-SETTINGS-REORG — шрифти, підзаголовки, account-menu, lang-btn */
 .settings-box {
@@ -2144,23 +2176,186 @@ input#q::-webkit-search-cancel-button {
 
 /* FIX-MENU-SVG-V2 */
 .account-menu {
-  z-index: 9999 !important;
-  pointer-events: auto !important;
+  z-index: 9999;
+  pointer-events: auto;
 }
 .account-menu-item {
-  pointer-events: auto !important;
-  cursor: pointer !important;
+  pointer-events: auto;
+  cursor: pointer;
 }
 .icon-compact-btn svg {
-  display: block !important;
-  width: 18px !important;
-  height: 18px !important;
-  flex-shrink: 0 !important;
-  stroke: currentColor !important;
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke: currentColor;
 }
 
 
 
+/* =========================================
+   COLLECTIONS — masonry-сітка підбірок і модалка
+   ========================================= */
+
+.collections-page { width: 100%; box-sizing: border-box; }
+.collections-masonry {
+  column-count: 4;
+  column-gap: 16px;
+  width: 100%;
+}
+@media (max-width: 1100px) { .collections-masonry { column-count: 3; } }
+html[data-layout="desktop"] .collections-masonry { column-count: 4; }
+@media (max-width: 899px) { .collections-masonry { column-count: 2; } }
+@media (max-width: 520px) { .collections-masonry { column-count: 1; } }
+
+.collection-card {
+  break-inside: avoid;
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--bg-1);
+  border: 1px solid rgba(var(--white-rgb), .06);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: transform .2s, border-color .2s, background .2s;
+}
+.collection-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--accent-rgb), .35);
+  background: var(--bg-2);
+}
+.collection-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.collections-cover {
+  display: grid;
+  gap: 3px;
+  height: 108px;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+}
+.collections-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.collections-cover-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  color: var(--text-muted);
+}
+.collection-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.collection-card-emoji { font-family: var(--sans); font-size: 16px; flex-shrink: 0; }
+.collection-card-desc {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.collection-card-count {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Модалка добірки ───────────────────────────────────────── */
+.collection-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .82);
+  backdrop-filter: blur(8px);
+}
+.collection-modal {
+  width: min(1200px, 96vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 20px;
+  background: var(--bg-0);
+  border: 1px solid rgba(var(--white-rgb), .08);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .8);
+  animation: fadeUp .2s ease-out;
+}
+.collection-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.collection-modal-close {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: .15s;
+}
+.collection-modal-close:hover { background: var(--bg-3); color: var(--text); }
+.collection-modal-desc {
+  margin: 8px 0 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ── Стріммінги ─────────────────────────────────────────────── */
+.streaming-card { padding: 14px; text-align: left; font: inherit; color: var(--text); }
+.streaming-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96px;
+  padding: 14px;
+  box-sizing: border-box;
+  border-radius: var(--r-sm);
+  background: #f2f1f4;
+}
+.streaming-logo-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* Плитки фільмів усередині модалки — як тренди на головній. */
+.collections-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 18px 14px;
+  width: 100%;
+}
+
+/* [LAYOUT] Мобільні правила вікон: модалка на повний екран, плитки щільніше. */
+@media (max-width: 899px) {
+  .collection-modal-overlay { padding: 0; }
+  .collection-modal {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    padding: 14px;
+  }
+  .collections-modal-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
+}
+@media (max-width: 480px) {
+  .collections-modal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 /* FIX-QUICK-NOTE */
 .quick-note-overlay {
   position: fixed;
@@ -2319,37 +2514,37 @@ input#q::-webkit-search-cancel-button {
    CARD BACK BUTTON (FINAL CLEAN)
    ========================================= */
 .card-bar {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  z-index: 100 !important;
-  pointer-events: none !important;
-  padding: 16px !important;
-  padding-top: calc(16px + env(safe-area-inset-top)) !important;
-  box-sizing: border-box !important;
-  display: flex !important;
-  justify-content: space-between !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  pointer-events: none;
+  padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top));
+  box-sizing: border-box;
+  display: flex;
+  justify-content: space-between;
 }
 
 .card-x {
-  pointer-events: auto !important;
-  width: 46px !important;
-  height: 46px !important;
-  border-radius: var(--r-sm) !important;
-  background: rgba(var(--accent-rgb), 0.12) !important;
-  border: 1px solid rgba(var(--accent-rgb), 0.3) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  color: var(--text) !important;
-  font-size: 22px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  transition: 0.2s !important;
+  pointer-events: auto;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-sm);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text);
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s;
 }
 .card-x:hover {
-  background: rgba(var(--accent-rgb), 0.25) !important;
+  background: rgba(var(--accent-rgb), 0.25);
 }
 
 /* FIX-NOTES-FEED-STRUCTURE */
@@ -2970,7 +3165,8 @@ body.mc-chat-open #snow-layer { display: none; }
 .mc-chat-api-save { margin-top: 12px; }
 
 /* ── десктоп: бічна панель ───────────────────────────────────── */
-@media (min-width: 900px) {
+/* [LAYOUT] повний десктоп-запит, щоб стиль не потрапляв на мобайл. */
+@media (min-width: 900px) and (min-height: 600px) {
   .mc-chat-panel {
     right: 18px;
     bottom: 18px;
@@ -2989,7 +3185,7 @@ body.mc-chat-open #snow-layer { display: none; }
 @media (max-width: 899px) {
   body.mc-chat-open { overflow: hidden; }
   /* На телефоні анімація появи рядка додає мікро-стрибок під час стріму. */
-  .mc-chat-msg { animation: none !important; }
+  html[data-layout="mobile"] .mc-chat-msg { animation: none; }
 }
 @media (max-width: 380px) {
   .mc-chat-bubble { font-size: 14px; }
@@ -3000,30 +3196,31 @@ body.mc-chat-open #snow-layer { display: none; }
   .mc-chat-panel,
   .mc-chat-backdrop,
   .mc-chat-fab,
-  .mc-chat-msg { transition: none !important; animation: none !important; }
+  .mc-chat-msg { transition: none; animation: none; }
 }
 /* FIX-SHOW-BACK-MOBILE + FIX-SAFE-AREA-ALL-CARDS */
+/* [LAYOUT] Мобільні оверрайди: scopes через атрибут, щоб не впливати на десктоп. */
 @media (max-width: 899px) {
-  .card-bar {
-    display: flex !important; /* Кнопка назад як на десктопі */
-    padding: calc(env(safe-area-inset-top) + 10px) 12px 10px !important;
+  html[data-layout="mobile"] .card-bar {
+    display: flex; /* Кнопка назад як на десктопі */
+    padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
   }
-  .card-x {
-    background: rgba(8, 7, 10, .68) !important;
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
+  html[data-layout="mobile"] .card-x {
+    background: rgba(8, 7, 10, .68);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
-  #overlay #card .card-scroll {
-    padding-top: calc(16px + env(safe-area-inset-top)) !important;
-    padding-bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+  html[data-layout="mobile"] #overlay #card .card-scroll {
+    padding-top: calc(16px + env(safe-area-inset-top));
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
   }
-  .card-mobile-root {
-    padding-top: 0 !important;
+  html[data-layout="mobile"] .card-mobile-root {
+    padding-top: 0;
   }
 }
 
-/* FIX-DESKTOP-GRID */
-@media (min-width: 900px) {
+/* FIX-DESKTOP-GRID — [LAYOUT] повний десктоп-запит, щоб не застосовуватись на мобайлі. */
+@media (min-width: 900px) and (min-height: 600px) {
   .card-desktop-root {
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
@@ -3139,23 +3336,87 @@ body.mc-chat-open #snow-layer { display: none; }
   #sidebar-backdrop, .hamburger { display: none; }
   
   .sidebar-header { margin-right: 20px; padding: 0; border: none; height: 100%; display: flex; align-items: center; }
-  .sidebar-logo { margin: 0; font-size: 24px; }
+  .sidebar-logo { margin: 0; font-size: 24px; cursor: pointer; }
+  /* [LAYOUT] Головна тепер відкривається кліком по логотипу — пункт меню ховаємо лише на десктопі. */
+  html[data-layout="desktop"] #sidebar .nav-item[data-tab="home"] { display: none; }
+  /* [LAYOUT] Обсерваторію заміняє блок «Твій смак» на верхній панелі. */
+  html[data-layout="desktop"] #sidebar .nav-item[data-tab="statistics"] { display: none; }
   .sidebar-email { display: none; }
+
+  /* [LAYOUT] Відступи всієї інфи на головній: 22px зліва та справа. */
+  html[data-layout="desktop"] { --mc-home-pad: 0 22px; }
+
+  /* [LAYOUT] «Твій смак» на верхній панелі: розмір як у функціональних кнопок. */
+  html[data-layout="desktop"] .taste-top-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    height: 38px;
+    /* [LAYOUT] Аватар біля лівого краю, оцінка — біля правого. */
+    padding: 0 10px 0 6px;
+    min-width: 130px;
+    border-radius: 19px;
+    border: 1px solid rgba(var(--accent-rgb), .35);
+    background: rgba(var(--accent-rgb), .12);
+    color: var(--accent);
+    cursor: pointer;
+    transition: .2s;
+  }
+  html[data-layout="desktop"] .taste-top-btn:hover {
+    background: rgba(var(--accent-rgb), .22);
+    border-color: var(--accent);
+  }
+  html[data-layout="desktop"] .taste-top-avatar {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+  html[data-layout="desktop"] .taste-top-avatar svg { width: 26px; height: 26px; }
+  html[data-layout="desktop"] .taste-top-value {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  /* [LAYOUT] Рядок пошуку ховається; іконка на верхній панелі його відкриває. */
+  html[data-layout="desktop"] .desktop-search-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; padding: 0;
+    border-radius: 50%;
+    background: rgba(var(--white-rgb), .04);
+    border: 1px solid rgba(var(--white-rgb), .12);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  html[data-layout="desktop"] .desktop-search-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), .12);
+  }
+  html[data-layout="desktop"] body:not(.mc-search-open) > header { display: none; }
+  html[data-layout="desktop"] body:not(.mc-search-open):not(.no-search) { padding-top: 64px; }
   
+  /* [LAYOUT] Центруємо меню відносно екрану, а не проміжку логотип→кнопки. */
   .sidebar-nav {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(58vw, 960px);
     flex-direction: row;
     height: 100%;
     padding: 0;
     gap: 4px;
     align-items: center;
-    flex: 1;
     justify-content: center;
     overflow: visible;
   }
   .nav-item {
-    height: 38px !important;
+    height: 38px;
     padding: 0 12px;
-    margin: 0 !important;
+    margin: 0;
     font-size: 13px;
     border-radius: 8px;
     display: flex;
@@ -3181,7 +3442,7 @@ body.mc-chat-open #snow-layer { display: none; }
   }
 
   /* 2. Body and Header */
-  body { padding-left: 0; padding-top: 134px; }
+  body { padding-left: 0; padding-top: 160px; }
   body.no-search { padding-top: 64px; }
   body.no-search #type-filter { margin-top: 24px; margin-bottom: 10px; }
   
@@ -3190,19 +3451,36 @@ body.mc-chat-open #snow-layer { display: none; }
     top: 64px;
     left: 0;
     width: 100%;
-    height: 70px;
-    padding: 10px 40px;
+    height: 96px;
+    padding: 8px 22px;
     background: transparent;
     border: none;
     z-index: 990;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 6px;
     box-sizing: border-box;
     backdrop-filter: none;
   }
   body.no-search > header { display: none; }
   body:has(#overlay.open) > header { display: none; }
   
+  /* [LAYOUT] Підказка над рядком: шрифт як у плейсхолдера, градієнт як у назви фільму. */
+  .search-hint {
+    display: block;
+    margin-left: 10px;
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    background: linear-gradient(135deg, var(--text) 20%, var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  html[data-layout="desktop"] input#q::placeholder { color: transparent; }
+
   .search-container {
     width: 100%;
     max-width: 100%;
@@ -3210,13 +3488,21 @@ body.mc-chat-open #snow-layer { display: none; }
     /* Фон і бордюр задає 70-fixes-settings.css через color-mix(var(--bg-1)/var(--text)),
        щоб скло реагувало на тему. Тут їх не дублюємо. */
     backdrop-filter: blur(16px);
-    border-radius: 24px;
+    border-radius: var(--r-sm);
     display: flex;
     align-items: center;
-    padding: 0 20px;
+    padding: 0 10px;
     margin: 0;
   }
   input#q { background: transparent; border: none; box-shadow: none; height: 100%; width: 100%; font-size: 15px; padding: 0; }
+  /* [LAYOUT] Ободок належить підкладці, а не інпуту — межі збігаються з рядком 22px. */
+  html[data-layout="desktop"] input#q:focus { box-shadow: none; }
+  html[data-layout="desktop"] input#q:focus-visible { outline: none; }
+  html[data-layout="desktop"] .search-container:focus-within {
+    border-radius: var(--r-sm);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), .18);
+  }
 
   /* 3. Content and Grid */
   #results {
@@ -3237,12 +3523,102 @@ body.mc-chat-open #snow-layer { display: none; }
     margin-right: 0;
   }
 
-  /* Сітка на 7 колонок */
+  /* Сітка на 8 колонок */
   body #results .home-grid {
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(8, minmax(0, 1fr));
     gap: 20px 16px;
     width: 100%;
+  }
+
+  /* [LAYOUT] Блок «Для тебе» — окрема виділена панель із горизонтальною стрічкою. */
+  html[data-layout="desktop"] .home-recs-panel {
+    background: linear-gradient(135deg, rgba(var(--accent-rgb), .05), rgba(22, 20, 27, .55));
+    border: 1px solid rgba(var(--white-rgb), .07);
+    border-radius: var(--r-lg);
+    padding: 18px;
+    margin-bottom: 26px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .25);
+  }
+  html[data-layout="desktop"] #results .home-recs-panel .home-grid.recs-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    padding-bottom: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent) rgba(var(--white-rgb), .05);
+  }
+  html[data-layout="desktop"] #results .home-recs-panel .recs-strip .rec-card {
+    flex: 0 0 clamp(100px, 8.5vw, 180px);
+    width: clamp(100px, 8.5vw, 180px);
+  }
+
+  /* [LAYOUT] Стрілки прокрутки стрічки — крок 3 картки, великий хіт-бокс. */
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-wrap { position: relative; }
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-arrow {
+    position: absolute;
+    top: 40%;
+    transform: translateY(-50%);
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 7, 10, .88);
+    border: 1px solid rgba(var(--accent-rgb), .38);
+    color: var(--accent);
+    cursor: pointer;
+    z-index: 3;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .55);
+    transition: .2s;
+  }
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-arrow:hover {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+  }
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-prev { left: -16px; }
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-next { right: -16px; }
+
+  /* [LAYOUT] Шапка панелі: перемикач одразу біля заголовка, оновлення — праворуч. */
+  html[data-layout="desktop"] .home-recs-panel .section-head {
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+  }
+  html[data-layout="desktop"] .home-recs-panel .home-inline-type-switch {
+    gap: 5px;
+    padding: 4px;
+  }
+  html[data-layout="desktop"] .home-recs-panel .home-inline-pill {
+    padding: 7px 14px;
+    font-size: 14.4px;
+  }
+  html[data-layout="desktop"] .home-recs-panel .home-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: var(--r-sm);
+    border: 1px solid rgba(var(--white-rgb), .12);
+    background: rgba(var(--white-rgb), .04);
+    color: var(--text-secondary);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: .2s;
+  }
+  html[data-layout="desktop"] .home-recs-panel .home-refresh-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(var(--accent-rgb), .12);
   }
 
   /* 4. Overlay */
@@ -3274,14 +3650,14 @@ html:not(.mc-kbd) :focus-visible {
   outline: none;
 }
 html.mc-kbd :focus-visible {
-  outline: 2px solid var(--accent) !important;
-  outline-offset: 2px !important;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 html.mc-kbd .rec-card:focus-visible,
 html.mc-kbd .item:focus-visible,
 html.mc-kbd .card-tab:focus-visible {
-  outline: 3px solid var(--accent) !important;
-  outline-offset: -2px !important;
+  outline: 3px solid var(--accent);
+  outline-offset: -2px;
   border-radius: var(--r-sm);
 }
 
@@ -3470,6 +3846,33 @@ html.mc-kbd .card-tab:focus-visible {
   background: var(--accent);
   color: var(--accent-fg);
 }
+
+/* [LAYOUT] Факт дня — вільна плашка зверху праворуч, без затемнення екрану. */
+.fact-modal-overlay {
+  position: fixed;
+  top: 168px;
+  right: 22px;
+  z-index: 1500;
+}
+@media (max-width: 899px), (max-height: 599px) {
+  .fact-modal-overlay { top: 80px; right: 16px; }
+}
+.fact-modal {
+  width: clamp(320px, 14.28vw, 560px);
+  height: clamp(220px, 25vh, 360px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), .09), rgba(22, 20, 27, .96));
+  border: 1px solid rgba(var(--accent-rgb), .28);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .75);
+  animation: fadeUp .2s ease-out;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.fact-modal.dismissing { opacity: 0; transform: scale(.96); }
+.fact-modal .fact-card-text { flex: 1; min-height: 0; overflow-y: auto; font-size: 14px; }
 
 .cold-splash {
   position: fixed;
@@ -3801,14 +4204,14 @@ html.mc-kbd .card-tab:focus-visible {
   height: 34px;
 }
 @media (min-width: 900px) and (min-height: 600px) {
-  /* !important потрібен, бо 60-perf-home.css фіксує 44/34px з !important. */
+  /* Каскад: цей файл іде після 60-perf-home.css, тому перемагає за порядком. */
   body #results .recs-controls-bar .mood-pills {
-    padding: 5px !important;
-    height: auto !important;
-    max-height: none !important;
+    padding: 5px;
+    height: auto;
+    max-height: none;
   }
   body #results .recs-controls-bar .mood-pill {
-    height: 32px !important;
+    height: 32px;
   }
 }
 
@@ -3837,7 +4240,7 @@ html.mc-kbd .card-tab:focus-visible {
 }
 @media (hover: none) {
   .item:hover, .taste-summary:hover, .game-card:hover, .actor-tile:hover, .similar-card:hover {
-    transform: none !important;
+    transform: none;
   }
 }
 
@@ -3936,7 +4339,8 @@ html.mc-kbd .card-tab:focus-visible {
 
 /* Мобільна головна: ховаємо лише режими, а не весь бар —
    інакше разом з ними зникають пілюлі настрою. */
+/* [LAYOUT] Мобільний стиль: scopes через атрибут, щоб не впливати на десктоп. */
 @media (max-width: 899px) {
-  #results .recs-controls-bar .recs-mode-pills { display: none !important; }
+  html[data-layout="mobile"] #results .recs-controls-bar .recs-mode-pills { display: none; }
 }
 

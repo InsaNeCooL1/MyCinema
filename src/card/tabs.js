@@ -547,7 +547,7 @@ function renderStudiosTab(ctx) {
 
 function buildCardTabs(ctx) {
   const r = ctx.item;
-  const isDesktop = typeof isDesktopLayout === 'function' ? isDesktopLayout() : window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
+  const isDesktop = isDesktopLayout();
   let tabsList;
   if (r.type === 'tv') {
     tabsList = [{ id: 'seasons', label: 'Сезони' }, { id: 'cast', label: 'Актори' }];

@@ -41,8 +41,18 @@ document.getElementById('poster-zoom').addEventListener('click', (e) => {
 });
 
 // ========== NAV DROPDOWNS & PRIORITY+ ==========
+/* [LAYOUT][DESKTOP] Іконка на верхній панелі відкриває/закриває рядок пошуку. */
+function toggleDesktopSearch() {
+  if (typeof isDesktopLayout === 'function' && !isDesktopLayout()) return;
+  const open = document.body.classList.toggle('mc-search-open');
+  if (open) {
+    const input = document.getElementById('q');
+    if (input) { input.focus(); input.select(); }
+  }
+}
+
 function closeNavDropdowns() {
-  if (window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches) {
+  if (isDesktopLayout()) {
     document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
   }
 }
@@ -52,7 +62,7 @@ function toggleNavGroup(groupName, e) {
   const group = document.querySelector(`.nav-group[data-group="${groupName}"]`);
   if (!group) return;
   const isOpen = group.classList.contains('open');
-  const isDesktop = window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
+  const isDesktop = isDesktopLayout();
   if (isDesktop) {
     document.querySelectorAll('.nav-group.open').forEach(g => {
       if (g !== group) g.classList.remove('open');
@@ -60,8 +70,30 @@ function toggleNavGroup(groupName, e) {
     if (typeof hideFilterDropdown === 'function') hideFilterDropdown();
     if (typeof hideAutocomplete === 'function') hideAutocomplete();
   }
+  /* [LAYOUT] Клік по кнопці «Топи» веде на сторінку топів; підпункти відкривають конкретний топ. */
+  if (groupName === 'tops' && isDesktop && typeof setTab === 'function') setTab('tops');
+  /* [LAYOUT] На десктопі група вже відкривається по наведенню — клік не закриває її. */
+  if (isDesktop) { group.classList.add('open'); return; }
   group.classList.toggle('open', !isOpen);
 }
+
+/* [LAYOUT] Десктоп: підменю «Списки», «Огляд» тощо розкриваються по наведенню. */
+(function initNavHover() {
+  document.querySelectorAll('#sidebar .nav-group').forEach(group => {
+    let closeTimer = null;
+    group.addEventListener('mouseenter', () => {
+      if (!isDesktopLayout()) return;
+      if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+      closeNavDropdowns();
+      group.classList.add('open');
+    });
+    group.addEventListener('mouseleave', () => {
+      if (!isDesktopLayout()) return;
+      /* Невелика затримка: місток між кнопкою й меню + повернення курсору не закривають список. */
+      closeTimer = setTimeout(() => group.classList.remove('open'), 180);
+    });
+  });
+})();
 
 (function initPriorityNav() {
   const nav = document.getElementById('sidebar-nav');
@@ -71,7 +103,7 @@ function toggleNavGroup(groupName, e) {
   if (!nav || !sidebar || !moreGroup || !moreMenu) return;
 
   const topItems = Array.from(nav.querySelectorAll(':scope > .nav-top-item'));
-  const desktopMQ = window.matchMedia('(min-width: 900px) and (min-height: 600px)');
+  const desktopMQ = DESKTOP_MQ;
   let hasMoved = false;
 
   function updatePriorityNav() {

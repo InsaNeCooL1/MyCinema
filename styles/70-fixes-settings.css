@@ -9,10 +9,10 @@
 /* FIX-SEARCH-GLASS-THEME — color follows current theme (bg-1 at 65%, text at 8%) */
 @media (min-width: 900px) and (min-height: 600px) {
   .search-container {
-    background: rgba(15, 14, 19, 0.65) !important; /* fallback: navy */
-    background: color-mix(in srgb, var(--bg-1) 65%, transparent) !important;
-    border: 1px solid rgba(var(--white-rgb), .08) !important; /* fallback */
-    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent) !important;
+    background: rgba(15, 14, 19, 0.65); /* fallback: navy */
+    background: color-mix(in srgb, var(--bg-1) 65%, transparent);
+    border: 1px solid rgba(var(--white-rgb), .08); /* fallback */
+    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
   }
 }
 
@@ -85,7 +85,7 @@
 .settings-field-actions .settings-btn { width: auto; flex: 1 1 140px; }
 .settings-field-status { font-size: 12px; min-height: 1.2em; color: var(--text-muted); }
 /* display:flex на .settings-section перекриває звичайний [hidden] */
-.settings-section[hidden], .mc-chat-api-block[hidden] { display: none !important; }
+.settings-section[hidden], .mc-chat-api-block[hidden] { display: none; }
 
 /* FIX-SETTINGS-REORG — шрифти, підзаголовки, account-menu, lang-btn */
 .settings-box {
@@ -171,19 +171,19 @@
 
 /* FIX-MENU-SVG-V2 */
 .account-menu {
-  z-index: 9999 !important;
-  pointer-events: auto !important;
+  z-index: 9999;
+  pointer-events: auto;
 }
 .account-menu-item {
-  pointer-events: auto !important;
-  cursor: pointer !important;
+  pointer-events: auto;
+  cursor: pointer;
 }
 .icon-compact-btn svg {
-  display: block !important;
-  width: 18px !important;
-  height: 18px !important;
-  flex-shrink: 0 !important;
-  stroke: currentColor !important;
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke: currentColor;
 }
 
 

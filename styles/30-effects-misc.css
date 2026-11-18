@@ -150,13 +150,13 @@
   letter-spacing: .5px;
 }
 .ac-history {
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-  color: var(--text-secondary) !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
 }
 .ac-history:hover {
-  color: var(--text) !important;
+  color: var(--text);
 }
 .ac-history svg {
   opacity: .6;

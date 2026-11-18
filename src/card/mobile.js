@@ -141,6 +141,25 @@
       } else {
         _tvBadge = el('div', 'tv-icon-badge', 'TV');
       }
+      if (ctx.providerPick) {
+        /* [LAYOUT] Лейба стрімінгу/мережі відкриває картку компанії. */
+        _tvBadge.classList.add('tv-icon-badge-clickable');
+        _tvBadge.title = `${ctx.providerPick.name || 'Стрімінг'} → картка компанії`;
+        _tvBadge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const pick = ctx.providerPick;
+          let companyId = pick.source === 'studio' ? pick.id : null;
+          if (!companyId && typeof MC_STREAMINGS !== 'undefined' && pick.name) {
+            const needle = String(pick.name).toLowerCase();
+            const svc = MC_STREAMINGS.find(s =>
+              s.name.toLowerCase() === needle ||
+              s.name.toLowerCase().includes(needle) ||
+              needle.includes(s.name.toLowerCase()));
+            if (svc) companyId = svc.id;
+          }
+          if (companyId && typeof openCompany === 'function') openCompany(companyId);
+        });
+      }
       titleRow.append(_tvBadge);
     }
     titleRow.append(el('h1', 'title-main', d.title || d.name));

@@ -49,6 +49,44 @@ function seededRandom(str) {
   };
 }
 
+/* [LAYOUT] М'який зсув рекомендацій при оновленні:
+   кожна з перших 10 позицій із шансом ≤15% бере званого кандидата,
+   чим вище ранг у моделі — тим більша вага; решта лишається порядком моделі. */
+const RECS_SHUFFLE_CHANCE = 0.15;
+function softShuffleRecs(items, nonce) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  const top = Math.min(10, items.length);
+  const poolSize = Math.min(items.length, 30);
+  const rng = seededRandom(`recs-shuffle|${nonce || 0}`);
+  const weights = [];
+  for (let i = 0; i < poolSize; i++) weights.push(1 / (1 + i * 0.35));
+  const out = items.slice();
+  const used = new Set();
+  for (let slot = 0; slot < top; slot++) {
+    if (rng() >= RECS_SHUFFLE_CHANCE) continue;
+    let total = 0;
+    const avail = [];
+    for (let j = 0; j < poolSize; j++) {
+      if (j === slot || used.has(j)) continue;
+      avail.push([j, weights[j]]);
+      total += weights[j];
+    }
+    if (!avail.length) break;
+    let r = rng() * total;
+    let pick = avail[avail.length - 1][0];
+    for (const [j, w] of avail) { r -= w; if (r <= 0) { pick = j; break; } }
+    const tmp = out[slot]; out[slot] = out[pick]; out[pick] = tmp;
+    used.add(slot); used.add(pick);
+  }
+  return out;
+}
+
+function maybeShuffleRecs(data, nonce) {
+  if (!data || !Array.isArray(data.items) || !(nonce > 0)) return data;
+  const items = softShuffleRecs(data.items, nonce);
+  return items === data.items ? data : { ...data, items };
+}
+
 function isExcludedFromTaste(x, avg) {
   if (!x) return true;
   if (x.excludeFromProfile === true) return true;
@@ -1272,6 +1310,22 @@ function buildTempAvatarCard(data) {
   return card;
 }
 
+function updateTopTasteButton(taste) {
+  const btn = document.getElementById('taste-top-btn');
+  if (!btn) return;
+  const avatarData = computeTempAvatarData();
+  const avatarEl = document.getElementById('taste-top-avatar');
+  if (avatarEl) avatarEl.innerHTML = buildTempAvatarSVG(avatarData, 26);
+  let summaryVal = '—';
+  const t = taste || computeTasteVector();
+  if (t && t.count >= 3) {
+    const vals = RATING_CRITERIA.map(c => t[c.key] || 0).filter(v => v > 0);
+    if (vals.length) summaryVal = fmtNum(vals.reduce((a, b) => a + b, 0) / vals.length) + '/10';
+  }
+  const valEl = document.getElementById('taste-top-value');
+  if (valEl) valEl.textContent = summaryVal;
+}
+
 function renderTasteSummary(taste) {
   const container = el('div', 'taste-summary-container' + (state.home.tasteExpanded ? ' is-expanded' : ''));
   const hasTaste = taste && taste.count >= 3;
@@ -1281,6 +1335,14 @@ function renderTasteSummary(taste) {
   if (hasTaste) {
     const vals = RATING_CRITERIA.map(c => taste[c.key] || 0).filter(v => v > 0);
     if (vals.length) summaryVal = fmtNum(vals.reduce((a, b) => a + b, 0) / vals.length) + '/10';
+  }
+
+  // [LAYOUT] Синхронізуємо блок «Твій смак» на верхній панелі (десктоп).
+  if (document.getElementById('taste-top-btn')) {
+    const topAvatar = document.getElementById('taste-top-avatar');
+    if (topAvatar) topAvatar.innerHTML = buildTempAvatarSVG(avatarData, 26);
+    const topValue = document.getElementById('taste-top-value');
+    if (topValue) topValue.textContent = summaryVal;
   }
 
   const btn = el('button', 'taste-summary');
@@ -1473,7 +1535,7 @@ async function loadHome() {
   }
   if (state.home.recs && state.home.sig === sig) { renderHomeContent(taste); return; }
   const cached = readRecsCache(sig, critical); /* FIX-RECS-CACHE-V2 */
-  if (cached) { /* FIX-CACHE-RESET */ state.home.recs = cached; state.home.sig = sig; state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */; renderHomeContent(taste); return; }
+  if (cached) { /* FIX-CACHE-RESET */ state.home.recs = maybeShuffleRecs(cached, state.home.refreshNonce); state.home.sig = sig; state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */; renderHomeContent(taste); return; }
   if (state.home.loading === sig) return;
 
   // Поки йшли мережеві запити, користувач міг піти на іншу вкладку.
@@ -1486,7 +1548,7 @@ async function loadHome() {
     const data = await buildSmartRecommendations(seeds, state.home.mood, state.home.mode);
     if (state.home.loading !== sig) return; // [LOADHOME-RACE-FIX] застарілий запит
     writeRecsCache(sig, critical, data); /* FIX-RECS-CACHE-V2 */
-    state.home.recs = data;
+    state.home.recs = maybeShuffleRecs(data, state.home.refreshNonce);
     state.home.sig = sig;
     state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
     renderHomeContent(taste);
@@ -1504,38 +1566,23 @@ async function loadHome() {
 }
 
 function buildRecsControlsBar() {
+  /* [LAYOUT] Режими «Баланс/Перлини/Свіже» остаточно прибрано — лишаємо настрої. */
   const controlsBar = el('div', 'recs-controls-bar');
-  const modesBar = el('div', 'recs-mode-pills');
-  const modeDefs = [
-    { id: 'balance', label: '✨ Баланс' },
-    { id: 'gems', label: '💎 Перлини' },
-    { id: 'fresh', label: '🆕 Свіже' }
-  ];
-  modeDefs.forEach(m => {
-    const mb = el('button', 'recs-mode-pill' + ((state.home.mode || 'balance') === m.id ? ' active' : ''), m.label);
-    mb.type = 'button';
-    mb.addEventListener('click', () => {
-      if ((state.home.mode || 'balance') === m.id) return;
-      state.home.mode = m.id;
-      try { localStorage.setItem('mycinema.home.mode', m.id); } catch (e) {} /* FIX-MODE-SAVE */
-      state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
-      refresh();
-    });
-    modesBar.append(mb);
-  });
-  controlsBar.append(modesBar, renderMoodPills());
+  controlsBar.append(renderMoodPills());
   return controlsBar;
 }
 
 function renderHomeSkeleton(taste) {
-  box.style.padding = '0';
+  box.style.padding = 'var(--mc-home-pad, 0)';
   box.replaceChildren();
 
-  box.append(renderTasteSummary(taste || computeTasteVector()));
+  updateTopTasteButton(taste);
+  if (typeof isDesktopLayout === 'function' && !isDesktopLayout()) {
+    box.append(renderTasteSummary(taste || computeTasteVector()));
+  }
 
   const wrap = el('div', 'home-wrap');
-  const factCard = buildFactOfDayCard();
-  if (factCard) wrap.append(factCard);
+  buildFactOfDayCard();
   const sec = el('section', 'home-section');
   const head = el('div', 'section-head');
   head.append(el('h2', 'section-title', '✨ Для тебе'));
@@ -1618,29 +1665,9 @@ function buildPlannedByMoodSection() {
     .sort((a, b) => (b.updated || 0) - (a.updated || 0));
   if (!allPlanned.length) return null;
 
-  const moodKey = state.home.mood;
-  const moodData = moodKey && MOODS[moodKey] ? MOODS[moodKey] : null;
-  if (!state.home.planFilter) state.home.planFilter = 'all';
-
-  let moodPool = allPlanned;
-  if (moodData) {
-    const matched = allPlanned.filter(x => {
-      if (!x.genres || !x.genres.length) return false;
-      const targetGenres = x.type === 'tv' ? (moodData.tvGenres || moodData.genres) : moodData.genres;
-      return x.genres.some(g => targetGenres.includes(g));
-    });
-    if (matched.length) moodPool = matched;
-  }
-
-  const applyTimeFilter = (arr, f) => {
-    if (f === 'short') return arr.filter(x => x.type === 'movie' && x.runtime > 0 && x.runtime <= 105);
-    if (f === 'movie') return arr.filter(x => x.type === 'movie');
-    if (f === 'mini') return arr.filter(x => x.type === 'tv' && (x.totalSeasons === 1 || (!x.totalSeasons && x.episode_count > 0 && x.episode_count <= 10)));
-    return arr;
-  };
-
-  const pool = applyTimeFilter(moodPool, state.home.planFilter);
-  const sec = el('section', 'home-section planned-mood-sec');
+  /* [LAYOUT] Усі заплановані вже відсортовані за датою зміни (спадання). */
+  const pool = allPlanned;
+  const sec = el('section', 'home-section planned-mood-sec home-recs-panel');
   const head = el('div', 'section-head');
   const titleWrap = el('div', 'planned-head-left');
   titleWrap.append(el('h2', 'section-title', '🎯 З твого «Планую»'));
@@ -1648,40 +1675,33 @@ function buildPlannedByMoodSection() {
   const rouletteBtn = el('button', 'roulette-btn', '🎲 Вибрати за мене');
   rouletteBtn.type = 'button';
   rouletteBtn.addEventListener('click', () => {
-    const p = pool.length ? pool : moodPool;
-    const pick = p[Math.floor(Math.random() * p.length)];
+    const pick = pool[Math.floor(Math.random() * pool.length)];
     if (pick) openCard(pick);
   });
 
   head.append(titleWrap, rouletteBtn);
   sec.append(head);
 
-  const pfBar = el('div', 'plan-filter-bar');
-  [
-    ['all', 'Усі'],
-    ['short', '⚡ До 100 хв'],
-    ['movie', '🎬 Фільми'],
-    ['mini', '📺 Міні-серіали']
-  ].forEach(([fid, lbl]) => {
-    const b = el('button', 'recs-mode-pill' + (state.home.planFilter === fid ? ' active' : ''), lbl);
-    b.type = 'button';
-    b.addEventListener('click', () => {
-      state.home.planFilter = fid;
-      const fresh = buildPlannedByMoodSection();
-      if (fresh) sec.replaceWith(fresh);
-    });
-    pfBar.append(b);
-  });
-  sec.append(pfBar);
+  /* [LAYOUT] Горизонтальна стрічка зі стрілками — як у блоці «Для тебе». */
+  const stripWrap = el('div', 'recs-strip-wrap');
+  const strip = el('div', 'home-grid recs-strip');
+  pool.forEach(item => strip.append(recCard(item, false)));
 
-  if (!pool.length) {
-    sec.append(el('div', 'home-note', 'Немає тайтлів у «Планую» під цей фільтр (або ще не підвантажено хронометраж).'));
-    return sec;
-  }
+  const step = () => {
+    const card = strip.querySelector('.rec-card');
+    return card ? (card.getBoundingClientRect().width + 12) * 3 : 360;
+  };
+  const prev = el('button', 'recs-strip-arrow recs-strip-prev');
+  const next = el('button', 'recs-strip-arrow recs-strip-next');
+  prev.type = 'button'; next.type = 'button';
+  prev.title = 'Назад'; next.title = 'Далі';
+  prev.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+  next.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+  prev.addEventListener('click', () => strip.scrollBy({ left: -step(), behavior: 'smooth' }));
+  next.addEventListener('click', () => strip.scrollBy({ left: step(), behavior: 'smooth' }));
 
-  const strip = el('div', 'home-grid');
-  pool.slice(0, 14).forEach(item => strip.append(recCard(item, false)));
-  sec.append(strip);
+  stripWrap.append(prev, strip, next);
+  sec.append(stripWrap);
   return sec;
 }
 
@@ -1713,119 +1733,107 @@ function renderHomeContent(taste) {
   if (!state.home.view) {
     try { state.home.view = localStorage.getItem('mycinema.home.view') || 'my'; } catch { state.home.view = 'my'; }
   }
-  box.replaceChildren(); box.style.padding = '0';
-
-  const viewBarWrap = el('div', 'home-view-switch-wrap');
-  const viewBar = el('div', 'home-view-switch');
-  const myPill = el('button', 'home-view-pill' + (state.home.view === 'my' ? ' active' : ''), '✨ Для мене');
-  const trPill = el('button', 'home-view-pill' + (state.home.view === 'explore' ? ' active' : ''), '🌍 Тренди');
-  myPill.type = 'button'; trPill.type = 'button';
-  myPill.addEventListener('click', () => {
-    if (state.home.view === 'my') return;
-    state.home.view = 'my';
-    try { localStorage.setItem('mycinema.home.view', 'my'); } catch {}
-    renderHomeContent(taste);
-  });
-  /* EXPLORE_CLICK_TRIGGER */
-  trPill.addEventListener('click', () => {
-    if (state.home.view === 'explore') return;
-    state.home.view = 'explore';
-    try { localStorage.setItem('mycinema.home.view', 'explore'); } catch {}
-    if (!state.home.general) {
-      loadHome();
-    } else {
-      renderHomeContent(taste);
-    }
-  });
-  viewBar.append(myPill, trPill);
-  viewBarWrap.append(viewBar);
-  box.append(viewBarWrap);
+  box.replaceChildren(); box.style.padding = 'var(--mc-home-pad, 0)';
 
   if (state.home.view === 'my') {
-    box.append(renderTasteSummary(taste || computeTasteVector()));
+    updateTopTasteButton(taste);
+    /* [LAYOUT] На мобайлі блок смаку лишається на головній — верхньої панелі там немає. */
+    if (typeof isDesktopLayout === 'function' && !isDesktopLayout()) {
+      box.append(renderTasteSummary(taste || computeTasteVector()));
+    }
   }
 
   const wrap = el('div', 'home-wrap');
 
   if (state.home.view === 'my') {
-    const factCard = buildFactOfDayCard();
-    if (factCard) wrap.append(factCard);
+    buildFactOfDayCard();
 
     const recs = state.home.recs;
     if (recs && recs.seeds > 0) {
-      const sec = el('section', 'home-section');
+      const isMobile = typeof isDesktopLayout === 'function' && !isDesktopLayout();
+      const sec = el('section', 'home-section home-recs-panel');
       const head = el('div', 'section-head');
       head.style.alignItems = 'center';
       head.append(el('h2', 'section-title', '✨ Для тебе'));
       head.append(buildHomeTypeSwitch(taste));
       sec.append(head);
 
-    // Єдиний блок режимів видачі та настрою під «Для тебе»
-    const controlsBar = el('div', 'recs-controls-bar');
-    const modesBar = el('div', 'recs-mode-pills');
-    const modeDefs = [
-      { id: 'balance', label: '✨ Баланс' },
-      { id: 'gems', label: '💎 Перлини' },
-      { id: 'fresh', label: '🆕 Свіже' }
-    ];
-    modeDefs.forEach(m => {
-      const mb = el('button', 'recs-mode-pill' + ((state.home.mode || 'balance') === m.id ? ' active' : ''), m.label);
-      mb.type = 'button';
-      mb.addEventListener('click', () => {
-        if ((state.home.mode || 'balance') === m.id) return;
-        state.home.mode = m.id;
-        try { localStorage.setItem('mycinema.home.mode', m.id); } catch (e) {} /* FIX-MODE-SAVE */
-        state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */;
-        refresh();
-      });
-      modesBar.append(mb);
-    });
-    controlsBar.append(modesBar, renderMoodPills());
-    sec.append(controlsBar);
+      /* [LAYOUT] Мобайл лишає режими/настрої — десктоп їх прибрав свідомо. */
+      if (isMobile) sec.append(buildRecsControlsBar());
 
-    const type = state.home.tab;
-    const allItems = recs.items.filter(x => x.type === type && !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) && !(typeof isDismissed === 'function' && isDismissed(x.key)));
-    const shownCount = state.home.shown[type] || 14 /* FIX-SHOWN-14 */;
-    const visibleItems = allItems.slice(0, shownCount);
+      const type = state.home.tab;
+      const allItems = recs.items.filter(x => x.type === type && !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) && !(typeof isDismissed === 'function' && isDismissed(x.key)));
+      if (allItems.length) {
+        if (isMobile) {
+          /* Мобайл:原 логіка з HEAD — 14 тайтлів + «Показати ще» по 14. */
+          const shownCount = state.home.shown[type] || 14;
+          const visibleItems = allItems.slice(0, shownCount);
+          const grid = el('div', 'home-grid');
+          visibleItems.forEach(item => grid.append(recCard(item, true)));
+          sec.append(grid);
+          if (allItems.length > shownCount) {
+            const moreBtn = el('button', 'home-more', 'Показати ще');
+            moreBtn.type = 'button';
+            moreBtn.addEventListener('click', () => {
+              const current = state.home.shown[type] || 14;
+              const fresh = (state.home.recs?.items || []).filter(x =>
+                x.type === type &&
+                !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) &&
+                !(typeof isDismissed === 'function' && isDismissed(x.key)));
+              const nextShown = Math.min(fresh.length, current + 14);
+              allItems.slice(current, nextShown).forEach(item => grid.append(recCard(item, true)));
+              state.home.shown[type] = nextShown;
+              if (nextShown >= fresh.length) moreBtn.remove();
+            });
+            sec.append(moreBtn);
+          }
+        } else {
+          const stripWrap = el('div', 'recs-strip-wrap');
+          const grid = el('div', 'home-grid recs-strip');
+          allItems.forEach(item => grid.append(recCard(item, true)));
 
-    if (visibleItems.length) {
-      const grid = el('div', 'home-grid');
-      visibleItems.forEach(item => grid.append(recCard(item, true)));
-      sec.append(grid);
-    } else {
-      sec.append(el('div', 'home-note', 'Немає рекомендацій у цьому режимі. Спробуй «Баланс» або інший настрій.'));
-    }
+          const step = () => {
+            const card = grid.querySelector('.rec-card');
+            return card ? (card.getBoundingClientRect().width + 12) * 3 : 360;
+          };
+          const prev = el('button', 'recs-strip-arrow recs-strip-prev');
+          const next = el('button', 'recs-strip-arrow recs-strip-next');
+          prev.type = 'button'; next.type = 'button';
+          prev.title = 'Назад'; next.title = 'Далі';
+          prev.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+          next.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+          prev.addEventListener('click', () => grid.scrollBy({ left: -step(), behavior: 'smooth' }));
+          next.addEventListener('click', () => grid.scrollBy({ left: step(), behavior: 'smooth' }));
 
-    if (allItems.length > shownCount) {
-      const moreBtn = el('button', 'home-more', 'Показати ще');
-      /* FIX-SHOWMORE */
-      moreBtn.addEventListener('click', () => {
-        const grid = sec.querySelector('.home-grid');
-        const current = state.home.shown[type] || 14 /* FIX-SHOWN-14 */;
-        const fresh = (state.home.recs?.items || []).filter(x => x.type === type && !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) && !(typeof isDismissed === 'function' && isDismissed(x.key)));
-        const nextShown = Math.min(fresh.length, current + 14) /* FIX-SHOWN-14 */;
-        if (grid) fresh.slice(current, nextShown).forEach(item => grid.append(recCard(item, true)));
-        state.home.shown[type] = nextShown;
-        if (nextShown >= fresh.length) moreBtn.remove();
-      });
-      sec.append(moreBtn);
-    }
-
-    /* FIX-RECS-AGE */
-    let _cacheAge = '';
-    try {
-      const _c = typeof mcCacheGet === 'function' ? mcCacheGet(RECS_CACHE, null) : JSON.parse(localStorage.getItem(RECS_CACHE));
-      if (_c && _c.ts) {
-        const _hrs = Math.floor((Date.now() - _c.ts) / 3600000);
-        if (_hrs < 1) _cacheAge = ' (щойно)';
-        else if (_hrs < 24) _cacheAge = ` (${_hrs} год. тому)`;
-        else _cacheAge = ` (${Math.floor(_hrs / 24)} дн. тому)`;
+          stripWrap.append(prev, grid, next);
+          sec.append(stripWrap);
+        }
+      } else {
+        sec.append(el('div', 'home-note', 'Немає рекомендацій у цьому режимі. Спробуй «Баланс» або інший настрій.'));
       }
-    } catch (e) {}
-    const refreshBtn = el('button', 'home-more', '🔄 Оновити рекомендації' + _cacheAge);
-    refreshBtn.style.marginTop = '12px';
-    refreshBtn.style.background = 'transparent';
-    refreshBtn.style.border = '1px solid var(--bg-3)';
+
+    /* [LAYOUT] Кнопка оновлення — у шапці панелі, іконка в стилі верхнього меню. */
+    let refreshBtn;
+    if (isMobile) {
+      /* Оригінальна мобільна кнопка з HEAD. */
+      let cacheAge = '';
+      try {
+        const cached = typeof mcCacheGet === 'function' ? mcCacheGet(RECS_CACHE, null) : JSON.parse(localStorage.getItem(RECS_CACHE));
+        if (cached && cached.ts) {
+          const hrs = Math.floor((Date.now() - cached.ts) / 3600000);
+          cacheAge = hrs < 1 ? ' (щойно)' : (hrs < 24 ? ` (${hrs} год. тому)` : ` (${Math.floor(hrs / 24)} дн. тому)`);
+        }
+      } catch (e) {}
+      refreshBtn = el('button', 'home-more', '🔄 Оновити рекомендації' + cacheAge);
+      refreshBtn.style.marginTop = '12px';
+      refreshBtn.style.background = 'transparent';
+      refreshBtn.style.border = '1px solid var(--bg-3)';
+    } else {
+      refreshBtn = el('button', 'home-refresh-btn');
+      refreshBtn.title = 'Оновити рекомендації';
+      refreshBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg><span>Оновити</span>';
+    }
+    refreshBtn.type = 'button';
     refreshBtn.addEventListener('click', () => {
       if (typeof mcCacheDel === 'function') mcCacheDel(RECS_CACHE);
       state.home.refreshNonce = (state.home.refreshNonce || 0) + 1;
@@ -1835,7 +1843,8 @@ function renderHomeContent(taste) {
       refresh();
       showSyncToast('✨ Оновлено');
     });
-    sec.append(refreshBtn);
+    /* [LAYOUT] Мобайл: кнопка під видачею, як і раніше; десктоп — у шапці панелі. */
+    (isMobile ? sec : head).append(refreshBtn);
     wrap.append(sec);
 
   } else if (recs && recs.seeds === 0) {
@@ -1849,14 +1858,11 @@ function renderHomeContent(taste) {
     if (plannedSec) wrap.append(plannedSec);
   }
 
-  if (state.home.view === 'explore' && !state.home.general) {
-    wrap.append(el('div', 'avail-empty', 'Підбірки зараз недоступні офлайн або ще завантажуються.'));
-  }
-  if (state.home.view === 'explore' && state.home.general) {
+  /* [LAYOUT] Тренди завжди під блоком «Планую», фільми й серіали окремо. */
+  if (state.home.general) {
     const exploreHead = el('div', 'section-head');
     exploreHead.style.alignItems = 'center';
     exploreHead.append(el('h2', 'section-title', '🌍 Тренди і платформи'));
-    exploreHead.append(buildHomeTypeSwitch(taste));
     wrap.append(exploreHead);
     const g = state.home.general;
     if (!state.home.genShown) state.home.genShown = {};
@@ -1884,7 +1890,7 @@ function renderHomeContent(taste) {
       s.append(head);
 
       const grid = el('div', 'home-grid');
-      let shown = state.home.genShown[blockId] || 10;
+      let shown = state.home.genShown[blockId] || 16;
       items.slice(0, shown).forEach(item => grid.append(recCard(item, false)));
       s.append(grid);
 
@@ -1892,7 +1898,7 @@ function renderHomeContent(taste) {
         const moreBtn = el('button', 'home-more', 'Показати ще');
         moreBtn.type = 'button';
         moreBtn.addEventListener('click', () => {
-          const nextShown = Math.min(items.length, shown + 20);
+          const nextShown = Math.min(items.length, shown + 16);
           items.slice(shown, nextShown).forEach(item => grid.append(recCard(item, false)));
           shown = nextShown;
           state.home.genShown[blockId] = shown;
@@ -1944,11 +1950,14 @@ function renderHomeContent(taste) {
       return mixed;
     };
 
-    if (state.home.tab === 'movie') {
+    /* [LAYOUT] Видача залежить від вибраного типу: фільми або платформи/серіали. */
+    if (state.home.tab === 'movie' && g.trMovies && g.trMovies.length) {
+      wrap.append(el('div', 'section-head', '🎬 Фільми'));
       renderBlock('trMovies', '🔥 Популярні фільми', 'сьогодні', g.trMovies);
       renderBlock('newMovies', '🎬 Нові фільми', 'свіже', g.newMovies);
       renderBlock('topMovies', '🏆 Найрейтинговіші фільми', 'класика', g.topMovies);
-    } else if (Array.isArray(g.tvStreams)) {
+    } else if (state.home.tab !== 'movie' && Array.isArray(g.tvStreams) && g.tvStreams.length) {
+      wrap.append(el('div', 'section-head', '📺 Платформи'));
       g.tvStreams.forEach(st => {
         const mixed = mixTvStreamItems(st);
         renderBlock('tv-' + st.id, st.title, '', mixed, { logo: st.logo, isOther: st.id === 'other' });
@@ -1960,23 +1969,26 @@ function renderHomeContent(taste) {
 }
 
 function buildFactOfDayCard() {
-  if (typeof getFactOfDay !== 'function' || typeof isFactDismissedToday !== 'function') return null;
-  if (isFactDismissedToday()) return null;
+  if (typeof getFactOfDay !== 'function' || typeof isFactDismissedToday !== 'function') return;
+  if (isFactDismissedToday()) return;
+  if (document.querySelector('.fact-modal-overlay')) return;
   const fact = getFactOfDay();
-  if (!fact) return null;
+  if (!fact) return;
 
-  const card = el('div', 'fact-card');
+  const overlay = el('div', 'fact-modal-overlay');
+  const card = el('div', 'fact-modal');
   const head = el('div', 'fact-card-head');
   head.append(el('span', 'fact-card-badge', '🎞️ Факт дня'));
 
   const closeBtn = el('button', 'fact-card-close', '✕');
   closeBtn.type = 'button';
   closeBtn.title = 'Сховати до завтра';
-  closeBtn.addEventListener('click', () => {
+  const close = () => {
     dismissFactToday();
     card.classList.add('dismissing');
-    setTimeout(() => card.remove(), 180);
-  });
+    setTimeout(() => overlay.remove(), 180);
+  };
+  closeBtn.addEventListener('click', close);
   head.append(closeBtn);
   card.append(head);
 
@@ -1985,10 +1997,13 @@ function buildFactOfDayCard() {
   if (fact.title && typeof openFactMedia === 'function') {
     const linkBtn = el('button', 'fact-card-link', `🎬 ${fact.title}${fact.year ? ' (' + fact.year + ')' : ''} →`);
     linkBtn.type = 'button';
-    linkBtn.addEventListener('click', () => openFactMedia(fact));
+    linkBtn.addEventListener('click', () => { close(); openFactMedia(fact); });
     card.append(linkBtn);
   }
-  return card;
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.append(card);
+  document.body.append(overlay);
 }
 
 const _nextEpSeasonCache = new Map();

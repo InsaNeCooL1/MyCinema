@@ -35,3 +35,10 @@ coverage/
 
 # Cloudflare Worker local copy (contains MDBList API key — do NOT commit)
 worker/index.js
+
+# Backup clone (local only)
+MyCinemaBKP/
+MyCinemaBKP.tar.gz
+
+# Generated datasets cache (large IMDb TSV / search cache)
+tools/.cache/

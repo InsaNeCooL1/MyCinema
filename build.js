@@ -6,6 +6,7 @@ const esbuild = require('esbuild');
 // ⚠️ Порядок ТОЧНО як у index.html — критично, бо скрипти залежать один від одного
 const SRC_FILES = [
   'src/config.js',
+  'src/layout.js',
   'src/core.js',
   'src/api.js',
   'src/ui.js',
@@ -14,6 +15,12 @@ const SRC_FILES = [
   'src/recs-math.js',
   'src/imdb-ratings.js',
   'src/home.js',
+  'src/collections-data.js',
+  'src/collections.js',
+  'src/tops-data.js',
+  'src/tops.js',
+  'src/streaming-data.js',
+  'src/streaming.js',
   'src/library.js',
   'src/share.js',
   'src/world-map-data.js',
@@ -48,6 +55,7 @@ const CSS_FILES = [
   'styles/50-home-stats.css',
   'styles/60-perf-home.css',
   'styles/70-fixes-settings.css',
+  'styles/75-collections.css',
   'styles/80-notes-card.css',
   'styles/85-chat.css',
   'styles/90-layout-safe.css',

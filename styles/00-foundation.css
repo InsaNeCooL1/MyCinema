@@ -18,6 +18,8 @@
   --r-sm: 8px;    /* buttons, pills, tabs, inputs */
   --r-md: 12px;   /* medium containers, cards */
   --r-lg: 16px;   /* large cards, modals */
+  /* [LAYOUT] Бічні відступи контенту головної (десктоп перевизначає). */
+  --mc-home-pad: 0;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -96,6 +98,12 @@ input#q::placeholder { color: var(--text-dim); }
 .sidebar-header { padding: 26px 22px 22px; border-bottom: 1px solid rgba(var(--white-rgb), .05); flex-shrink: 0; }
 .sidebar-logo { font-family: var(--serif); font-size: 26px; font-weight: 800; font-style: italic; color: var(--accent); margin-bottom: 4px; letter-spacing: -.5px; }
 .sidebar-email { font-size: 11px; color: var(--text-muted); word-break: break-all; font-family: var(--mono); letter-spacing: .3px; }
+/* [LAYOUT] Іконка пошуку існує лише у десктопній верхній панелі. */
+.desktop-search-toggle { display: none; }
+/* [LAYOUT] Підказка над рядком — десктоп показує її окремим рядком. */
+.search-hint { display: none; }
+/* [LAYOUT] Блок «Твій смак» на верхній панелі — лише десктоп. */
+.taste-top-btn { display: none; }
 
 .sidebar-nav {
   flex: 1 1 auto;

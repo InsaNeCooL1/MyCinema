@@ -2,24 +2,25 @@
 /* PERF OPTIMIZATION (FPS & MOBILE WEBVIEW)                  */
 /* ========================================================= */
 .rec-dismiss {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  background: rgba(8, 7, 10, .78) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(8, 7, 10, .78);
 }
 
 .timeline-items .item {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  background: var(--bg-1) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--bg-1);
 }
 
 
 
 
 
+/* [LAYOUT] Десктоп-стиль: явно обмежений атрибутом, щоб не впливати на мобайл. */
 @media (min-width: 900px) {
-  #overlay #card.is-person .card-scroll {
-    padding: 72px 40px 40px !important;
+  html[data-layout="desktop"] #overlay #card.is-person .card-scroll {
+    padding: 72px 40px 40px;
   }
 }
 
@@ -138,10 +139,11 @@ input#q::-webkit-search-cancel-button {
   appearance: none;
 }
 
+/* [LAYOUT] Десктоп-стиль: явно обмежений атрибутом, щоб не впливати на мобайл. */
 @media (min-width: 900px) {
-  body #results > .taste-summary-container.is-expanded {
-    flex: 0 0 100% !important;
-    max-width: 100% !important;
+  html[data-layout="desktop"] body #results > .taste-summary-container.is-expanded {
+    flex: 0 0 100%;
+    max-width: 100%;
   }
 }
 
@@ -152,22 +154,22 @@ input#q::-webkit-search-cancel-button {
 
 /* Запобіжник для контейнера */
 .mood-pills {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 /* Мобільний: горизонтальний скрол + видимий скролбар */
 @media (max-width: 899px) {
-    .mood-pills {
-        overflow-x: auto !important;
-        overflow-y: hidden !important;
+    html[data-layout="mobile"] .mood-pills {
+        overflow-x: auto;
+        overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
-        padding-bottom: 8px !important;
-        scrollbar-width: thin !important;
-        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05) !important;
+        padding-bottom: 8px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05);
     }
-    .mood-pills::-webkit-scrollbar {
-        display: block !important;
+    html[data-layout="mobile"] .mood-pills::-webkit-scrollbar {
+        display: block;
         height: 4px;
     }
     .mood-pills::-webkit-scrollbar-thumb {
@@ -183,28 +185,28 @@ input#q::-webkit-search-cancel-button {
 /* Десктоп: один рядок, поступове зменшення відступів */
 @media (min-width: 900px) and (min-height: 600px) {
     body #results .mood-pills {
-        flex-wrap: nowrap !important; /* СУВОРО ОДИН РЯДОК */
-        height: 44px !important;
-        max-height: 44px !important;
-        overflow-x: auto !important; /* Якщо не влазить - горизонтальний скрол */
-        overflow-y: hidden !important;
-        padding: 4px !important;
-        align-items: center !important;
-        scrollbar-width: thin !important;
-        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05) !important;
+        flex-wrap: nowrap; /* СУВОРО ОДИН РЯДОК */
+        height: 44px;
+        max-height: 44px;
+        overflow-x: auto; /* Якщо не влазить - горизонтальний скрол */
+        overflow-y: hidden;
+        padding: 4px;
+        align-items: center;
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent) rgba(var(--white-rgb), .05);
     }
     /* Прибираємо скролбар-смужку, бо на десктопі вона зайва (скролимо мишкою/тачем) */
     body #results .mood-pills::-webkit-scrollbar {
-        height: 0px !important;
-        display: none !important;
+        height: 0px;
+        display: none;
     }
     body #results .mood-pill {
-        height: 34px !important;
+        height: 34px;
         /* Поступове зменшення відступів та шрифту */
-        padding: 0 clamp(6px, 1vw, 16px) !important;
-        font-size: clamp(11px, 1vw, 13px) !important;
-        gap: clamp(2px, 0.5vw, 6px) !important;
-        flex-shrink: 0 !important; /* Не стискаємо самі плитки, але вони самі зменшуються */
+        padding: 0 clamp(6px, 1vw, 16px);
+        font-size: clamp(11px, 1vw, 13px);
+        gap: clamp(2px, 0.5vw, 6px);
+        flex-shrink: 0; /* Не стискаємо самі плитки, але вони самі зменшуються */
     }
 }
 

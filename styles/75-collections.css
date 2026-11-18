@@ -1,0 +1,163 @@
+/* =========================================
+   COLLECTIONS — masonry-сітка підбірок і модалка
+   ========================================= */
+
+.collections-page { width: 100%; box-sizing: border-box; }
+.collections-masonry {
+  column-count: 4;
+  column-gap: 16px;
+  width: 100%;
+}
+@media (max-width: 1100px) { .collections-masonry { column-count: 3; } }
+html[data-layout="desktop"] .collections-masonry { column-count: 4; }
+@media (max-width: 899px) { .collections-masonry { column-count: 2; } }
+@media (max-width: 520px) { .collections-masonry { column-count: 1; } }
+
+.collection-card {
+  break-inside: avoid;
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--bg-1);
+  border: 1px solid rgba(var(--white-rgb), .06);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: transform .2s, border-color .2s, background .2s;
+}
+.collection-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--accent-rgb), .35);
+  background: var(--bg-2);
+}
+.collection-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.collections-cover {
+  display: grid;
+  gap: 3px;
+  height: 108px;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+}
+.collections-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.collections-cover-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  color: var(--text-muted);
+}
+.collection-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.collection-card-emoji { font-family: var(--sans); font-size: 16px; flex-shrink: 0; }
+.collection-card-desc {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.collection-card-count {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Модалка добірки ───────────────────────────────────────── */
+.collection-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .82);
+  backdrop-filter: blur(8px);
+}
+.collection-modal {
+  width: min(1200px, 96vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 20px;
+  background: var(--bg-0);
+  border: 1px solid rgba(var(--white-rgb), .08);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .8);
+  animation: fadeUp .2s ease-out;
+}
+.collection-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.collection-modal-close {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: .15s;
+}
+.collection-modal-close:hover { background: var(--bg-3); color: var(--text); }
+.collection-modal-desc {
+  margin: 8px 0 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ── Стріммінги ─────────────────────────────────────────────── */
+.streaming-card { padding: 14px; text-align: left; font: inherit; color: var(--text); }
+.streaming-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96px;
+  padding: 14px;
+  box-sizing: border-box;
+  border-radius: var(--r-sm);
+  background: #f2f1f4;
+}
+.streaming-logo-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* Плитки фільмів усередині модалки — як тренди на головній. */
+.collections-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 18px 14px;
+  width: 100%;
+}
+
+/* [LAYOUT] Мобільні правила вікон: модалка на повний екран, плитки щільніше. */
+@media (max-width: 899px) {
+  .collection-modal-overlay { padding: 0; }
+  .collection-modal {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    padding: 14px;
+  }
+  .collections-modal-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
+}
+@media (max-width: 480px) {
+  .collections-modal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

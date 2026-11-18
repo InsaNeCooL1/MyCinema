@@ -58,10 +58,10 @@
 }
 .filter-dropdown.hidden { display: none; }
 .filter-dropdown-panel {
-  margin-bottom: 0 !important;
-  background: transparent !important;
-  border: 0 !important;
-  padding: 14px 16px !important;
+  margin-bottom: 0;
+  background: transparent;
+  border: 0;
+  padding: 14px 16px;
 }
 .filter-dropdown-head {
   display: flex;
@@ -227,6 +227,15 @@
   }
   .nav-caret { margin-left: 2px; }
 
+  /* [LAYOUT] Невидимий місток між кнопкою та меню — курсор не «випадає» у проміжку. */
+  .nav-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    right: 0;
+    height: 12px;
+  }
   .nav-dropdown {
     position: absolute;
     top: calc(100% + 10px);
@@ -290,7 +299,7 @@
     border-radius: var(--r-sm);
     flex-shrink: 0;
   }
-  .sidebar-footer .icon-compact-btn .btn-label { display: none !important; }
+  .sidebar-footer .icon-compact-btn .btn-label { display: none; }
   .sidebar-footer .login-btn-side.icon-compact-btn {
     background: rgba(var(--accent-rgb), .14);
     color: var(--accent);
@@ -311,21 +320,28 @@
     color: #fff;
   }
   .sidebar-footer .settings-compact-btn {
-    border: 1px solid rgba(var(--white-rgb), .12) !important;
-    color: var(--text-secondary) !important;
-    background: rgba(var(--white-rgb), .04) !important;
+    border: 1px solid rgba(var(--white-rgb), .12);
+    color: var(--text-secondary);
+    background: rgba(var(--white-rgb), .04);
   }
   .sidebar-footer .settings-compact-btn:hover {
-    border-color: var(--accent) !important;
-    color: var(--accent) !important;
-    background: rgba(var(--accent-rgb), .12) !important;
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), .12);
   }
 
   /* Дропдаун фільтра справа під пошуком */
   .filter-dropdown {
-    left: auto !important;
-    right: 0 !important;
-    width: min(460px, 100%) !important;
+    left: auto;
+    right: 0;
+    width: min(460px, 100%);
   }
+}
+
+/* [LAYOUT] Колишній інлайн-стиль кнопки налаштувань перенесено сюди,
+   щоб десктоп-правила покладалися лише на каскад. Мобайл виглядає як раніше. */
+html[data-layout="mobile"] .settings-compact-btn {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 

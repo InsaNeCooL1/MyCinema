@@ -176,7 +176,7 @@ let lib = load();
 let _dirtyItems = new Set();
 let _saveTimer = null;
 let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_ADJUST_KEY)) || {}; } catch { return {}; } })();
-const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'activity', 'statistics', 'game']);
+const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'activity', 'statistics', 'game', 'collections', 'streamings', 'tops']);
 let _savedTab = 'home';
 try {
   const t = localStorage.getItem('mycinema.activeTab');
@@ -1134,9 +1134,11 @@ function showSyncToast(text) {
 
 // ============ PLACEHOLDER ============
 function rotatePlaceholder() {
-  const current = input.placeholder;
+  const hint = document.getElementById('search-hint');
+  const current = hint ? hint.textContent : input.placeholder;
   let next, attempts = 0;
   do { next = PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)]; attempts++; } while (next === current && attempts < 10);
+  if (hint) hint.textContent = next;
   input.placeholder = next;
 }
 rotatePlaceholder();

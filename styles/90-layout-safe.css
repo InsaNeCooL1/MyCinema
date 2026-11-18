@@ -1,25 +1,26 @@
 /* FIX-SHOW-BACK-MOBILE + FIX-SAFE-AREA-ALL-CARDS */
+/* [LAYOUT] Мобільні оверрайди: scopes через атрибут, щоб не впливати на десктоп. */
 @media (max-width: 899px) {
-  .card-bar {
-    display: flex !important; /* Кнопка назад як на десктопі */
-    padding: calc(env(safe-area-inset-top) + 10px) 12px 10px !important;
+  html[data-layout="mobile"] .card-bar {
+    display: flex; /* Кнопка назад як на десктопі */
+    padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
   }
-  .card-x {
-    background: rgba(8, 7, 10, .68) !important;
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
+  html[data-layout="mobile"] .card-x {
+    background: rgba(8, 7, 10, .68);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
-  #overlay #card .card-scroll {
-    padding-top: calc(16px + env(safe-area-inset-top)) !important;
-    padding-bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+  html[data-layout="mobile"] #overlay #card .card-scroll {
+    padding-top: calc(16px + env(safe-area-inset-top));
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
   }
-  .card-mobile-root {
-    padding-top: 0 !important;
+  html[data-layout="mobile"] .card-mobile-root {
+    padding-top: 0;
   }
 }
 
-/* FIX-DESKTOP-GRID */
-@media (min-width: 900px) {
+/* FIX-DESKTOP-GRID — [LAYOUT] повний десктоп-запит, щоб не застосовуватись на мобайлі. */
+@media (min-width: 900px) and (min-height: 600px) {
   .card-desktop-root {
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);

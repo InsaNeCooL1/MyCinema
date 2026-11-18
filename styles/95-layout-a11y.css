@@ -20,23 +20,87 @@
   #sidebar-backdrop, .hamburger { display: none; }
   
   .sidebar-header { margin-right: 20px; padding: 0; border: none; height: 100%; display: flex; align-items: center; }
-  .sidebar-logo { margin: 0; font-size: 24px; }
+  .sidebar-logo { margin: 0; font-size: 24px; cursor: pointer; }
+  /* [LAYOUT] Головна тепер відкривається кліком по логотипу — пункт меню ховаємо лише на десктопі. */
+  html[data-layout="desktop"] #sidebar .nav-item[data-tab="home"] { display: none; }
+  /* [LAYOUT] Обсерваторію заміняє блок «Твій смак» на верхній панелі. */
+  html[data-layout="desktop"] #sidebar .nav-item[data-tab="statistics"] { display: none; }
   .sidebar-email { display: none; }
+
+  /* [LAYOUT] Відступи всієї інфи на головній: 22px зліва та справа. */
+  html[data-layout="desktop"] { --mc-home-pad: 0 22px; }
+
+  /* [LAYOUT] «Твій смак» на верхній панелі: розмір як у функціональних кнопок. */
+  html[data-layout="desktop"] .taste-top-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    height: 38px;
+    /* [LAYOUT] Аватар біля лівого краю, оцінка — біля правого. */
+    padding: 0 10px 0 6px;
+    min-width: 130px;
+    border-radius: 19px;
+    border: 1px solid rgba(var(--accent-rgb), .35);
+    background: rgba(var(--accent-rgb), .12);
+    color: var(--accent);
+    cursor: pointer;
+    transition: .2s;
+  }
+  html[data-layout="desktop"] .taste-top-btn:hover {
+    background: rgba(var(--accent-rgb), .22);
+    border-color: var(--accent);
+  }
+  html[data-layout="desktop"] .taste-top-avatar {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+  html[data-layout="desktop"] .taste-top-avatar svg { width: 26px; height: 26px; }
+  html[data-layout="desktop"] .taste-top-value {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  /* [LAYOUT] Рядок пошуку ховається; іконка на верхній панелі його відкриває. */
+  html[data-layout="desktop"] .desktop-search-toggle {
+    display: flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; padding: 0;
+    border-radius: 50%;
+    background: rgba(var(--white-rgb), .04);
+    border: 1px solid rgba(var(--white-rgb), .12);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  html[data-layout="desktop"] .desktop-search-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), .12);
+  }
+  html[data-layout="desktop"] body:not(.mc-search-open) > header { display: none; }
+  html[data-layout="desktop"] body:not(.mc-search-open):not(.no-search) { padding-top: 64px; }
   
+  /* [LAYOUT] Центруємо меню відносно екрану, а не проміжку логотип→кнопки. */
   .sidebar-nav {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(58vw, 960px);
     flex-direction: row;
     height: 100%;
     padding: 0;
     gap: 4px;
     align-items: center;
-    flex: 1;
     justify-content: center;
     overflow: visible;
   }
   .nav-item {
-    height: 38px !important;
+    height: 38px;
     padding: 0 12px;
-    margin: 0 !important;
+    margin: 0;
     font-size: 13px;
     border-radius: 8px;
     display: flex;
@@ -62,7 +126,7 @@
   }
 
   /* 2. Body and Header */
-  body { padding-left: 0; padding-top: 134px; }
+  body { padding-left: 0; padding-top: 160px; }
   body.no-search { padding-top: 64px; }
   body.no-search #type-filter { margin-top: 24px; margin-bottom: 10px; }
   
@@ -71,19 +135,36 @@
     top: 64px;
     left: 0;
     width: 100%;
-    height: 70px;
-    padding: 10px 40px;
+    height: 96px;
+    padding: 8px 22px;
     background: transparent;
     border: none;
     z-index: 990;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 6px;
     box-sizing: border-box;
     backdrop-filter: none;
   }
   body.no-search > header { display: none; }
   body:has(#overlay.open) > header { display: none; }
   
+  /* [LAYOUT] Підказка над рядком: шрифт як у плейсхолдера, градієнт як у назви фільму. */
+  .search-hint {
+    display: block;
+    margin-left: 10px;
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    background: linear-gradient(135deg, var(--text) 20%, var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  html[data-layout="desktop"] input#q::placeholder { color: transparent; }
+
   .search-container {
     width: 100%;
     max-width: 100%;
@@ -91,13 +172,21 @@
     /* Фон і бордюр задає 70-fixes-settings.css через color-mix(var(--bg-1)/var(--text)),
        щоб скло реагувало на тему. Тут їх не дублюємо. */
     backdrop-filter: blur(16px);
-    border-radius: 24px;
+    border-radius: var(--r-sm);
     display: flex;
     align-items: center;
-    padding: 0 20px;
+    padding: 0 10px;
     margin: 0;
   }
   input#q { background: transparent; border: none; box-shadow: none; height: 100%; width: 100%; font-size: 15px; padding: 0; }
+  /* [LAYOUT] Ободок належить підкладці, а не інпуту — межі збігаються з рядком 22px. */
+  html[data-layout="desktop"] input#q:focus { box-shadow: none; }
+  html[data-layout="desktop"] input#q:focus-visible { outline: none; }
+  html[data-layout="desktop"] .search-container:focus-within {
+    border-radius: var(--r-sm);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), .18);
+  }
 
   /* 3. Content and Grid */
   #results {
@@ -118,12 +207,102 @@
     margin-right: 0;
   }
 
-  /* Сітка на 7 колонок */
+  /* Сітка на 8 колонок */
   body #results .home-grid {
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(8, minmax(0, 1fr));
     gap: 20px 16px;
     width: 100%;
+  }
+
+  /* [LAYOUT] Блок «Для тебе» — окрема виділена панель із горизонтальною стрічкою. */
+  html[data-layout="desktop"] .home-recs-panel {
+    background: linear-gradient(135deg, rgba(var(--accent-rgb), .05), rgba(22, 20, 27, .55));
+    border: 1px solid rgba(var(--white-rgb), .07);
+    border-radius: var(--r-lg);
+    padding: 18px;
+    margin-bottom: 26px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .25);
+  }
+  html[data-layout="desktop"] #results .home-recs-panel .home-grid.recs-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    padding-bottom: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent) rgba(var(--white-rgb), .05);
+  }
+  html[data-layout="desktop"] #results .home-recs-panel .recs-strip .rec-card {
+    flex: 0 0 clamp(100px, 8.5vw, 180px);
+    width: clamp(100px, 8.5vw, 180px);
+  }
+
+  /* [LAYOUT] Стрілки прокрутки стрічки — крок 3 картки, великий хіт-бокс. */
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-wrap { position: relative; }
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-arrow {
+    position: absolute;
+    top: 40%;
+    transform: translateY(-50%);
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 7, 10, .88);
+    border: 1px solid rgba(var(--accent-rgb), .38);
+    color: var(--accent);
+    cursor: pointer;
+    z-index: 3;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .55);
+    transition: .2s;
+  }
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-arrow:hover {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+  }
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-prev { left: -16px; }
+  html[data-layout="desktop"] .home-recs-panel .recs-strip-next { right: -16px; }
+
+  /* [LAYOUT] Шапка панелі: перемикач одразу біля заголовка, оновлення — праворуч. */
+  html[data-layout="desktop"] .home-recs-panel .section-head {
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+  }
+  html[data-layout="desktop"] .home-recs-panel .home-inline-type-switch {
+    gap: 5px;
+    padding: 4px;
+  }
+  html[data-layout="desktop"] .home-recs-panel .home-inline-pill {
+    padding: 7px 14px;
+    font-size: 14.4px;
+  }
+  html[data-layout="desktop"] .home-recs-panel .home-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: var(--r-sm);
+    border: 1px solid rgba(var(--white-rgb), .12);
+    background: rgba(var(--white-rgb), .04);
+    color: var(--text-secondary);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: .2s;
+  }
+  html[data-layout="desktop"] .home-recs-panel .home-refresh-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(var(--accent-rgb), .12);
   }
 
   /* 4. Overlay */
@@ -155,14 +334,14 @@ html:not(.mc-kbd) :focus-visible {
   outline: none;
 }
 html.mc-kbd :focus-visible {
-  outline: 2px solid var(--accent) !important;
-  outline-offset: 2px !important;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 html.mc-kbd .rec-card:focus-visible,
 html.mc-kbd .item:focus-visible,
 html.mc-kbd .card-tab:focus-visible {
-  outline: 3px solid var(--accent) !important;
-  outline-offset: -2px !important;
+  outline: 3px solid var(--accent);
+  outline-offset: -2px;
   border-radius: var(--r-sm);
 }
 

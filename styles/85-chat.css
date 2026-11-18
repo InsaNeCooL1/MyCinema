@@ -544,7 +544,8 @@ body.mc-chat-open #snow-layer { display: none; }
 .mc-chat-api-save { margin-top: 12px; }
 
 /* ── десктоп: бічна панель ───────────────────────────────────── */
-@media (min-width: 900px) {
+/* [LAYOUT] повний десктоп-запит, щоб стиль не потрапляв на мобайл. */
+@media (min-width: 900px) and (min-height: 600px) {
   .mc-chat-panel {
     right: 18px;
     bottom: 18px;
@@ -563,7 +564,7 @@ body.mc-chat-open #snow-layer { display: none; }
 @media (max-width: 899px) {
   body.mc-chat-open { overflow: hidden; }
   /* На телефоні анімація появи рядка додає мікро-стрибок під час стріму. */
-  .mc-chat-msg { animation: none !important; }
+  html[data-layout="mobile"] .mc-chat-msg { animation: none; }
 }
 @media (max-width: 380px) {
   .mc-chat-bubble { font-size: 14px; }
@@ -574,5 +575,5 @@ body.mc-chat-open #snow-layer { display: none; }
   .mc-chat-panel,
   .mc-chat-backdrop,
   .mc-chat-fab,
-  .mc-chat-msg { transition: none !important; animation: none !important; }
+  .mc-chat-msg { transition: none; animation: none; }
 }

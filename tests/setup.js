@@ -108,6 +108,7 @@ loadScript('src/config.js');
 if (typeof window.LS_VER === 'undefined') {
   throw new Error('Setup FAIL: config.js globals missing. LS_VER = ' + window.LS_VER);
 }
+loadScript('src/layout.js');
 loadScript('src/core.js');
 loadScript('src/recs-math.js');
 loadScript('src/imdb-ratings.js');

@@ -255,14 +255,14 @@
   height: 34px;
 }
 @media (min-width: 900px) and (min-height: 600px) {
-  /* !important потрібен, бо 60-perf-home.css фіксує 44/34px з !important. */
+  /* Каскад: цей файл іде після 60-perf-home.css, тому перемагає за порядком. */
   body #results .recs-controls-bar .mood-pills {
-    padding: 5px !important;
-    height: auto !important;
-    max-height: none !important;
+    padding: 5px;
+    height: auto;
+    max-height: none;
   }
   body #results .recs-controls-bar .mood-pill {
-    height: 32px !important;
+    height: 32px;
   }
 }
 
@@ -291,7 +291,7 @@
 }
 @media (hover: none) {
   .item:hover, .taste-summary:hover, .game-card:hover, .actor-tile:hover, .similar-card:hover {
-    transform: none !important;
+    transform: none;
   }
 }
 
@@ -390,7 +390,8 @@
 
 /* Мобільна головна: ховаємо лише режими, а не весь бар —
    інакше разом з ними зникають пілюлі настрою. */
+/* [LAYOUT] Мобільний стиль: scopes через атрибут, щоб не впливати на десктоп. */
 @media (max-width: 899px) {
-  #results .recs-controls-bar .recs-mode-pills { display: none !important; }
+  html[data-layout="mobile"] #results .recs-controls-bar .recs-mode-pills { display: none; }
 }
 

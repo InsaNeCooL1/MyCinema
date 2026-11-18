@@ -2,10 +2,7 @@
 
 'use strict';
 
-const DESKTOP_MQ = window.matchMedia('(min-width: 900px) and (min-height: 600px)');
-function isDesktopLayout() {
-  return DESKTOP_MQ.matches;
-}
+/* DESKTOP_MQ та isDesktopLayout() тепер в src/layout.js — єдина точка істини. */
 
 (function bindCardLayoutSwitch() {
   const onLayoutChange = () => {
@@ -259,12 +256,12 @@ async function loadMediaCardData(ctx) {
       if (r.type === 'tv' && Array.isArray(d.networks) && d.networks.length) {
         const net = d.networks.find(n => preferredBrands.includes(n.name) && n.logo_path)
                  || d.networks.filter(n => n.logo_path).pop();
-        if (net) pick = { name: net.name, logo: net.logo_path, source: 'network' };
+        if (net) pick = { name: net.name, logo: net.logo_path, source: 'network', id: net.id };
       }
       // 2. Fallback: перша production_company з логотипом (для фільмів і якщо немає networks)
       if (!pick && Array.isArray(d.production_companies)) {
         const studio = d.production_companies.find(c => c.logo_path);
-        if (studio) pick = { name: studio.name, logo: studio.logo_path, source: 'studio' };
+        if (studio) pick = { name: studio.name, logo: studio.logo_path, source: 'studio', id: studio.id };
       }
       ctx.providerPick = pick;
     }
@@ -328,6 +325,13 @@ function closeCard() {
   if (cardStack.length) history.go(-cardStack.length);
   else { overlay.classList.remove('open'); refresh(); }
 }
+
+/* [LAYOUT] Клік по затемненню поза карткою закриває її. */
+overlay.addEventListener('click', (e) => {
+  if (e.target !== overlay) return;
+  if (!overlay.classList.contains('open') || !cardStack.length) return;
+  closeCard();
+});
 
 async function loadMediaForForward(s) {
   overlay.classList.add("open");
