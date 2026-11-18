@@ -283,22 +283,166 @@ describe('chat context — рекомендації та смак', () => {
 
     expect(recs.available).toBe(true);
     expect(recs.total).toBe(2);
+    expect(recs.totalByType).toEqual({ movie: 1, tv: 1 });
+    expect(recs.shownByType).toEqual({ movie: 1, tv: 1 });
     expect(recs.mode).toBe('general');
     expect(recs.mood).toBe('chill');
     expect(recs.seeds).toBe(5);
-    expect(recs.items.map(x => x.key)).toEqual(['movie-2', 'tv-3']);
-    expect(recs.items[0].why).toEqual(['Як «Дюна»', 'Твій жанр · Драма']);
-    expect(recs.items[1].why).toEqual([]);
-    expect(recs.items[1].genres).toEqual(['Кримінал', 'Детектив']);
-    expect(recs.items[0].rank).toBe(1);
+    // Компактні рядки: без JSON-ключів, але з рейтингом, жанрами й причинами.
+    expect(recs.movies).toEqual(['Прибуття (2020) | ★7.6 | Драма | Як «Дюна», Твій жанр · Драма']);
+    expect(recs.tv).toEqual(['Темний (2020) | ★7.6 | Кримінал, Детектив']);
+    expect(recs).not.toHaveProperty('items');
   });
 
   it('порожня стрічка → available:false із поясненням', () => {
     window.state = { tab: 'home', home: { recs: null } };
     const ctx = build();
     expect(ctx.recommendations.available).toBe(false);
-    expect(ctx.recommendations.items).toEqual([]);
+    expect(ctx.recommendations.movies).toEqual([]);
+    expect(ctx.recommendations.tv).toEqual([]);
     expect(ctx.recommendations.note).toMatch(/не згенеровані/i);
+  });
+
+  it('серіали не зникають з контексту, навіть коли фільмів більше за ліміт', () => {
+    window.lib = {};
+    const movies = Array.from({ length: 40 }, (_, i) => makeRec('movie-' + (100 + i), 'Фільм ' + i));
+    const tv = Array.from({ length: 5 }, (_, i) => makeRec('tv-' + (200 + i), 'Серіал ' + i, { type: 'tv' }));
+    window.state = {
+      tab: 'home',
+      home: { recs: { mode: 'balance', mood: null, seeds: 3, items: [...movies, ...tv] } },
+    };
+
+    const recs = build().recommendations;
+
+    expect(recs.total).toBe(45);
+    expect(recs.totalByType).toEqual({ movie: 40, tv: 5 });
+    // Ліміт 22: усі 5 серіалів збережено, решту добирають фільми.
+    expect(recs.shownByType).toEqual({ movie: 17, tv: 5 });
+    expect(recs.movies.length).toBe(17);
+    expect(recs.tv.length).toBe(5);
+    tv.forEach((item) => expect(recs.tv.join('\n')).toContain(item.title));
+    expect(recs.note).toMatch(/40 фільмів, 5 серіалів/);
+  });
+
+  it('бачить усю історію «Переглянутого» і не радить тайтли з бібліотеки', () => {
+    const watched = {};
+    for (let i = 0; i < 65; i++) {
+      watched['movie-' + (300 + i)] = makeLibEntry({
+        key: 'movie-' + (300 + i),
+        id: 300 + i,
+        title: 'Переглянуте ' + i,
+        year: '2000',
+        status: 'watched',
+        updated: NOW - i * 1000,
+      });
+    }
+    watched['tv-777'] = makeLibEntry({
+      key: 'tv-777',
+      id: 777,
+      title: 'Старий серіал',
+      year: '1999',
+      type: 'tv',
+      status: 'watched',
+      updated: NOW - 999999,
+    });
+    watched['movie-empty'] = makeLibEntry({
+      key: 'movie-empty',
+      id: 888,
+      title: 'Без статусу',
+      status: null,
+      ratings: {},
+      favorite: false,
+      updated: NOW,
+    });
+    window.lib = watched;
+    window.state = {
+      tab: 'home',
+      home: {
+        recs: {
+          items: [
+            makeRec('movie-300', 'Переглянуте 0'),
+            makeRec('tv-777', 'Старий серіал', { type: 'tv' }),
+            makeRec('movie-empty', 'Без статусу'),
+            makeRec('movie-999', 'Свіжий фільм'),
+          ],
+        },
+      },
+    };
+
+    const ctx = build();
+
+    // seen — один компактний рядок; старі тайтли не загубились.
+    expect(typeof ctx.taste.seen).toBe('string');
+    expect(ctx.taste.seen).toContain('Старий серіал');
+    expect(ctx.taste.seen).toContain('Переглянуте 64');
+    // Усе, що є в бібліотеці, відфільтровано з рекомендацій.
+    expect(ctx.recommendations.movies.join('\n')).toContain('Свіжий фільм');
+    expect(ctx.recommendations.movies.join('\n')).not.toContain('Переглянуте');
+    expect(ctx.recommendations.total).toBe(1);
+  });
+
+  it('добирає серіали з «Трендів», якщо розумна стрічка їх не дала', () => {
+    window.lib = {};
+    const generalTv = Array.from({ length: 10 }, (_, i) => makeRec('tv-' + (500 + i), 'Трендовий серіал ' + i, { type: 'tv' }));
+    const generalMovies = Array.from({ length: 20 }, (_, i) => makeRec('movie-' + (600 + i), 'Трендовий фільм ' + i));
+    window.state = {
+      tab: 'home',
+      home: {
+        view: 'explore',
+        tab: 'tv',
+        recs: { mode: 'balance', items: [makeRec('movie-700', 'Один фільм')] },
+        general: {
+          tvStreams: [{ pop: generalTv.slice(0, 6), fresh: generalTv.slice(6) }],
+          trMovies: generalMovies,
+        },
+      },
+    };
+
+    const ctx = build();
+    const recs = ctx.recommendations;
+
+    expect(recs.available).toBe(true);
+    expect(recs.fallbackByType.tv).toBe(8);
+    expect(recs.totalByType.tv).toBe(8);
+    expect(recs.tv.length).toBe(8);
+    expect(recs.tv[0]).toContain('Трендовий серіал 0');
+    expect(recs.movies.join('\n')).toContain('Один фільм');
+
+    // Знімок видимого списку Explore для поточного таба.
+    expect(ctx.browse.tab).toBe('tv');
+    expect(ctx.browse.items.length).toBe(10);
+    expect(ctx.browse.items[0]).toContain('Трендовий серіал 0');
+  });
+
+  it('для великої бібліотеки seen обмежений 180 найпомітнішими назвами', () => {
+    const big = {};
+    for (let i = 0; i < 400; i++) {
+      big['movie-' + (1000 + i)] = makeLibEntry({
+        key: 'movie-' + (1000 + i),
+        id: 1000 + i,
+        title: 'Тайтл ' + i,
+        year: String(1950 + (i % 70)),
+        status: 'watched',
+        favorite: false,
+        ratings: i === 399 ? { plot: 10, cast: 10, style: 10, emotions: 10 } : {},
+        // Старі, але популярні хіти — саме їх модель найчастіше радить «з голови».
+        tmdbRating: i === 399 ? 9.9 : (i >= 300 && i < 320 ? 9.5 : 6),
+        updated: NOW - i * 1000,
+      });
+    }
+    window.lib = big;
+    window.state = { tab: 'home', home: { recs: null } };
+
+    const taste = build().taste;
+    const names = taste.seen.split(' | ');
+
+    expect(taste.seenTotal).toBe(400);
+    expect(names.length).toBe(180);
+    // Найкраще оцінений тайтл передається окремо в topRated.
+    expect(taste.topRated.join('\n')).toContain('Тайтл 399');
+    // Популярні старі тайтли потрапляють у seen першими, а не губляться.
+    expect(names).toContain('Тайтл 300');
+    expect(names[0]).toBe('Тайтл 300');
   });
 
   it('профіль смаку: критерії, топ-жанри, улюблені, топ оцінок', () => {
@@ -316,11 +460,14 @@ describe('chat context — рекомендації та смак', () => {
     expect(taste.criteria.ratedTitles).toBe(2);
     expect(taste.criteria.plot).toBe(8);
     expect(taste.topGenres[0]).toBe('Фантастика');
-    expect(taste.topRated[0].title).toBe('Дюна');
-    expect(taste.favorites.map(x => x.title)).toEqual(['Дюна']);
+    expect(taste.topRated[0]).toContain('Дюна (2021)');
+    expect(taste.favorites).toEqual(['Дюна (2021) | фільм | ★8.5']);
     expect(taste.statusCounts.watched).toBe(3);
-    expect(taste.libraryTitles.map(x => x.title)).toEqual(['Дюна', 'Прибуття', 'Без оцінки']);
-    expect(taste.libraryTitles[0]).toMatchObject({ type: 'movie', status: 'watched' });
+    expect(taste.recent.map(x => x.split(' (')[0])).toEqual(['Дюна', 'Прибуття', 'Без оцінки']);
+    expect(taste.recent[0]).toContain('| фільм |');
+    expect(taste.recent[2]).toContain('| watched');
+    // Усі три тайтли вже в recent, тому seen порожній — без дублювання.
+    expect(taste.seen).toBe('');
   });
 
   it('не надсилає нотатки, email, uid та інші приватні поля', () => {
@@ -413,10 +560,11 @@ describe('chat UI', () => {
     expect(system).toContain('ОБГОВОРЕННЯ (за замовчуванням)');
     expect(system).toContain('У ЦЬОМУ РЕЖИМІ ЗАБОРОНЕНО');
     expect(system).toContain('ПІДБІР (лише за прямим запитом)');
-    expect(system).toContain('перевір усі елементи з type: "tv"');
+    expect(system).toContain('recommendations.tv');
+    expect(system).toContain('context.browse.items');
     expect(system).toContain('медичний процедурал');
     expect(system).toContain('кіберпанк-фантастику');
-    expect(system).toContain('Ніколи не радь нічого з taste.libraryTitles');
+    expect(system).toContain('Ніколи не радь нічого з taste.seen');
     expect(system).toContain('не керуєш застосунком');
     expect(system).toContain('available: false');
     expect(system).toContain('спочатку коротка жива реакція');
@@ -548,7 +696,7 @@ describe('chat BYOK — ключ, ручний вибір моделі, лока
   it('вибрана модель зберігається локально і знімає її блокування', () => {
     expect(window.mcChat.setModel('gemini-3.5-flash-lite')).toBe('gemini-3.5-flash-lite');
     expect(localStorage.getItem('mycinema.geminiModel')).toBe('gemini-3.5-flash-lite');
-    expect(window.mcChat._debug.requestModels()).toEqual(['gemini-3.5-flash-lite']);
+    expect(window.mcChat._debug.requestModels()).toEqual(CHAIN_IDS);
 
     window.mcChat._debug.blockModel('gemini-3.5-flash-lite', 60000);
     expect(window.mcChat._debug.buildChain()).not.toContain('gemini-3.5-flash-lite');
@@ -566,25 +714,31 @@ describe('chat BYOK — ключ, ручний вибір моделі, лока
     expect(window.mcChat._debug.buildChain()).toEqual(CHAIN_IDS);
   });
 
-  it('429 на обраній моделі показує повідомлення й не перемикає модель', async () => {
+  it('429 на обраній моделі блокує її, але резервна рятує відповідь у тому ж запиті', async () => {
     window.mcChat.setApiKey('AIza-abc');
     window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
-    global.fetch = vi.fn(async () => quotaResponse('43s'));
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(quotaResponse('43s'))
+      .mockResolvedValueOnce(jsonResponse({
+        candidates: [{ content: { parts: [{ text: 'Раджу «Дюну»' }] } }],
+      }));
 
     submitChat('Що подивитись?');
     await vi.waitFor(() => {
-      expect(document.querySelector('.mc-chat-error')).toBeTruthy();
+      const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
+      expect(bubble && bubble.textContent).toContain('Раджу «Дюну»');
     }, { timeout: 3000 });
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-3.5-flash-lite');
-    expect(document.querySelector('.mc-chat-error-text').textContent).toMatch(/Ліміт обраної моделі/);
+    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.1-flash-lite');
+    expect(document.querySelector('.mc-chat-error')).toBeNull();
 
     const quota = JSON.parse(localStorage.getItem('mycinema.geminiQuota'));
     expect(Number(quota['gemini-3.5-flash-lite'])).toBeGreaterThan(Date.now());
   });
 
-  it('503 на обраній моделі показує дружнє повідомлення без автоперемикання', async () => {
+  it('503 на обох моделях перемикає на резервну й показує дружнє повідомлення', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     window.mcChat.setApiKey('AIza-abc');
     window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
@@ -595,12 +749,33 @@ describe('chat BYOK — ключ, ручний вибір моделі, лока
       expect(document.querySelector('.mc-chat-error')).toBeTruthy();
     }, { timeout: 3000 });
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch.mock.calls[0][0]).toContain('gemini-3.5-flash-lite');
+    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.1-flash-lite');
     expect(document.querySelector('.mc-chat-error-text').textContent).toMatch(/тимчасово недоступний/);
-    expect(window.mcChat._state.lastApiError).toMatchObject({ model: 'gemini-3.5-flash-lite', status: 503 });
+    expect(window.mcChat._state.lastApiError).toMatchObject({ model: 'gemini-3.1-flash-lite', status: 503 });
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it.each([500, 502, 503])('%i на обраній моделі перемикає на 3.1-flash-lite', async (status) => {
+    window.mcChat.setApiKey('AIza-abc');
+    window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce(serverResponse(status))
+      .mockResolvedValueOnce(jsonResponse({
+        candidates: [{ content: { parts: [{ text: 'Раджу «Прибуття»' }] } }],
+      }));
+
+    submitChat('Порадь фільм');
+    await vi.waitFor(() => {
+      const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
+      expect(bubble && bubble.textContent).toContain('Прибуття');
+    }, { timeout: 3000 });
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch.mock.calls[1][0]).toContain('gemini-3.1-flash-lite');
+    expect(document.querySelector('.mc-chat-error')).toBeNull();
   });
 
   it('якщо обрана модель недоступна для ключа — запит не йде', async () => {
@@ -721,6 +896,52 @@ describe('chat BYOK — ключ, ручний вибір моделі, лока
     const secondBody = requestBodyAt(1);
     expect(JSON.stringify(secondBody.contents)).not.toContain('sig-123');
     expect(JSON.stringify(secondBody.contents)).not.toContain('Внутрішній ланцюг');
+  });
+
+  it('SSE-чанки без candidates і без parts ігноруються, а не ламають стрім', async () => {
+    window.mcChat.setApiKey('AIza-abc');
+    window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
+    const sse = (obj) => 'data: ' + JSON.stringify(obj) + '\n\n';
+    global.fetch = vi.fn(async () => sseResponse([
+      sse({}),                                          // зовсім порожній чанк
+      sse({ usageMetadata: { totalTokenCount: 12 } }),  // тільки метадані
+      sse({ candidates: [] }),                          // candidates порожній
+      sse({ candidates: [{ finishReason: 'STOP' }] }),  // немає parts
+      sse({ candidates: [{ content: { parts: [null, { text: 42 }, { text: 'Раджу ' }, { text: '«Дюну»', thought: false }] } }] }),
+    ]));
+
+    submitChat('Що подивитись?');
+    await vi.waitFor(() => {
+      const bubble = document.querySelector('.mc-chat-msg.assistant .mc-chat-bubble');
+      expect(bubble && bubble.textContent).toContain('Раджу «Дюну»');
+    }, { timeout: 3000 });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.mc-chat-error')).toBeNull();
+    expect(window.mcChat._state.lastTiming.usage.totalTokenCount).toBe(12);
+  });
+
+  it('finishReason SAFETY віддає зрозуміле повідомлення без каскаду й падіння', async () => {
+    window.mcChat.setApiKey('AIza-abc');
+    window.mcChat._state.health = { ok: true, status: 200, models: CHAIN_IDS };
+    global.fetch = vi.fn(async () => sseResponse([
+      'data: ' + JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'Не можу' }] }, finishReason: 'SAFETY' }],
+      }) + '\n\n',
+    ]));
+
+    submitChat('Що подивитись?');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.mc-chat-error')).toBeTruthy();
+    }, { timeout: 3000 });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1); // каскад тут не викликаємо
+    expect(document.querySelector('.mc-chat-error-text').textContent).toMatch(/правила безпеки/);
+    expect(window.mcChat._state.lastTiming.finishReason).toBe('SAFETY');
+  });
+
+  it('таймаут Gemini-запиту — щонайменше 25 с (low thinking думає 4–8 с до першої літери)', () => {
+    expect(window.mcChat._debug.timeoutMs()).toBeGreaterThanOrEqual(25000);
   });
 
   it('у клієнті не лишилося OpenRouter і Gemma 4', () => {

@@ -91,6 +91,17 @@ describe('worker /imdb/batch — D1 + KV-шарди + негативний ке�
     expect(second.json.data.movie['278'].imdbRating).toBe(9.3);
   });
 
+  it('зовнішні fetch-и мають явний таймаут 30 с', async () => {
+    const env = { MDBLIST_KEY: 'k' };
+    global.fetch = mockMdb({ movie: [HIT] });
+
+    await post(env, { movies: [278] });
+
+    const signal = global.fetch.mock.calls[0][1] && global.fetch.mock.calls[0][1].signal;
+    expect(signal).toBeTruthy();
+    expect(signal.aborted).toBe(false);
+  });
+
   it('D1: один SELECT + один batch INSERT, включно з негативним записом', async () => {
     const db = makeD1();
     const env = { MDBLIST_KEY: 'k', IMDB_DB: db };
