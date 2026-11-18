@@ -283,14 +283,19 @@ async function submitOnboarding() {
   // [ONB-TV-FIX] Для TV — сезонні оцінки, інакше computeItemRating().avg = 0
   items.forEach(it => {
     const isTv = it.type === 'tv';
+    const prev = lib[it.key] || {};
     lib[it.key] = {
       ...it,
-      status: 'watched',
+      ...prev,
+      key: it.key,
+      id: it.id,
+      type: it.type,
+      status: prev.status || 'watched',
       ...(isTv
-        ? { seasonRatings: { 1: { overall: 8 } }, totalSeasons: 1 }
-        : { ratings: { overall: 8 } }),
+        ? { seasonRatings: prev.seasonRatings || { 1: { overall: 8 } }, totalSeasons: prev.totalSeasons || 1 }
+        : { ratings: prev.ratings || { overall: 8 } }),
       updated: Date.now(),
-      createdAt: Date.now()
+      createdAt: prev.createdAt || Date.now()
     };
     _dirtyItems.add(it.key); /* SYNC-FIX-ONB */
   });

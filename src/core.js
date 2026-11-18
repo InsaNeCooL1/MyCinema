@@ -20,7 +20,14 @@ let _idbDbPromise = null;
 function _openIdb() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
   if (_idbDbPromise) return _idbDbPromise;
-  _idbDbPromise = new Promise((resolve) => {
+  let p, resolveOpen;
+  const fail = () => {
+    resolveOpen(null);
+    // Помилка або blocked не має кешуватися назавжди — дозволяємо повторну спробу.
+    Promise.resolve().then(() => { if (_idbDbPromise === p) _idbDbPromise = null; });
+  };
+  p = new Promise((resolve) => {
+    resolveOpen = resolve;
     try {
       const req = indexedDB.open(_IDB_NAME, 1);
       req.onupgradeneeded = () => {
@@ -28,12 +35,13 @@ function _openIdb() {
         if (!db.objectStoreNames.contains(_IDB_STORE)) db.createObjectStore(_IDB_STORE);
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
+      req.onerror = fail;
       // Інакше mcCacheReady може висіти назавжди (наприклад, blocked upgrade),
       // і startAppWithIdbCache ніколи не викличе boot().
-      req.onblocked = () => resolve(null);
-    } catch { resolve(null); }
+      req.onblocked = fail;
+    } catch { fail(); }
   });
+  _idbDbPromise = p;
   return _idbDbPromise;
 }
 
@@ -62,13 +70,16 @@ function mcCacheSet(key, val) {
     return;
   }
   _idbMem.set(key, val);
-  try { localStorage.removeItem(key); } catch {}
+  const toLocal = () => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} };
   _openIdb().then(db => {
-    if (!db) return;
+    if (!db) { toLocal(); return; } // IDB недоступний — лишаємо localStorage як сховище
     try {
       const tx = db.transaction(_IDB_STORE, 'readwrite');
+      tx.onabort = tx.onerror = toLocal;
+      // Видаляємо localStorage-копію лише після успішного запису в IDB.
+      tx.oncomplete = () => { try { localStorage.removeItem(key); } catch {} };
       tx.objectStore(_IDB_STORE).put(val, key);
-    } catch {}
+    } catch { toLocal(); }
   });
 }
 
