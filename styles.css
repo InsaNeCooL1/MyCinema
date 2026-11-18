@@ -3432,7 +3432,8 @@ body.mc-chat-open #snow-layer { display: none; }
     padding: 0;
     gap: 8px;
     align-items: center;
-    margin-left: 20px;
+    /* [LAYOUT] Меню відцентроване абсолютно — футер притискаємо до правого краю. */
+    margin-left: auto;
   }
   .sidebar-footer .icon-compact-btn {
     width: 38px;
