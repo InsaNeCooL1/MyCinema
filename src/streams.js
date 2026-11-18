@@ -1170,9 +1170,11 @@
     var mediaKey = (opts && opts.key) || '';
     var q = String(title || '').trim();
     var headerTitle = q + (year ? ' (' + year + ')' : '');
-    createShell(headerTitle || 'Джерело UA');
+    var ov = createShell(headerTitle || 'Джерело UA');
 
-    var body = document.getElementById('streams-body');
+    // Тримаємо body саме цього оверлею: якщо користувач закриє його й
+    // відкриє інший тайтл, пізня відповідь не має малюватися в новому.
+    var body = ov.querySelector('#streams-body');
     if (!q && !origTitle) {
       body.innerHTML = '<div class="streams-error">Порожня назва</div>';
       return;
@@ -1192,7 +1194,7 @@
       searchProviderSmart(searchKinoukr, q, origTitle, year, type),
       searchProviderSmart(searchUAFix, q, origTitle, year, type)
     ]).then(function (results) {
-      if (!document.getElementById('streams-overlay')) return;
+      if (!body || !body.isConnected) return;
       var uacdnUrl = results[0].status === 'fulfilled' ? results[0].value : null;
       var eneyida = results[1].status === 'fulfilled' ? results[1].value : [];
       var uas = results[2].status === 'fulfilled' ? results[2].value : [];
@@ -1220,8 +1222,8 @@
 
       renderUnifiedPicker(providers, q || origTitle, mediaKey);
     }).catch(function (e) {
-      var b = document.getElementById('streams-body');
-      if (b) b.innerHTML = '<div class="streams-error">Помилка: ' + esc(e.message) + '</div>';
+      if (!body || !body.isConnected) return;
+      body.innerHTML = '<div class="streams-error">Помилка: ' + esc(e.message) + '</div>';
     });
   }
 

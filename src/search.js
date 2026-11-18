@@ -1,20 +1,32 @@
 'use strict';
 
+let acReqId = 0;
+
 function hideAutocomplete() { 
+  acReqId++; // будь-який незавершений autocomplete-запит стає застарілим
   autocomplete.classList.add("hidden"); 
   autocomplete.replaceChildren(); 
 }
 
+function readSearchHistory() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('mycinema.search_history'));
+    return Array.isArray(raw) ? raw : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 function addToHistory(q) {
-  let hist = JSON.parse(localStorage.getItem('mycinema.search_history')) || [];
+  let hist = readSearchHistory();
   hist = hist.filter(x => x !== q); // Видаляємо дублікат, якщо вже був
   hist.unshift(q); // Додаємо на початок
   if (hist.length > 10) hist = hist.slice(0, 10); // Обмежуємо 10 записами
-  localStorage.setItem('mycinema.search_history', JSON.stringify(hist));
+  try { localStorage.setItem('mycinema.search_history', JSON.stringify(hist)); } catch (e) {}
 }
 
 function showHistory() {
-  const hist = JSON.parse(localStorage.getItem('mycinema.search_history')) || [];
+  const hist = readSearchHistory();
   if (!hist.length) { hideAutocomplete(); return; }
   
   autocomplete.replaceChildren();
@@ -104,9 +116,12 @@ input.addEventListener("input", () => {
   clearTimeout(acTimer);
   const q = input.value.trim();
   if (!q) { showHistory(); return; }
+  const reqId = ++acReqId;
   acTimer = setTimeout(async () => {
     try {
       const data = await tmdbFetch(`/search/multi?language=uk-UA&query=${encodeURIComponent(q)}&include_adult=false`);
+      // Пізня відповідь не має перемальовувати список для вже зміненого запиту.
+      if (reqId !== acReqId || input.value.trim() !== q) return;
       showAutocomplete(data.results, q);
     } catch (e) {}
   }, 300);

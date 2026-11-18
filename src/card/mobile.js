@@ -133,7 +133,9 @@
           _img.className = 'tv-icon-img';
           _tvBadge.append(_img);
         } else {
-          _tvBadge.textContent = (ctx.providerPick.name.charAt(0) || '?').toUpperCase();
+          // name може бути null/порожнім у часткових відповідях TMDB.
+          var _letter = String(ctx.providerPick.name || '').trim().charAt(0).toUpperCase();
+          _tvBadge.textContent = _letter || '?';
           _tvBadge.classList.add('tv-icon-badge-letter');
         }
       } else {

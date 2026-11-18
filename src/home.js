@@ -1476,6 +1476,10 @@ async function loadHome() {
   if (cached) { /* FIX-CACHE-RESET */ state.home.recs = cached; state.home.sig = sig; state.home.shown = { movie: 14, tv: 14 } /* FIX-SHOWN-14 */; renderHomeContent(taste); return; }
   if (state.home.loading === sig) return;
 
+  // Поки йшли мережеві запити, користувач міг піти на іншу вкладку.
+  // Не малюємо скелетон поверх неї.
+  if (state.tab !== 'home') return;
+
   state.home.loading = sig;
   renderHomeSkeleton(taste);
   try {
@@ -2073,6 +2077,9 @@ function buildContinueWatchingSection() {
           if (!episodes || !labelEl.isConnected) return;
           if (!item.seasonCounts?.[next.s] && episodes.length && lib[item.key]) {
             lib[item.key].seasonCounts = { ...(lib[item.key].seasonCounts || {}), [next.s]: episodes.length };
+            // Без цього кількість серій живе лише в пам'яті до випадкового save().
+            if (typeof _dirtyItems !== 'undefined') _dirtyItems.add(item.key);
+            if (typeof save === 'function') save();
           }
           const epObj = episodes.find(ep => ep.episode_number === next.e);
           if (epObj) {

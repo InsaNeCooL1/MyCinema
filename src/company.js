@@ -187,7 +187,8 @@ async function loadCompanyCardData(ctx) {
     ctx.pages.tv = { page: 1, sort: ctx.companySort, ...tvPage, items: [...tvPage.items] };
     ctx.companyTab = (moviePage.totalResults > 0 || !tvPage.totalResults) ? 'movie' : 'tv';
   } catch (e) {
-    ctx.error = escapeHtml(e.message);
+    // Екранування робить renderCard — інакше повідомлення видно з &amp;/&lt;.
+    ctx.error = e.message;
   }
 }
 

@@ -238,7 +238,11 @@
   function mcSaveKey(value) {
     var clean = String(value == null ? '' : value).replace(/\s+/g, '').trim();
     var changed = clean !== mcGetKey();
-    mcSetKeyLocal(clean, Date.now());
+    // ts має бути монотонним: якщо з хмари прийшов час із майбутнього
+    // (перекіс годинника), звичайний Date.now() виявиться «старішим» і
+    // свіжий ключ перезапишеться старим під час наступного sync.
+    var ts = Math.max(Date.now(), mcGetKeyTs() + 1);
+    mcSetKeyLocal(clean, ts);
     // Блокування моделей належать проєкту, але новий ключ = новий початок.
     if (changed) mcClearQuota();
     // Ключ тепер частина профілю: зберігаємо в хмару разом з іншими налаштуваннями.
@@ -704,12 +708,16 @@
     var libraryTitles = all.slice().sort(function (a, b) {
       return (Number(b.updated) || 0) - (Number(a.updated) || 0);
     }).slice(0, 60).map(function (x) {
-      return {
+      var row = {
         title: x.title || x.name || '',
         year: x.year || '',
         type: x.type || 'movie',
         status: x.status || 'none'
       };
+      // Промт забороняє радити антисіди; без цього прапорця модель
+      // не може відрізнити їх від звичайних тайтлів бібліотеки.
+      if (x.antiSeed === true) row.antiSeed = true;
+      return row;
     });
 
     var counts = {};
@@ -1149,7 +1157,8 @@
     mcChat.els.send.title = busy ? 'Зупинити' : 'Надіслати';
     mcChat.els.send.setAttribute('aria-label', busy ? 'Зупинити відповідь' : 'Надіслати повідомлення');
     mcChat.els.send.classList.toggle('stop', busy);
-    mcChat.els.input.disabled = busy;
+    // Поле не блокуємо: наступне питання можна друкувати під час стріму,
+    // а mcSend() сам не дасть надіслати його до завершення поточної відповіді.
   }
 
   function mcOpen(opts) {
@@ -1468,9 +1477,11 @@
     if (mcChat.els && mcChat.els.input) {
       mcChat.els.input.value = '';
       mcChat.els.input.style.height = 'auto';
-      // Клавіатура закривається одразу після надсилання: на телефоні вона
-      // міняє 86dvh і вся панель «стрибає» ще до початку відповіді.
-      try { mcChat.els.input.blur(); } catch (_) {}
+      // Клавіатура закривається одразу після надсилання лише на телефоні:
+      // там вона міняє 86dvh і панель «стрибає». На десктопі фокус лишаємо.
+      if (window.innerWidth < 900) {
+        try { mcChat.els.input.blur(); } catch (_) {}
+      }
     }
 
     mcChat.lastUserText = text;
@@ -1652,9 +1663,16 @@
       mcChat.streamMessage = null;
       mcSetBusy(false);
       // На телефоні не повертаємо фокус — інакше клавіатура знову відкриється
-      // після відповіді. Десктопу це зручно, тому лишаємо тільки для нього.
+      // після відповіді. На десктопі повертаємо, тільки якщо користувач
+      // не перейшов в інше поле (інакше викрадаємо фокус із пошуку тощо).
       if (mcChat.open && window.innerWidth >= 900) {
-        try { mcChat.els.input.focus(); } catch (_) {}
+        var active = document.activeElement;
+        var panel = mcChat.els.panel;
+        var keepFocus = !active || active === document.body || active === mcChat.els.input ||
+          (panel && panel.contains(active));
+        if (keepFocus) {
+          try { mcChat.els.input.focus(); } catch (_) {}
+        }
       }
     }
   }

@@ -143,7 +143,7 @@ async function loadPersonCardData(ctx) {
         }
       }
     }).catch(function() {});
-  } catch (e) { ctx.error = escapeHtml(e.message); } /* FIX-PERSON-ERR-ESC */
+  } catch (e) { ctx.error = e.message; } /* FIX-PERSON-ERR-ESC: екранує renderCard */
 }
 
 async function loadPersonForForward(id) {

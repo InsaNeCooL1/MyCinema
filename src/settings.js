@@ -73,7 +73,9 @@ function refreshSettingsControls() {
   set('network-enable-toggle', networkOn);
   var fields = document.getElementById('online-network-fields');
   if (fields) fields.hidden = !networkOn;
-  if (typeof syncRoomFields === 'function') syncRoomFields();
+  if (window.mcRoom && typeof window.mcRoom.syncRoomFields === 'function') {
+    window.mcRoom.syncRoomFields();
+  }
 }
 
 /* FIX-RELEASE-HANDLERS-2 */

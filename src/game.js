@@ -265,7 +265,10 @@ function finishGame() {
   let hist = [];
   try { const raw = JSON.parse(localStorage.getItem('kingOfTheHillHistory') || '[]'); if (Array.isArray(raw)) hist = raw; } catch {}
   hist.push({ date: new Date().toISOString(), wins: state.game.history.filter(h => h.result !== 'skip').length, total: state.game.totalRounds, type: state.game.type, champion: state.game.champion });
-  localStorage.setItem('kingOfTheHillHistory', JSON.stringify(hist));
+  if (hist.length > 200) hist = hist.slice(-200);
+  // Запис історії не має ламати перехід до екрана результатів
+  // (квота/приватний режим можуть кинути на setItem).
+  try { localStorage.setItem('kingOfTheHillHistory', JSON.stringify(hist)); } catch (e) {}
   renderGame();
 }
 
