@@ -88,9 +88,9 @@
     width: 100%;
     max-width: 100%;
     height: 48px;
-    background: rgba(var(--white-rgb), .15) !important;
+    /* Фон і бордюр задає 70-fixes-settings.css через color-mix(var(--bg-1)/var(--text)),
+       щоб скло реагувало на тему. Тут їх не дублюємо. */
     backdrop-filter: blur(16px);
-    border: 1px solid rgba(var(--white-rgb), .4) !important;
     border-radius: 24px;
     display: flex;
     align-items: center;

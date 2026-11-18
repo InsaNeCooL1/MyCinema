@@ -3207,9 +3207,9 @@ body.mc-chat-open #snow-layer { display: none; }
     width: 100%;
     max-width: 100%;
     height: 48px;
-    background: rgba(var(--white-rgb), .15) !important;
+    /* Фон і бордюр задає 70-fixes-settings.css через color-mix(var(--bg-1)/var(--text)),
+       щоб скло реагувало на тему. Тут їх не дублюємо. */
     backdrop-filter: blur(16px);
-    border: 1px solid rgba(var(--white-rgb), .4) !important;
     border-radius: 24px;
     display: flex;
     align-items: center;
@@ -3775,13 +3775,17 @@ html.mc-kbd .card-tab:focus-visible {
 .recs-controls-bar .recs-mode-pills {
   margin: 0;
   flex-shrink: 0;
-  display: flex;
   align-items: center;
   gap: 6px;
   padding: 5px;
   border-radius: var(--r-md);
   background: linear-gradient(135deg, rgba(var(--accent-rgb), .10), rgba(var(--accent-rgb), .03));
   border: 1px solid rgba(var(--accent-rgb), .24);
+}
+/* Показуємо режими лише там, де їх не ховає 10-card.css
+   (@media max-width:899px або max-height:599px). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .recs-controls-bar .recs-mode-pills { display: flex; }
 }
 .recs-controls-bar .mood-pills {
   flex: 1 1 320px;
@@ -3797,13 +3801,14 @@ html.mc-kbd .card-tab:focus-visible {
   height: 34px;
 }
 @media (min-width: 900px) and (min-height: 600px) {
+  /* !important потрібен, бо 60-perf-home.css фіксує 44/34px з !important. */
   body #results .recs-controls-bar .mood-pills {
-    padding: 5px;
-    height: auto;
-    max-height: none;
+    padding: 5px !important;
+    height: auto !important;
+    max-height: none !important;
   }
   body #results .recs-controls-bar .mood-pill {
-    height: 32px;
+    height: 32px !important;
   }
 }
 
@@ -3929,8 +3934,9 @@ html.mc-kbd .card-tab:focus-visible {
   justify-content: center;
 }
 
-/* Мобільна головна: прибираємо плашку режимів «Баланс / Перлини / Свіже» */
+/* Мобільна головна: ховаємо лише режими, а не весь бар —
+   інакше разом з ними зникають пілюлі настрою. */
 @media (max-width: 899px) {
-  #results .recs-controls-bar { display: none !important; }
+  #results .recs-controls-bar .recs-mode-pills { display: none !important; }
 }
 
