@@ -383,3 +383,8 @@
   justify-content: center;
 }
 
+/* Мобільна головна: прибираємо плашку режимів «Баланс / Перлини / Свіже» */
+@media (max-width: 899px) {
+  #results .recs-controls-bar { display: none !important; }
+}
+

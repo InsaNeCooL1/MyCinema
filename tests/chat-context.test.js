@@ -408,19 +408,20 @@ describe('chat UI', () => {
     expect(system).toContain('Кіно-помічник');
     expect(system).toContain('CONTEXT_JSON:');
     expect(system).toContain('кінодруг');
-    expect(system).toContain('Рамки');
-    // Рекомендації — підказки, а не жорсткий список: картка й запит важливіші.
-    expect(system).not.toContain('насамперед бери з context.recommendations.items');
-    expect(system).toContain('Пріоритетні тайтли зі стрічки');
-    expect(system).toContain('Подумки зіставляй кожен тайтл за суттю');
-    expect(system).toContain('окремо перевір усі елементи з type: "tv"');
-    expect(system).toContain('Не радь нічого з taste.libraryTitles');
+    expect(system).toContain('Правила, які не порушуються');
+    expect(system).toContain('ДВА РЕЖИМИ РОБОТИ');
+    expect(system).toContain('ОБГОВОРЕННЯ (за замовчуванням)');
+    expect(system).toContain('У ЦЬОМУ РЕЖИМІ ЗАБОРОНЕНО');
+    expect(system).toContain('ПІДБІР (лише за прямим запитом)');
+    expect(system).toContain('перевір усі елементи з type: "tv"');
+    expect(system).toContain('медичний процедурал');
+    expect(system).toContain('кіберпанк-фантастику');
+    expect(system).toContain('Ніколи не радь нічого з taste.libraryTitles');
     expect(system).toContain('не керуєш застосунком');
     expect(system).toContain('available: false');
     expect(system).toContain('спочатку коротка жива реакція');
     expect(system).toContain('кожен із нового рядка');
-    expect(system).toContain('Доктора Хауса');
-    expect(system).toContain('Той, хто біжить по лезу');
+    expect(system).toContain('Назва (рік) — чому саме вона підходить цьому користувачу');
     expect(captured.body.contents[captured.body.contents.length - 1]).toEqual({
       role: 'user',
       parts: [{ text: 'Що подивитись на вечір?' }],

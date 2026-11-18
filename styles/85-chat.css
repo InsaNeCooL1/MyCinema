@@ -562,6 +562,8 @@ body.mc-chat-open #snow-layer { display: none; }
 }
 @media (max-width: 899px) {
   body.mc-chat-open { overflow: hidden; }
+  /* На телефоні анімація появи рядка додає мікро-стрибок під час стріму. */
+  .mc-chat-msg { animation: none !important; }
 }
 @media (max-width: 380px) {
   .mc-chat-bubble { font-size: 14px; }
