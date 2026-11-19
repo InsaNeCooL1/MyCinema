@@ -35,7 +35,7 @@ function streamingServiceByKey(key) {
 function findStreamingServiceByName(name) {
   const needle = String(name || '').trim().toLowerCase();
   if (!needle) return null;
-  const alias = { netflix: ['netflix'], prime: ['amazon', 'prime video'], disney: ['disney+', 'disney plus'], hbo: ['hbo max', 'max'], apple: ['apple tv+', 'apple tv'], paramount: ['paramount+', 'paramount plus'], hulu: ['hulu'], peacock: ['peacock'], sky: ['sky', 'now tv'], starz: ['starz'], mubi: ['mubi'], crunchyroll: ['crunchyroll'] };
+  const alias = { netflix: ['netflix'], prime: ['amazon', 'prime video'], disney: ['disney+', 'disney plus', 'walt disney'], hbo: ['hbo max', 'max'], apple: ['apple tv+', 'apple tv'], paramount: ['paramount+', 'paramount plus'], hulu: ['hulu'], peacock: ['peacock'], sky: ['sky', 'now tv'], starz: ['starz'], mubi: ['mubi'], crunchyroll: ['crunchyroll'] };
   return streamingServices().find(s => (alias[s.key] || [s.name.toLowerCase()]).some(a => needle === a || needle.includes(a))) || null;
 }
 

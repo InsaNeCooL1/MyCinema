@@ -9,6 +9,7 @@ const SRC_FILES = [
   'src/layout.js',
   'src/core.js',
   'src/api.js',
+  'src/title-logos.js',
   'src/ui.js',
   'src/facts.js',
   'src/search.js',

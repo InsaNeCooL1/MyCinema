@@ -66,6 +66,7 @@ function refreshSettingsControls() {
   set('snow-toggle', typeof SnowFeature !== 'undefined' ? SnowFeature.isEnabled() : true);
   set('kbd-nav-toggle', typeof isKbdNavEnabled === 'function' ? isKbdNavEnabled() : false);
   set('streams-enable-toggle', settings.enableStreams !== false);
+  set('title-logo-toggle', settings.titleLogos);
 
   // «Дивитись по мережі»: за замовчуванням увімкнено, якщо вже є URL кімнати.
   var online = typeof getOnlineConfig === 'function' ? getOnlineConfig() : {};
@@ -98,6 +99,14 @@ function onStreamingUAToggle(on) {
   _clearReleaseCaches();
   showSyncToast(on ? '📺 Тільки UA стрімінг' : '📺 Будь-який стрімінг');
   if (state.tab === 'home') refresh();
+}
+
+function onTitleLogoToggle(on) {
+  settings.titleLogos = !!on;
+  try { localStorage.setItem('mycinema.titleLogos', on ? 'true' : 'false'); } catch (e) {}
+  if (typeof save === 'function') save();
+  if (typeof cardStack !== 'undefined' && cardStack.length && typeof renderCard === 'function') renderCard(true);
+  showSyncToast(on ? '🅰️ Логотипи в картці' : '🔤 Звичайні назви');
 }
 
 /* FIX-STATUS-TOGGLE */

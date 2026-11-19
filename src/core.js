@@ -140,7 +140,8 @@ const settings = {
   digitalOnly: localStorage.getItem('mycinema.digitalOnly') !== 'false',       // default true
   streamingOnlyUA: localStorage.getItem('mycinema.streamingOnlyUA') === 'true', // default false
   showStatusBadges: localStorage.getItem('mycinema.showStatusBadges') !== 'false', // FIX-STATUS-TOGGLE
-  enableStreams: localStorage.getItem('mycinema.enableStreams') !== 'false'
+  enableStreams: localStorage.getItem('mycinema.enableStreams') !== 'false',
+  titleLogos: localStorage.getItem('mycinema.titleLogos') === 'true' // FIX-TITLE-LOGOS
 };
 
 /* FIX-RELEASE-HELPERS — спільні для card.js і home.js */
@@ -176,7 +177,7 @@ let lib = load();
 let _dirtyItems = new Set();
 let _saveTimer = null;
 let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_ADJUST_KEY)) || {}; } catch { return {}; } })();
-const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'activity', 'statistics', 'game', 'collections', 'streamings', 'tops']);
+const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics', 'game', 'collections', 'streamings', 'tops']);
 let _savedTab = 'home';
 try {
   const t = localStorage.getItem('mycinema.activeTab');
@@ -199,8 +200,7 @@ let state = {
   game: { active: false, type: 'movie', round: 0, totalRounds: 20, champion: null, challenger: null, history: [], finished: false, pool: [], seen: new Set(), usedPages: new Set() },
   stats: { tab: 'taste', actorTab: 'rating', castLoading: false, castProgress: { done: 0, total: 0 } },
   librarySearch: '', librarySort: localStorage.getItem('mycinema.librarySort') || 'updated', /* FIX-SORT-PERSIST */
-  calendarMonth: null, calendarStatus: 'all',
-  activityFilter: 'all', activitySort: 'newest'
+  calendarMonth: null, calendarStatus: 'all'
 };
 let cardStack = [];
 let filterPage = 1;
@@ -725,55 +725,8 @@ function saveLocalOnly() {
   }
 }
 
-// ============ ACTIVITY LOG ============
-const ACTIVITY_LOG_KEY = 'mycinema.activityLog.v1';
-const ACTIVITY_LOG_MAX = 500;
-
-function readActivityLog() {
-  try {
-    const arr = JSON.parse(localStorage.getItem(ACTIVITY_LOG_KEY) || '[]');
-    return Array.isArray(arr) ? arr : [];
-  } catch { return []; }
-}
-
-function writeActivityLog(arr) {
-  try {
-    localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(arr.slice(0, ACTIVITY_LOG_MAX)));
-  } catch {}
-}
-
-function clearActivityLog() {
-  try { localStorage.removeItem(ACTIVITY_LOG_KEY); } catch {}
-}
-
-function logActivity(entry) {
-  if (!entry || !entry.cat || !entry.text) return;
-  const now = Date.now();
-  const list = readActivityLog();
-  const item = entry.item || null;
-  const itemKey = entry.key || (item && item.key) || '';
-  const rec = {
-    id: now + '-' + Math.random().toString(36).slice(2, 6),
-    ts: now,
-    cat: entry.cat,
-    sub: entry.sub || '',
-    icon: entry.icon || '•',
-    text: entry.text,
-    key: itemKey,
-    title: entry.title || (item && item.title) || '',
-    poster: entry.poster !== undefined ? entry.poster : (item && item.poster) || null,
-    type: entry.type || (item && item.type) || ''
-  };
-  // Склеюємо швидкі повторні оцінки одного тайтлу (протягом 25с) в один запис
-  if (entry.coalesceKey && list.length && list[0].coalesceKey === entry.coalesceKey && (now - list[0].ts) < 25000) {
-    rec.coalesceKey = entry.coalesceKey;
-    list[0] = rec;
-  } else {
-    if (entry.coalesceKey) rec.coalesceKey = entry.coalesceKey;
-    list.unshift(rec);
-  }
-  writeActivityLog(list);
-}
+// Журнал дій видалено — виклики logActivity лишаються безпечними no-op.
+function logActivity() {}
 
 // Єдина точка видалення тайтлу з lib
 function removeLibItem(key) {

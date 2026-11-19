@@ -410,7 +410,7 @@ function renderCard(restore) {
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
   card.append(scroll);
-  if (!ctx.details && !ctx.error) scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
+  if (ctx.type === 'media' && !ctx.details && !ctx.error) scroll.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Завантаження...</div>';
   else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(ctx.error)}</div>`; /* FIX-CARD-ERR-ESC */
   else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
   else if (ctx.type === 'company') renderCompanyCard(ctx, scroll);

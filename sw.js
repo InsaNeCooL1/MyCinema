@@ -1,6 +1,6 @@
 'use strict';
 
-const SW_VER = 'v5';
+const SW_VER = 'v8';
 const SHELL_CACHE = 'mycinema-shell-' + SW_VER;
 const IMG_CACHE = 'mycinema-img-' + SW_VER;
 const CDN_CACHE = 'mycinema-cdn-' + SW_VER;

@@ -266,6 +266,26 @@
   }
 }
 
+/* FIX-DESKTOP-MOODS — настрої поруч із перемикачем «Фільми / Серіали». */
+.home-head-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.home-head-moods {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.home-head-moods .mood-pills {
+  padding: 5px;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), .10), rgba(var(--accent-rgb), .03));
+  border: 1px solid rgba(var(--accent-rgb), .24);
+}
+.home-head-moods .mood-pill { height: 32px; }
+
 .country-flag-box {
   width: 38px;
   height: 38px;

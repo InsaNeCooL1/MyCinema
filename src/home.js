@@ -1757,11 +1757,13 @@ function renderHomeContent(taste) {
       const head = el('div', 'section-head');
       head.style.alignItems = 'center';
       head.append(el('h2', 'section-title', '✨ Для тебе'));
-      head.append(buildHomeTypeSwitch(taste));
+      const headControls = el('div', 'home-head-controls');
+      headControls.append(buildHomeTypeSwitch(taste));
+      const headMoods = el('div', 'home-head-moods');
+      headMoods.append(renderMoodPills());
+      headControls.append(headMoods);
+      head.append(headControls);
       sec.append(head);
-
-      /* [LAYOUT] Мобайл лишає режими/настрої — десктоп їх прибрав свідомо. */
-      if (isMobile) sec.append(buildRecsControlsBar());
 
       const type = state.home.tab;
       const allItems = recs.items.filter(x => x.type === type && !(typeof isTrackedInLib === 'function' ? isTrackedInLib(x.key) : !!lib[x.key]) && !(typeof isDismissed === 'function' && isDismissed(x.key)));

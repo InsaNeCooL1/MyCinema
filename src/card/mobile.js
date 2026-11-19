@@ -156,7 +156,12 @@
       }
       titleRow.append(_tvBadge);
     }
-    titleRow.append(el('h1', 'title-main', d.title || d.name));
+    const titleMain = el('h1', 'title-main', d.title || d.name);
+    titleRow.append(titleMain);
+    /* FIX-TITLE-LOGOS — логотип замість назви лише всередині картки тайтлу. */
+    if (settings.titleLogos && typeof applyTitleLogo === 'function') {
+      applyTitleLogo(r, titleMain, 'title-logo');
+    }
     wrap.append(titleRow);
 
     const ageRating = getAgeRating(d, r);

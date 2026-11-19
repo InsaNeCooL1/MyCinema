@@ -73,14 +73,6 @@ describe('Block 1 fixes & invariants', () => {
     expect(ordered[1].key).toBe('movie-old');
   });
 
-  it('logActivity склеює швидкі оцінки одного тайтлу в один запис', () => {
-    window.logActivity({ cat: 'rating', icon: '⭐', text: 'Оцінено: 7,0/10', key: 'movie-10', title: 'Test', coalesceKey: 'rate-movie-10' });
-    window.logActivity({ cat: 'rating', icon: '⭐', text: 'Оцінено: 8,5/10', key: 'movie-10', title: 'Test', coalesceKey: 'rate-movie-10' });
-    const log = window.readActivityLog();
-    expect(log).toHaveLength(1);
-    expect(log[0].text).toBe('Оцінено: 8,5/10');
-  });
-
   it('scoreCandidate у streams.js надає пріоритет точному збігу назви, року й типу', () => {
     const { scoreCandidate } = window._streamsUtil;
     const oldRemake = { title: 'Дюна', year: '1984', isTvHint: false, provider: 'eneyida' };

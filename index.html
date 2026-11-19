@@ -53,7 +53,6 @@
       <div class="nav-dropdown">
         <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> <span>Мій топ</span></div>
         <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> <span>Календар</span></div>
-        <div class="nav-item" data-tab="activity" onclick="setTab('activity')"><span class="nav-icon">📜</span> <span>Журнал дій</span></div>
       </div>
     </div>
 
@@ -184,6 +183,11 @@
         <input type="checkbox" id="poster-bg-toggle" onchange="onPosterBgToggle(this.checked)">
         <span>Постер як фон на картці тайтлу</span>
       </label>
+      <label class="settings-toggle">
+        <input type="checkbox" id="title-logo-toggle" onchange="onTitleLogoToggle(this.checked)">
+        <span>Логотип замість назви (українською)</span>
+      </label>
+      <div class="notes-hint">Якщо українського логотипа немає — лишається звичайна назва.</div>
     </div>
   </div>
 </div>
