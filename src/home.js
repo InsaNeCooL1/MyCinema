@@ -1437,8 +1437,10 @@ async function loadHome() {
 
   if (!state.home.general) { const gc = readGeneralCache(); if (gc) state.home.general = gc; }
   /* LAZY_GENERAL_FETCH */
-  // Не завантажуємо важкі 39 сторінок трендів/стрімінгів, якщо користувач на вкладці «Для мене»
-  if (!state.home.general && state.home.view === 'explore') {
+  // Тренди тепер завжди показуються під блоком «Планую» у звичайному вигляді
+  // («Для мене»), тож підтягуємо їх незалежно від view. Кеш на 12 годин
+  // (GEN_TTL) захищає від повторних важких запитів.
+  if (!state.home.general) {
     try {
       const todayIso = new Date().toISOString().slice(0, 10);
       const twoYearsAgoIso = `${new Date().getFullYear() - 2}-01-01`;

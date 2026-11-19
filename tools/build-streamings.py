@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Статичні дані стрімінгів (TMDB company ID + лого) -> src/streaming-data.js."""
+"""Каталоги стрімінгів (TMDB Watch Providers) -> src/streaming-data.js.
+
+Раніше тут були TMDB company ID (Netflix Productions, Hulu Japan тощо) — це
+давало «профіль сервісу» з десятком власних продюсерських тайтлів, а не з
+каталогом підписки. Тепер використовуємо офіційні TMDB watch providers
+(дані JustWatch) з прив'язкою до регіону: /discover?with_watch_providers=...
+"""
 
 import json
 import urllib.request
@@ -8,39 +14,110 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROXY = 'https://mycinema-proxy.insaneteresh123.workers.dev'
 
-# TMDB company IDs: там, де точного company немає, беремо найближчу офіційну.
-SERVICES = [
-    ('Netflix', 178464),
-    ('Apple TV+', 194232),      # Apple Studios
-    ('Amazon', 208220),         # Amazon Studios
-    ('HBO', 3268),
-    ('Disney+', 2),             # Walt Disney Pictures
-    ('Paramount+', 314668),
-    ('Hulu', 140361),           # Hulu Japan (найближчий company)
-    ('Peacock', 5656),          # Peacock Productions
-    ('Sky', 19079),
-    ('Starz', 8034),
+# Регіони, для яких зберігаємо каталоги. Перший — типовий.
+REGIONS = [
+    ('UA', 'Україна'),
+    ('US', 'США'),
+    ('GB', 'Велика Британія'),
+    ('PL', 'Польща'),
+    ('DE', 'Німеччина'),
+    ('CA', 'Канада'),
+    ('FR', 'Франція'),
+    ('ES', 'Іспанія'),
+    ('IT', 'Італія'),
+    ('NL', 'Нідерланди'),
+    ('AU', 'Австралія'),
+    ('BR', 'Бразилія'),
+    ('JP', 'Японія'),
+    ('KR', 'Південна Корея'),
+    ('IN', 'Індія'),
+    ('TR', 'Туреччина'),
 ]
+
+# (key, назва в застосунку, точні назви провайдерів у TMDB)
+# Назви каналів/магазинів/рекламних тарифів відсіюються автоматично.
+SERVICES = [
+    ('netflix', 'Netflix', ['Netflix']),
+    ('prime', 'Amazon Prime Video', ['Amazon Prime Video']),
+    ('disney', 'Disney+', ['Disney Plus']),
+    ('hbo', 'HBO Max', ['HBO Max']),
+    ('apple', 'Apple TV+', ['Apple TV']),
+    ('paramount', 'Paramount+', ['Paramount Plus', 'Paramount Plus Premium',
+                                 'Paramount Plus Essential', 'Paramount Plus Basic with Ads']),
+    ('hulu', 'Hulu', ['Hulu']),
+    ('peacock', 'Peacock', ['Peacock', 'Peacock Premium', 'Peacock Premium Plus']),
+    ('sky', 'Sky / NOW', ['Sky', 'Sky Go', 'Now TV', 'SkyShowtime']),
+    ('starz', 'Starz', ['Starz']),
+    ('mubi', 'MUBI', ['MUBI']),
+    ('crunchyroll', 'Crunchyroll', ['Crunchyroll']),
+]
+
+# Підписки-канали та рекламні/дитячі варіанти — не окремі каталоги.
+EXCLUDE_PARTS = ('channel', 'store', 'with ads', 'free with ads', 'kids')
+
+
+def norm(name):
+    return ' '.join(str(name or '').lower().split())
+
+
+def is_primary(name):
+    n = norm(name)
+    return not any(part in n for part in EXCLUDE_PARTS)
+
+
+def fetch_providers(region):
+    url = f'{PROXY}/watch/providers/movie?language=en-US&watch_region={region}'
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=20) as res:
+        data = json.loads(res.read().decode('utf-8'))
+    return data.get('results') or []
 
 
 def main():
-    out = []
-    for name, cid in SERVICES:
-        logo = ''
-        try:
-            url = f'{PROXY}/company/{cid}?language=en-US'
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=15) as res:
-                data = json.loads(res.read().decode('utf-8'))
-                logo = data.get('logo_path') or ''
-        except Exception:  # noqa: BLE001
-            pass
-        out.append({'id': cid, 'name': name, 'logo': logo})
-        print(f'{name}: id={cid} logo={bool(logo)}')
+    by_region = {}
+    for code, _label in REGIONS:
+        providers = [p for p in fetch_providers(code) if is_primary(p.get('provider_name'))]
+        by_region[code] = providers
+        print(f'{code}: {len(providers)} providers')
 
+    out_services = []
+    for key, name, aliases in SERVICES:
+        alias_set = {norm(a) for a in aliases}
+        regions = {}
+        default_logo = ''
+        for code, _label in REGIONS:
+            matches = [p for p in by_region[code] if norm(p.get('provider_name')) in alias_set]
+            if not matches:
+                continue
+            # Один каталог може бути розбитий на кілька тарифів (Paramount+, Peacock, Sky).
+            ids = sorted({int(p['provider_id']) for p in matches})
+            best = sorted(matches, key=lambda p: (p.get('display_priority') or 999, p['provider_id']))[0]
+            logo = best.get('logo_path') or ''
+            regions[code] = {'ids': ids, 'logo': logo}
+            if not default_logo:
+                default_logo = logo
+        # Лого з українського регіону, якщо є, інакше — з першого доступного.
+        default_logo = regions.get('UA', {}).get('logo') or default_logo
+        if not regions:
+            print(f'⚠ {name}: не знайдено в жодному регіоні')
+            continue
+        out_services.append({
+            'key': key,
+            'name': name,
+            'logo': default_logo,
+            'regions': regions,
+        })
+        print(f'{name}: {", ".join(regions)}')
+
+    data = {
+        'defaultRegion': REGIONS[0][0],
+        'regions': [{'code': c, 'name': n} for c, n in REGIONS],
+        'services': out_services,
+    }
     header = '/* AUTO-GENERATED by tools/build-streamings.py — НЕ редагувати вручну. */\n'
     (ROOT / 'src' / 'streaming-data.js').write_text(
-        header + 'const MC_STREAMINGS = ' + json.dumps(out, ensure_ascii=False, indent=2) + ';\n')
+        header + 'const MC_STREAMINGS = ' + json.dumps(data, ensure_ascii=False, indent=2) + ';\n',
+        encoding='utf-8')
 
 
 if __name__ == '__main__':

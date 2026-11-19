@@ -144,19 +144,13 @@
       if (ctx.providerPick) {
         /* [LAYOUT] Лейба стрімінгу/мережі відкриває картку компанії. */
         _tvBadge.classList.add('tv-icon-badge-clickable');
-        _tvBadge.title = `${ctx.providerPick.name || 'Стрімінг'} → картка компанії`;
+        _tvBadge.title = `${ctx.providerPick.name || 'Стрімінг'} → ${typeof findStreamingServiceByName === 'function' && findStreamingServiceByName(ctx.providerPick.name) ? 'профіль стрімінгу' : 'картка компанії'}`;
         _tvBadge.addEventListener('click', (e) => {
           e.stopPropagation();
           const pick = ctx.providerPick;
-          let companyId = pick.source === 'studio' ? pick.id : null;
-          if (!companyId && typeof MC_STREAMINGS !== 'undefined' && pick.name) {
-            const needle = String(pick.name).toLowerCase();
-            const svc = MC_STREAMINGS.find(s =>
-              s.name.toLowerCase() === needle ||
-              s.name.toLowerCase().includes(needle) ||
-              needle.includes(s.name.toLowerCase()));
-            if (svc) companyId = svc.id;
-          }
+          const svc = typeof findStreamingServiceByName === 'function' ? findStreamingServiceByName(pick.name) : null;
+          if (svc && typeof openStreaming === 'function') { openStreaming(svc.key); return; }
+          const companyId = pick.source === 'studio' ? pick.id : null;
           if (companyId && typeof openCompany === 'function') openCompany(companyId);
         });
       }

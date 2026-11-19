@@ -23,13 +23,14 @@ function makeMediaCtx(item) {
   return { type: 'media', item, activeTab: item.type === 'tv' ? 'seasons' : 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' };
 }
 
-function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : (ctx.type === 'company' ? `#/company/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`); }
+function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : (ctx.type === 'company' ? `#/company/${ctx.id}` : (ctx.type === 'streaming' ? `#/streaming/${ctx.key}` : `#/${ctx.item.type}/${ctx.item.id}`)); }
 function pushCardState() {
   const ctx = cardStack[cardStack.length - 1];
   if (!ctx) return;
   const st = { mc: cardStack.length };
   if (ctx.type === 'person') st.ctx = { type: 'person', id: ctx.id };
   else if (ctx.type === 'company') st.ctx = { type: 'company', id: ctx.id };
+  else if (ctx.type === 'streaming') st.ctx = { type: 'streaming', key: ctx.key, region: ctx.streamingRegion };
   else st.ctx = { type: 'media', id: ctx.item.id, media_type: ctx.item.type, key: ctx.item.key };
   history.pushState(st, '', hashFor(ctx));
 }
@@ -159,7 +160,7 @@ function cardBar() {
 
 function renderLoading() {
   const top = cardStack[cardStack.length - 1];
-  card.classList.toggle('is-person', top?.type === 'person' || top?.type === 'company');
+  card.classList.toggle('is-person', top?.type === 'person' || top?.type === 'company' || top?.type === 'streaming');
   card.innerHTML = '';
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
@@ -354,13 +355,14 @@ window.addEventListener('popstate', async (e) => {
   if (depth > cardStack.length) {
     const s = e.state;
     if (!s || !s.ctx || depth - cardStack.length > 1) {
-      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id : (s.ctx.type === 'company' ? '#/company/' + s.ctx.id : '#/' + s.ctx.media_type + '/' + s.ctx.id)) : '';
+      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id : (s.ctx.type === 'company' ? '#/company/' + s.ctx.id : (s.ctx.type === 'streaming' ? '#/streaming/' + s.ctx.key : '#/' + s.ctx.media_type + '/' + s.ctx.id))) : '';
       location.hash = h;
       location.reload();
       return;
     }
     if (s.ctx.type === 'person') await loadPersonForForward(s.ctx.id);
     else if (s.ctx.type === 'company') await loadCompanyForForward(s.ctx.id);
+    else if (s.ctx.type === 'streaming') await loadStreamingForForward(s.ctx.key, s.ctx.region);
     else if (s.ctx.type === 'media') await loadMediaForForward(s.ctx);
     return;
   }
@@ -376,8 +378,10 @@ window.addEventListener('popstate', async (e) => {
 
 function routeFromHash() {
   const m = location.hash.match(/^#\/(movie|tv|person|company)\/(\d+)$/);
-  if (!m) return;
+  const s = location.hash.match(/^#\/streaming\/([a-z0-9_-]+)$/);
+  if (!m && !s) return;
   history.replaceState({ mc: 0 }, '', location.pathname + location.search);
+  if (s) { openStreaming(s[1]); return; }
   const id = parseInt(m[2]);
   if (m[1] === 'person') openPerson(id);
   else if (m[1] === 'company') openCompany(id);
@@ -393,7 +397,7 @@ function renderCard(restore) {
 
   const prevScroll = card.querySelector('.card-scroll');
   const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
-  card.classList.toggle('is-person', ctx.type === 'person' || ctx.type === 'company');
+  card.classList.toggle('is-person', ctx.type === 'person' || ctx.type === 'company' || ctx.type === 'streaming');
   card.innerHTML = '';
   if (settings.posterBg && ctx.type === 'media') {
     const bgPath = ctx.item?.poster || ctx.details?.poster_path;
@@ -410,6 +414,7 @@ function renderCard(restore) {
   else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(ctx.error)}</div>`; /* FIX-CARD-ERR-ESC */
   else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
   else if (ctx.type === 'company') renderCompanyCard(ctx, scroll);
+  else if (ctx.type === 'streaming') renderStreamingCard(ctx, scroll);
   else {
     const _isDesktop = isDesktopLayout();
     if (_isDesktop && typeof renderDesktopCard === 'function') {

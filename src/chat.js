@@ -817,7 +817,9 @@
 
   function mcBuildBrowseContext() {
     try {
-      if (typeof state === 'undefined' || !state.home || state.home.view !== 'explore' || !state.home.general) return null;
+      // Тренди тепер частина головної («Для мене»), а не окремого view —
+      // тому віддаємо їх у контекст AI, коли відкрита вкладка «Головна».
+      if (typeof state === 'undefined' || state.tab !== 'home' || !state.home || !state.home.general) return null;
       var type = state.home.tab === 'tv' ? 'tv' : 'movie';
       var items = mcCollectGeneralItems(type).slice(0, MC_CHAT_BROWSE_LIMIT);
       if (!items.length) return null;
