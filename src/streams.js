@@ -1,8 +1,9 @@
-/* Eneyida + UASerials + UACDN provider — Integrated Diary Player */
+/* Eneyida + UASerials PRO + EmbF providers — Integrated Diary Player */
 (function () {
   'use strict';
 
   var PROXY_DEFAULT = 'https://mycinema-proxy-base.insaneteresh123.workers.dev';
+  var EMBF_SITE = 'https://uakinogo.is';
   var PREFS_KEY = 'mycinema.streamPrefs.v1';
   var RESUME_KEY = 'mycinema.streamResume.v1';
 
@@ -23,6 +24,13 @@
       if (!r.ok) throw new Error('Проксі HTTP ' + r.status);
       return r.text();
     }).finally(function () { if (tmr) clearTimeout(tmr); });
+  }
+
+  /* Лише для пошуку на сайті-джерелі: Jina віддає HTML ізReflection CORS.
+     Sam embed і медіа тягнуться напряму з браузера — без проксі. */
+  function jinaPx(url) {
+    return fetch('https://r.jina.ai/' + url, { headers: { 'X-Return-Format': 'html' } })
+      .then(function (r) { if (!r.ok) throw new Error('Jina HTTP ' + r.status); return r.text(); });
   }
 
   function readJsonStore(k) {
@@ -177,6 +185,8 @@
   }
 
   function fetchQualities(m3u8Url) {
+    // iframe-плеєри (наприклад EmbF) не мають прямого url — просто немає що парсити
+    if (!m3u8Url || typeof m3u8Url !== 'string') return Promise.resolve([]);
     if (qualCache[m3u8Url]) return Promise.resolve(qualCache[m3u8Url]);
     var base = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
     return fetch(m3u8Url).then(function (r) {
@@ -289,13 +299,50 @@
     });
   }
 
-  function searchKinoukr(query) { return searchDleSite('https://kinoukr.tv', 'kinoukr', null, query); }
-  function searchUAFix(query) { return searchDleSite('https://uafix.net', 'uafix', null, query); }
-  function searchUASerialsMirror(query) {
-    return searchUASerials(query).catch(function () { return []; }).then(function (r) {
-      if (r && r.length) return r;
-      return searchDleSite('https://uaserials.pro', 'uaserials', true, query);
+  /* EmbF — пошук тайтлу на сайті, потім резолв embed'а в пряме медіа. */
+  function searchEmbf(query) {
+    return jinaPx(EMBF_SITE + '/index.php?do=search&subaction=search&story=' + encodeURIComponent(query))
+      .then(function (html) {
+        var results = [], seen = {};
+        var re = /<a[^>]+href="(https?:\/\/uakinogo\.is\/\d+-[^"]+\.html)"[^>]*>([\s\S]{1,200}?)<\/a>/gi;
+        var m;
+        while ((m = re.exec(html)) !== null) {
+          var href = m[1];
+          var title = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          if (!title || title.length < 2 || seen[href]) continue;
+          seen[href] = 1;
+          var win = html.slice(Math.max(0, m.index - 250), Math.min(html.length, m.index + 500));
+          var meta = extractSnippetMeta(win + ' ' + href);
+          results.push({ href: href, title: title, year: meta.year,
+            isTvHint: meta.isTvHint !== null ? meta.isTvHint : null, provider: 'embf' });
+        }
+        return results;
+      });
+  }
+
+  function resolveEmbf(cand) {
+    // Відкриваємо рідний плеєр EmbF у iframe — там його власні селектори
+    // якості й озвучки виглядають саме так, як на сайті-джерелі.
+    return jinaPx(cand.href).then(function (html) {
+      var m = html.match(/(?:https?:)?\/\/api\.embf\.net\/embed\/(?:movie|serial)\/\d+/i);
+      if (!m) throw new Error('EmbF: embed не знайдено');
+      var embedUrl = m[0].replace(/^\/\//, 'https://');
+      return [{
+        title: 'EmbF',
+        translation: 'EmbF',
+        iframeUrl: embedUrl,
+        season: '', episode: ''
+      }];
     });
+  }
+  function searchUASerialsMirror(query) {
+    // UASerials PRO — основне джерело; .my лишається лише як фолбек.
+    return searchDleSite('https://uaserials.pro', 'uaserials', true, query)
+      .catch(function () { return []; })
+      .then(function (r) {
+        if (r && r.length) return r;
+        return searchUASerials(query).catch(function () { return []; });
+      });
   }
 
   function searchProviderSmart(searchFn, title, origTitle, year, type) {
@@ -357,8 +404,8 @@
       return u;
     });
   }
-  function fetchUASerialsEmbed(embedUrl) {
-    return px(embedUrl, { referer: 'https://uaserials.my/' }).then(function (html) {
+  function fetchUASerialsEmbed(embedUrl, referer) {
+    return px(embedUrl, { referer: referer || 'https://uaserials.pro/' }).then(function (html) {
       var m = html.match(/file\s*:\s*'([^']+)'/) || html.match(/file\s*:\s*"([^"]+)"/);
       if (!m) throw new Error('UASerials: поле "file" відсутнє');
       var raw = m[1];
@@ -413,17 +460,17 @@
 
   function loadFlatForResult(cand) {
     if (detailCache[cand.href]) return Promise.resolve(detailCache[cand.href]);
-    if (cand.provider === 'kinoukr' || cand.provider === 'uafix') {
-      return resolveGenericDetailAndEmbed(cand).then(function (res) {
-        if (Array.isArray(res) && res[0] && res[0].iframeUrl) { detailCache[cand.href] = res; return res; }
-        var flatG = flatten(res);
-        if (!flatG.length) throw new Error('Немає доступних джерел');
-        detailCache[cand.href] = flatG;
-        return flatG;
+    if (cand.provider === 'embf') {
+      return resolveEmbf(cand).then(function (res) {
+        if (res && res.length) detailCache[cand.href] = res;
+        return res;
       });
     }
     var resolveP = cand.provider === 'uaserials'
-      ? resolveUASerialsDetail(cand.href).then(fetchUASerialsEmbed)
+      ? resolveUASerialsDetail(cand.href).then(function (embedUrl) {
+          var ref = String(cand.href).replace(/^(https?:\/\/[^/]+).*$/, '$1/');
+          return fetchUASerialsEmbed(embedUrl, ref);
+        })
       : resolveDetail(cand.href).then(fetchEmbedJson);
     return resolveP.then(function (tree) {
       var flat = flatten(tree);
@@ -675,6 +722,16 @@
     if (isHls) {
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
+        if (meta.audioLang) {
+          video.addEventListener('loadedmetadata', function () {
+            var tracks = video.audioTracks;
+            if (!tracks) return;
+            for (var i = 0; i < tracks.length; i++) {
+              if ((tracks[i].language || '').toLowerCase().indexOf(meta.audioLang) === 0 ||
+                  /укр|ukr/i.test(tracks[i].label || '')) { tracks[i].enabled = true; break; }
+            }
+          });
+        }
       } else {
         ensureHls().then(function (Hls) {
           if (Hls && Hls.isSupported()) {
@@ -682,6 +739,18 @@
             ov._hls = hls;
             hls.loadSource(url);
             hls.attachMedia(video);
+            if (meta.audioLang) {
+              hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function (_e, data) {
+                var list = (data && data.audioTracks) || [];
+                var idx = -1;
+                for (var i = 0; i < list.length; i++) {
+                  var t = list[i] || {};
+                  if ((t.lang && t.lang.toLowerCase().indexOf(meta.audioLang) === 0) ||
+                      /укр|ukr/i.test(t.name || '')) { idx = i; break; }
+                }
+                if (idx >= 0) { try { hls.audioTrack = idx; } catch (e) {} }
+              });
+            }
           } else {
             video.src = url;
           }
@@ -713,7 +782,7 @@
 
     var titleSpan = document.createElement('span');
     titleSpan.style.cssText = 'color:var(--text-secondary);font-size:13px;font-family:var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;text-align:center;';
-    titleSpan.textContent = title || 'UACDN';
+    titleSpan.textContent = title || 'Плеєр';
     bar.appendChild(titleSpan);
 
     var fsBtn = document.createElement('button');
@@ -800,7 +869,7 @@
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'streams-prov-btn' + (i === ui.provIdx ? ' active' : '');
-        var cnt = p.id === 'uacdn' ? 'HD' : String(p.results.length);
+        var cnt = String(p.results.length);
         btn.innerHTML = '<span>' + esc(p.label) + '</span><span class="streams-prov-cnt">' + esc(cnt) + '</span>';
         btn.addEventListener('click', function () {
           if (ui.provIdx === i) return;
@@ -833,6 +902,7 @@
         openVideo(chosen ? chosen.url : url, subtitle, {
           resumeKey: rKey,
           title: labelTitle,
+          audioLang: epMeta && epMeta.audioLang,
           onClosed: function (watchedSec) {
             if (epMeta && mediaKey && watchedSec >= 25 && !isEpWatchedInLib(mediaKey, sNum, epNum)) {
               ui.pendingMark = epMeta;
@@ -1036,7 +1106,7 @@
         body.appendChild(errEl);
       } else if (!hasSeasons || viewItems.length === 1) {
         var target = viewItems[0];
-        var epMetaSingle = hasSeasons ? { sNum: sNum, epNum: extractNum(target.episode, 1), code: 'S' + sNum + 'E' + String(extractNum(target.episode, 1)).padStart(2, '0') } : null;
+        var epMetaSingle = hasSeasons ? { sNum: sNum, epNum: extractNum(target.episode, 1), code: 'S' + sNum + 'E' + String(extractNum(target.episode, 1)).padStart(2, '0'), audioLang: target.audioLang } : { audioLang: target.audioLang };
         var playBtn = document.createElement('button');
         playBtn.type = 'button';
         playBtn.className = 'streams-play-btn';
@@ -1049,7 +1119,7 @@
         viewItems.forEach(function (ep, idx) {
           var epNum = extractNum(ep.episode, idx + 1);
           var watchedMark = isEpWatchedInLib(mediaKey, sNum, epNum);
-          var epMeta = { sNum: sNum, epNum: epNum, code: 'S' + sNum + 'E' + String(epNum).padStart(2, '0') };
+          var epMeta = { sNum: sNum, epNum: epNum, code: 'S' + sNum + 'E' + String(epNum).padStart(2, '0'), audioLang: ep.audioLang };
           var eb = document.createElement('button');
           eb.type = 'button';
           eb.className = 'streams-ep-btn';
@@ -1101,25 +1171,6 @@
       var seq = ++reqSeq;
       var prov = providers[ui.provIdx];
       if (!prov) return;
-
-      if (prov.id === 'uacdn') {
-        body.innerHTML = '';
-        var note = document.createElement('div');
-        note.className = 'streams-status';
-        note.style.padding = '12px 8px 4px';
-        note.textContent = 'Знайдено за точним IMDb ID у базі UACDN';
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'streams-play-btn';
-        btn.textContent = '▶ Відкрити UACDN плеєр';
-        btn.addEventListener('click', function () {
-          saveStreamPref(mediaKey, { provId: 'uacdn' });
-          openIframeOverlay(prov.url, mediaTitle);
-        });
-        body.appendChild(note);
-        body.appendChild(btn);
-        return;
-      }
 
       var idx = ui.matchIdxByProv[prov.id] || 0;
       if (idx >= prov.results.length) idx = 0;
@@ -1181,39 +1232,20 @@
     }
     body.innerHTML = '<div class="streams-status">Пошук «' + esc(q || origTitle) + '»…</div>';
 
-    var uacdnP = imdbId
-      ? fetch('https://franko.uacdn.online/show/imdb/' + imdbId, { method: 'HEAD' })
-          .then(function (r) { return r.ok ? 'https://franko.uacdn.online/show/imdb/' + imdbId : null; })
-          .catch(function () { return null; })
-      : Promise.resolve(null);
-
     Promise.allSettled([
-      uacdnP,
       searchProviderSmart(searchEneyida, q, origTitle, year, type),
       searchProviderSmart(searchUASerialsMirror, q, origTitle, year, type),
-      searchProviderSmart(searchKinoukr, q, origTitle, year, type),
-      searchProviderSmart(searchUAFix, q, origTitle, year, type)
+      searchProviderSmart(searchEmbf, q, origTitle, year, type)
     ]).then(function (results) {
       if (!body || !body.isConnected) return;
-      var uacdnUrl = results[0].status === 'fulfilled' ? results[0].value : null;
-      var eneyida = results[1].status === 'fulfilled' ? results[1].value : [];
-      var uas = results[2].status === 'fulfilled' ? results[2].value : [];
-      var kinoukr = results[3].status === 'fulfilled' ? results[3].value : [];
-      var uafix = results[4].status === 'fulfilled' ? results[4].value : [];
+      var eneyida = results[0].status === 'fulfilled' ? results[0].value : [];
+      var uas = results[1].status === 'fulfilled' ? results[1].value : [];
+      var embf = results[2].status === 'fulfilled' ? results[2].value : [];
 
       var providers = [];
-      if (uacdnUrl) providers.push({ id: 'uacdn', label: 'UACDN', url: uacdnUrl });
-      if (type === 'tv') {
-        if (uas.length) providers.push({ id: 'uaserials', label: 'UASerials', results: uas });
-        if (eneyida.length) providers.push({ id: 'eneyida', label: 'Eneyida', results: eneyida });
-        if (uafix.length) providers.push({ id: 'uafix', label: 'UAFix', results: uafix });
-        if (kinoukr.length) providers.push({ id: 'kinoukr', label: 'Kinoukr', results: kinoukr });
-      } else {
-        if (eneyida.length) providers.push({ id: 'eneyida', label: 'Eneyida', results: eneyida });
-        if (kinoukr.length) providers.push({ id: 'kinoukr', label: 'Kinoukr', results: kinoukr });
-        if (uafix.length) providers.push({ id: 'uafix', label: 'UAFix', results: uafix });
-        if (uas.length) providers.push({ id: 'uaserials', label: 'UASerials', results: uas });
-      }
+      if (eneyida.length) providers.push({ id: 'eneyida', label: 'Eneyida', results: eneyida });
+      if (uas.length) providers.push({ id: 'uaserials', label: 'UASerials PRO', results: uas });
+      if (embf.length) providers.push({ id: 'embf', label: 'EmbF', results: embf });
 
       if (!providers.length) {
         body.innerHTML = '<div class="streams-error">Нічого не знайдено на балансерах</div>';
@@ -1229,5 +1261,9 @@
 
   window.openStreamPicker = openStreamPicker;
   window.closeStreamPicker = function () { closeModal(false); };
-  window._streamsUtil = { scoreCandidate: scoreCandidate, extractSnippetMeta: extractSnippetMeta, normStr: normStr };
+  window._streamsUtil = {
+    scoreCandidate: scoreCandidate, extractSnippetMeta: extractSnippetMeta, normStr: normStr,
+    searchEmbf: searchEmbf, resolveEmbf: resolveEmbf,
+    searchUASerialsMirror: searchUASerialsMirror
+  };
 })();
