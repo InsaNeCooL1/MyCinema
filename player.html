@@ -5,33 +5,98 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MyCinema · Плеєр</title>
 <style>
-  :root { --accent:#ffb86c; }
-  html, body { margin:0; height:100%; background:#08070a; color:#f2eee9; font:14px/1.4 sans-serif; }
-  #bar { display:flex; align-items:center; gap:12px; padding:10px 14px; background:#111015; border-bottom:1px solid #24212b; }
-  #bar strong { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
-  button { background:#1c1a22; color:#f2eee9; border:1px solid #34303c; border-radius:8px; padding:8px 12px; cursor:pointer; }
-  button:hover { border-color:var(--accent); color:var(--accent); }
-  #hud { display:flex; gap:6px; flex-wrap:wrap; font:11px/1 ui-monospace, SFMono-Regular, monospace; color:var(--accent); }
+  :root {
+    --bg-0:#08070a; --bg-1:#0f0e13; --bg-2:#16141b; --bg-3:#201d28;
+    --accent:#ffb86c; --accent-hover:#ffc98a; --accent-rgb:255,184,108;
+    --text:#f2eee9; --text-secondary:#cfc8c0; --text-muted:#8d877f;
+    --danger:#ff5c5c; --success:#9de5c3;
+    --serif:'Georgia','Playfair Display',serif;
+    --sans:system-ui,-apple-system,'Inter',sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg-0); color:var(--text); font-family:var(--sans); }
+  button { font-family:inherit; cursor:pointer; }
+
+  #bar {
+    display:flex; align-items:center; gap:12px; padding:10px 14px;
+    background:var(--bg-1); border-bottom:1px solid rgba(255,255,255,.07);
+  }
+  #bar strong {
+    flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-family:var(--serif); font-style:italic; font-size:18px; color:var(--accent);
+  }
+  .btn {
+    background:var(--bg-2); color:var(--text); border:1px solid rgba(255,255,255,.12);
+    border-radius:var(--r-sm); padding:8px 12px; font-size:13px;
+  }
+  .btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  #hud { display:flex; gap:6px; flex-wrap:wrap; font:11px/1 var(--mono); color:var(--accent); }
   #hud[hidden] { display:none; }
-  #hud span { background:#191820; border:1px solid #302c38; padding:5px 7px; border-radius:6px; white-space:nowrap; }
-  #preload { height:2px; background:#1a1920; }
+  #hud span {
+    background:var(--bg-2); border:1px solid rgba(var(--accent-rgb),.22);
+    padding:5px 7px; border-radius:var(--r-sm); white-space:nowrap;
+  }
+  #preload { height:2px; background:var(--bg-2); }
   #preload i { display:block; height:100%; width:0; background:var(--accent); transition:width .5s; }
-  #stage { position:absolute; top:60px; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background:#000; }
+
+  #stage { position:absolute; top:60px; left:0; right:0; bottom:0; background:#000; }
   video { width:100%; height:100%; object-fit:contain; background:#000; }
-  #status { position:absolute; padding:20px; text-align:center; opacity:.8; }
+
+  /* Preloader у стилі MyCinema */
+  #loader {
+    position:absolute; inset:60px 0 0; z-index:5;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 35%, rgba(var(--accent-rgb),.10), transparent 55%), var(--bg-0);
+    transition:opacity .45s ease;
+  }
+  #loader.hidden { opacity:0; pointer-events:none; }
+  .loader-card {
+    width:min(420px,86vw); text-align:center; padding:30px 26px;
+    background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    border:1px solid rgba(var(--accent-rgb),.20); border-radius:var(--r-lg);
+    box-shadow:0 24px 70px rgba(0,0,0,.6);
+  }
+  .loader-logo {
+    font-family:var(--serif); font-style:italic; font-weight:800;
+    font-size:30px; color:var(--accent); letter-spacing:-.5px;
+  }
+  .loader-logo small { font:12px var(--mono); color:var(--text-muted); font-style:normal; }
+  .loader-sub { margin-top:16px; font-size:13px; color:var(--text-secondary); min-height:1.4em; }
+  .loader-track {
+    margin:18px auto 10px; height:5px; width:100%; border-radius:99px;
+    background:rgba(255,255,255,.07); overflow:hidden;
+  }
+  .loader-track i {
+    display:block; height:100%; width:18%; border-radius:99px;
+    background:linear-gradient(90deg, var(--accent), var(--accent-hover));
+    animation:slide 1.6s ease-in-out infinite;
+  }
+  .loader-track i.determinate { animation:none; transition:width .4s; width:0; }
+  .loader-stat { font:11px/1.5 var(--mono); color:var(--text-muted); min-height:2.8em; }
+  @keyframes slide { 0%{transform:translateX(-110%)} 100%{transform:translateX(560%)} }
 </style>
 </head>
 <body>
 <div id="bar">
   <strong id="title">MyCinema</strong>
-  <div id="hud"></div>
-  <button id="fs" type="button">⛶ На весь екран</button>
-  <button id="close" type="button">✕</button>
+  <div id="hud" hidden></div>
+  <button id="fs" class="btn" type="button">⛶ На весь екран</button>
+  <button id="close" class="btn" type="button">✕</button>
 </div>
 <div id="preload"><i></i></div>
 <div id="stage">
-  <div id="status">Завантаження…</div>
   <video id="video" controls autoplay playsinline crossorigin="anonymous"></video>
+  <div id="loader">
+    <div class="loader-card">
+      <div class="loader-logo">MyCinema <small>· плеєр</small></div>
+      <div class="loader-sub" id="loader-sub">Підключення до потоку…</div>
+      <div class="loader-track"><i id="loader-bar"></i></div>
+      <div class="loader-stat" id="loader-stat">—</div>
+    </div>
+  </div>
 </div>
 <script>
 (function () {
@@ -41,124 +106,127 @@
   var title = params.get('title') || 'MyCinema';
   document.getElementById('title').textContent = title;
   var video = document.getElementById('video');
-  var status = document.getElementById('status');
   var hud = document.getElementById('hud');
   var preloadBar = document.querySelector('#preload i');
+  var loader = document.getElementById('loader');
+  var loaderSub = document.getElementById('loader-sub');
+  var loaderStat = document.getElementById('loader-stat');
+  var loaderBar = document.getElementById('loader-bar');
   var hideTimer = null;
+  var loaderHidden = false;
 
   document.getElementById('close').onclick = function () { window.close(); };
   document.getElementById('fs').onclick = function () {
-    var stage = document.getElementById('stage');
     if (document.fullscreenElement) document.exitFullscreen();
-    else if (stage.requestFullscreen) stage.requestFullscreen();
+    else if (document.getElementById('stage').requestFullscreen) document.getElementById('stage').requestFullscreen();
   };
 
-  /* HUD з'являється разом із контролами плеєра й ховається, коли вони зникають. */
+  function hideLoader() {
+    if (loaderHidden) return;
+    loaderHidden = true;
+    loader.classList.add('hidden');
+    setTimeout(function () { loader.remove(); }, 500);
+  }
+  function showLoaderError(text) {
+    loaderSub.textContent = text;
+    loaderSub.style.color = 'var(--danger)';
+    loaderBar.classList.remove('determinate');
+  }
+
+  /* HUD разом із контролами плеєра */
   function showHud() {
     hud.hidden = false;
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(function () {
-      if (!video.paused) hud.hidden = true;
-    }, 3500);
+    hideTimer = setTimeout(function () { if (!video.paused) hud.hidden = true; }, 3500);
   }
-  ['mousemove', 'touchstart', 'keydown', 'click'].forEach(function (ev) {
-    document.addEventListener(ev, showHud, { passive: true });
+  ['mousemove','touchstart','keydown','click'].forEach(function (ev) {
+    document.addEventListener(ev, showHud, { passive:true });
   });
   video.addEventListener('play', showHud);
   video.addEventListener('pause', showHud);
-  showHud(); /* показуємо одразу на старті, потім timeout сховає під час гри */
+  video.addEventListener('loadeddata', hideLoader);
+  video.addEventListener('playing', hideLoader);
 
   function fmtBytes(n) {
     if (!isFinite(n) || n < 0) return '—';
-    if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
-    if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
-    return n.toFixed(0) + ' B';
+    if (n >= 1048576) return (n/1048576).toFixed(1)+' MB';
+    if (n >= 1024) return (n/1024).toFixed(0)+' KB';
+    return n.toFixed(0)+' B';
   }
-  function badge(text) {
-    var s = document.createElement('span');
-    s.textContent = text;
-    return s;
-  }
+  function badge(text) { var s=document.createElement('span'); s.textContent=text; return s; }
 
   function initStats() {
     var u;
-    try { u = new URL(src, location.href); } catch (e) { return; }
-    /* Працює і для /gst/<hash>/..., і для сирого /stream/...?link=<hash> */
+    try { u = new URL(src, location.href); } catch(e) { return; }
     var m = u.pathname.match(/\/gst\/([^/]+)\//);
-    var torrentHash = m ? m[1] : (u.searchParams.get('link') || '');
-    if (!torrentHash) return;
-    var index = u.searchParams.get('index') || '1';
-    var endpoint = u.origin + '/gst/' + encodeURIComponent(torrentHash) +
-      '/heartbeat?index=' + encodeURIComponent(index);
-    var lastBytes = null, lastTs = 0;
+    var hash = m ? m[1] : (u.searchParams.get('link') || '');
+    if (!hash) return;
+    var endpoint = u.origin + '/gst/' + encodeURIComponent(hash) + '/heartbeat?index=' +
+      encodeURIComponent(u.searchParams.get('index') || '1');
+    var lastBytes=null, lastTs=0;
 
     setInterval(function () {
-      fetch(endpoint, { cache: 'no-store' })
+      fetch(endpoint, { cache:'no-store' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
           if (!d) return;
-          var t = d.Torrent || {};
-          var now = Date.now();
-          var speed = '—';
+          var t = d.Torrent || {}, now = Date.now(), speed='—';
           if (lastBytes !== null && lastTs) {
-            var delta = (t.bytes_read_data || 0) - lastBytes;
-            var secs = (now - lastTs) / 1000;
-            if (secs > 0 && delta >= 0) speed = fmtBytes(delta / secs) + '/s';
+            var delta=(t.bytes_read_data||0)-lastBytes, secs=(now-lastTs)/1000;
+            if (secs>0 && delta>=0) speed=fmtBytes(delta/secs)+'/s';
           }
-          lastBytes = t.bytes_read_data || 0;
-          lastTs = now;
-
-          var pct = (t.torrent_size ? (t.preloaded_bytes || 0) / t.torrent_size * 100 : 0);
-          preloadBar.style.width = Math.min(100, Math.max(0, pct)).toFixed(1) + '%';
+          lastBytes=t.bytes_read_data||0; lastTs=now;
+          var pct=(t.torrent_size ? (t.preloaded_bytes||0)/t.torrent_size*100 : 0);
+          preloadBar.style.width=Math.min(100,Math.max(0,pct)).toFixed(1)+'%';
 
           hud.replaceChildren(
             badge(d.stat_string || '—'),
-            badge('⬇ ' + speed),
-            badge('📦 ' + pct.toFixed(1) + '%'),
-            badge('🧠 ' + fmtBytes(d.Filled || 0) + '/' + fmtBytes(d.Capacity || 0)),
-            badge('👥 ' + (t.active_peers || 0) + '/' + (t.total_peers || 0)),
-            badge('🌱 ' + (t.connected_seeders || 0))
+            badge('⬇ '+speed),
+            badge('📦 '+pct.toFixed(1)+'%'),
+            badge('🧠 '+fmtBytes(d.Filled||0)+'/'+fmtBytes(d.Capacity||0)),
+            badge('👥 '+(t.active_peers||0)+'/'+(t.total_peers||0)),
+            badge('🌱 '+(t.connected_seeders||0))
           );
+          if (!loaderHidden) {
+            loaderBar.classList.add('determinate');
+            loaderBar.style.width=Math.min(100,Math.max(4,pct)).toFixed(1)+'%';
+            loaderSub.textContent='Буфер потокy · '+pct.toFixed(1)+'%';
+            loaderStat.textContent=(d.stat_string||'—')+' · ⬇ '+speed+' · 👥 '+(t.active_peers||0)+'/'+ (t.total_peers||0);
+          }
           showHud();
         })
         .catch(function () {});
     }, 2000);
   }
 
-  if (!src) { status.textContent = 'Немає джерела'; return; }
+  if (!src) { showLoaderError('Немає джерела'); return; }
+
+  setTimeout(function () { if (!loaderHidden) loaderSub.textContent='Ще трохи… перші кадри готуються'; }, 8000);
 
   function start(Hls) {
     if (Hls && Hls.isSupported()) {
-      var hls = new Hls({ enableWorker: true });
+      var hls = new Hls({ enableWorker:true });
       hls.loadSource(src);
       hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, function (_e, data) {
+        if (data && data.fatal) showLoaderError('Помилка потоку: '+(data.details||'unknown'));
+      });
       hls.on(Hls.Events.MANIFEST_PARSED, function () {
-        status.hidden = true;
         video.play().catch(function () {});
         initStats();
-      });
-      hls.on(Hls.Events.ERROR, function (_e, data) {
-        if (data && data.fatal) {
-          status.hidden = false;
-          status.textContent = 'Помилка потоку: ' + (data.details || 'unknown');
-        }
       });
     } else {
       video.src = src;
-      video.addEventListener('loadedmetadata', function () {
-        status.hidden = true;
-        video.play().catch(function () {});
-        initStats();
-      });
+      video.addEventListener('loadedmetadata', function () { video.play().catch(function(){}); initStats(); });
     }
   }
 
   if (window.Hls) start(window.Hls);
   else {
     var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js';
-    s.onload = function () { start(window.Hls); };
-    s.onerror = function () { status.textContent = 'Не вдалося завантажити hls.js'; };
+    s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js';
+    s.onload=function(){ start(window.Hls); };
+    s.onerror=function(){ showLoaderError('Не вдалося завантажити hls.js'); };
     document.head.appendChild(s);
   }
 })();
