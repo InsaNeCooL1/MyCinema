@@ -1261,6 +1261,12 @@
 
   window.openStreamPicker = openStreamPicker;
   window.closeStreamPicker = function () { closeModal(false); };
+  // Використовується кімнатою в звичайному браузері (без Capacitor): відкрити
+  // потік убудованим плеєром замість спроби запустити VLC.
+  window.mcStreamsOpen = function (url, title) {
+    if (!url) return;
+    openVideo(url, '', { title: title || 'MyCinema' });
+  };
   window._streamsUtil = {
     scoreCandidate: scoreCandidate, extractSnippetMeta: extractSnippetMeta, normStr: normStr,
     searchEmbf: searchEmbf, resolveEmbf: resolveEmbf,

@@ -838,6 +838,7 @@ function getOnlineConfig() {
     if (!o.roomUrl) {
       try { var old = JSON.parse(localStorage.getItem('mycinema.room') || '{}') || {}; if (old.url) o.roomUrl = String(old.url); } catch (e2) {}
     }
+    if (!o.serverUrl && typeof DEFAULT_TORR_SERVER !== 'undefined') o.serverUrl = DEFAULT_TORR_SERVER;
     return o;
   } catch (e) { return {}; }
 }

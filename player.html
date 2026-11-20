@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MyCinema · Плеєр</title>
+<style>
+  :root { --accent:#ffb86c; }
+  html, body { margin:0; height:100%; background:#08070a; color:#f2eee9; font:14px/1.4 sans-serif; }
+  #bar { display:flex; align-items:center; gap:12px; padding:10px 14px; background:#111015; border-bottom:1px solid #24212b; }
+  #bar strong { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  button { background:#1c1a22; color:#f2eee9; border:1px solid #34303c; border-radius:8px; padding:8px 12px; cursor:pointer; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  #hud { display:flex; gap:6px; flex-wrap:wrap; font:11px/1 ui-monospace, SFMono-Regular, monospace; color:var(--accent); }
+  #hud[hidden] { display:none; }
+  #hud span { background:#191820; border:1px solid #302c38; padding:5px 7px; border-radius:6px; white-space:nowrap; }
+  #preload { height:2px; background:#1a1920; }
+  #preload i { display:block; height:100%; width:0; background:var(--accent); transition:width .5s; }
+  #stage { position:absolute; top:60px; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background:#000; }
+  video { width:100%; height:100%; object-fit:contain; background:#000; }
+  #status { position:absolute; padding:20px; text-align:center; opacity:.8; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <strong id="title">MyCinema</strong>
+  <div id="hud"></div>
+  <button id="fs" type="button">⛶ На весь екран</button>
+  <button id="close" type="button">✕</button>
+</div>
+<div id="preload"><i></i></div>
+<div id="stage">
+  <div id="status">Завантаження…</div>
+  <video id="video" controls autoplay playsinline crossorigin="anonymous"></video>
+</div>
+<script>
+(function () {
+  'use strict';
+  var params = new URLSearchParams(location.search);
+  var src = params.get('src') || '';
+  var title = params.get('title') || 'MyCinema';
+  document.getElementById('title').textContent = title;
+  var video = document.getElementById('video');
+  var status = document.getElementById('status');
+  var hud = document.getElementById('hud');
+  var preloadBar = document.querySelector('#preload i');
+  var hideTimer = null;
+
+  document.getElementById('close').onclick = function () { window.close(); };
+  document.getElementById('fs').onclick = function () {
+    var stage = document.getElementById('stage');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (stage.requestFullscreen) stage.requestFullscreen();
+  };
+
+  /* HUD з'являється разом із контролами плеєра й ховається, коли вони зникають. */
+  function showHud() {
+    hud.hidden = false;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      if (!video.paused) hud.hidden = true;
+    }, 3500);
+  }
+  ['mousemove', 'touchstart', 'keydown', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, showHud, { passive: true });
+  });
+  video.addEventListener('play', showHud);
+  video.addEventListener('pause', showHud);
+  showHud(); /* показуємо одразу на старті, потім timeout сховає під час гри */
+
+  function fmtBytes(n) {
+    if (!isFinite(n) || n < 0) return '—';
+    if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+    if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
+    return n.toFixed(0) + ' B';
+  }
+  function badge(text) {
+    var s = document.createElement('span');
+    s.textContent = text;
+    return s;
+  }
+
+  function initStats() {
+    var u;
+    try { u = new URL(src, location.href); } catch (e) { return; }
+    /* Працює і для /gst/<hash>/..., і для сирого /stream/...?link=<hash> */
+    var m = u.pathname.match(/\/gst\/([^/]+)\//);
+    var torrentHash = m ? m[1] : (u.searchParams.get('link') || '');
+    if (!torrentHash) return;
+    var index = u.searchParams.get('index') || '1';
+    var endpoint = u.origin + '/gst/' + encodeURIComponent(torrentHash) +
+      '/heartbeat?index=' + encodeURIComponent(index);
+    var lastBytes = null, lastTs = 0;
+
+    setInterval(function () {
+      fetch(endpoint, { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d) return;
+          var t = d.Torrent || {};
+          var now = Date.now();
+          var speed = '—';
+          if (lastBytes !== null && lastTs) {
+            var delta = (t.bytes_read_data || 0) - lastBytes;
+            var secs = (now - lastTs) / 1000;
+            if (secs > 0 && delta >= 0) speed = fmtBytes(delta / secs) + '/s';
+          }
+          lastBytes = t.bytes_read_data || 0;
+          lastTs = now;
+
+          var pct = (t.torrent_size ? (t.preloaded_bytes || 0) / t.torrent_size * 100 : 0);
+          preloadBar.style.width = Math.min(100, Math.max(0, pct)).toFixed(1) + '%';
+
+          hud.replaceChildren(
+            badge(d.stat_string || '—'),
+            badge('⬇ ' + speed),
+            badge('📦 ' + pct.toFixed(1) + '%'),
+            badge('🧠 ' + fmtBytes(d.Filled || 0) + '/' + fmtBytes(d.Capacity || 0)),
+            badge('👥 ' + (t.active_peers || 0) + '/' + (t.total_peers || 0)),
+            badge('🌱 ' + (t.connected_seeders || 0))
+          );
+          showHud();
+        })
+        .catch(function () {});
+    }, 2000);
+  }
+
+  if (!src) { status.textContent = 'Немає джерела'; return; }
+
+  function start(Hls) {
+    if (Hls && Hls.isSupported()) {
+      var hls = new Hls({ enableWorker: true });
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        status.hidden = true;
+        video.play().catch(function () {});
+        initStats();
+      });
+      hls.on(Hls.Events.ERROR, function (_e, data) {
+        if (data && data.fatal) {
+          status.hidden = false;
+          status.textContent = 'Помилка потоку: ' + (data.details || 'unknown');
+        }
+      });
+    } else {
+      video.src = src;
+      video.addEventListener('loadedmetadata', function () {
+        status.hidden = true;
+        video.play().catch(function () {});
+        initStats();
+      });
+    }
+  }
+
+  if (window.Hls) start(window.Hls);
+  else {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js';
+    s.onload = function () { start(window.Hls); };
+    s.onerror = function () { status.textContent = 'Не вдалося завантажити hls.js'; };
+    document.head.appendChild(s);
+  }
+})();
+</script>
+</body>
+</html>
