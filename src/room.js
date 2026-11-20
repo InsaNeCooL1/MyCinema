@@ -184,7 +184,7 @@
 
     frame = document.createElement('iframe');
     frame.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent';
-    frame.setAttribute('allow', 'fullscreen');
+    frame.setAttribute('allow', 'fullscreen; local-network-access');
     frame.onload = function () { clearTimeout(loadTimer); msg.style.display = 'none'; };
     loadTimer = setTimeout(function () {
       msg.style.display = 'flex';
@@ -250,6 +250,20 @@
         if (copyText(u)) toast('Плеєр не знайдено — URL скопійовано');
         else toast('Плеєр не знайдено');
       });
+      return;
+    }
+    // У звичайному браузері Capacitor-моста немає — граємо вбудованим плеєром
+    // замість того, щоб лише копіювати URL у буфер.
+    // У браузері відкриваємо окрему вкладку з плеєром — кімната лишається видною.
+    try {
+      var page = new URL('player.html?src=' + encodeURIComponent(u) +
+        '&title=' + encodeURIComponent(title || 'Кімната'), location.href).href;
+      var popup = window.open(page, '_blank');
+      if (popup) return;
+    } catch (e) {}
+    // Якщо браузер заблокував popup — граємо убудованим оверлеєм.
+    if (typeof window.mcStreamsOpen === 'function') {
+      window.mcStreamsOpen(u, title || 'Кімната');
       return;
     }
     if (copyText(u)) toast('URL потоку скопійовано');

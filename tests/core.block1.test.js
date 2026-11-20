@@ -73,6 +73,10 @@ describe('Block 1 fixes & invariants', () => {
     expect(ordered[1].key).toBe('movie-old');
   });
 
+  it('TorrServer має адресу за замовчуванням', () => {
+    expect(window.getOnlineConfig().serverUrl).toBe('http://localhost:8092');
+  });
+
   it('scoreCandidate у streams.js надає пріоритет точному збігу назви, року й типу', () => {
     const { scoreCandidate } = window._streamsUtil;
     const oldRemake = { title: 'Дюна', year: '1984', isTvHint: false, provider: 'eneyida' };
