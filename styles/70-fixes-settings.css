@@ -85,7 +85,7 @@
 .settings-field-actions .settings-btn { width: auto; flex: 1 1 140px; }
 .settings-field-status { font-size: 12px; min-height: 1.2em; color: var(--text-muted); }
 /* display:flex на .settings-section перекриває звичайний [hidden] */
-.settings-section[hidden], .mc-chat-api-block[hidden] { display: none; }
+.settings-section[hidden] { display: none; }
 
 /* FIX-SETTINGS-REORG — шрифти, підзаголовки, account-menu, lang-btn */
 .settings-box {

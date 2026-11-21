@@ -177,7 +177,7 @@ let lib = load();
 let _dirtyItems = new Set();
 let _saveTimer = null;
 let actorAdjust = (() => { try { return JSON.parse(localStorage.getItem(ACTOR_ADJUST_KEY)) || {}; } catch { return {}; } })();
-const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics', 'game', 'collections', 'streamings', 'tops']);
+const VALID_TABS = new Set(['home', 'watching', 'watched', 'planned', 'dropped', 'favorites', 'notes', 'top', 'calendar', 'statistics', 'game']);
 let _savedTab = 'home';
 try {
   const t = localStorage.getItem('mycinema.activeTab');
@@ -735,6 +735,89 @@ function removeLibItem(key) {
   if (typeof markCardLibDirty === 'function') markCardLibDirty();
 }
 
+/* [SYNC-FIELD-MERGE] Об'єкт бібліотеки зливаємо ПО ПОЛЯХ, а не цілим елементом.
+   Інакше паралельні правки різних полів (наприклад, оцінка на одному пристрої
+   і статус на іншому) затирають одна одну — звідси «зниклі» фільми й оцінки. */
+function _valEq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+function _fieldTs(item, field) {
+  if (!item) return 0;
+  const ft = item._fieldTs && item._fieldTs[field];
+  if (ft) return Number(ft) || 0;
+  /* легасі-поля, які вже мають власні таймстемпи */
+  if (field === 'status') return Number(item.statusDate) || 0;
+  if (field === 'ratings') return Number(item.ratingUpdated) || 0;
+  if (field === 'elo') return Number(item.eloUpdated) || 0;
+  return Number(item.updated) || 0;
+}
+
+function _mergeItem(a, b) {
+  if (!a) return b ? { ...b } : null;
+  if (!b) return { ...a };
+
+  const out = {};
+  for (const f of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (f === 'seasonRatings' || f === 'seasonRatingTs' || f === '_fieldTs') continue;
+    const av = a[f], bv = b[f];
+    /* Поле, яке є лише в одній копії, завжди лишаємо — не маємо права
+       викидати дані тільки через те, що інша сторона його не знає. */
+    if (!(f in a)) { out[f] = bv; continue; }
+    if (!(f in b)) { out[f] = av; continue; }
+    if (_valEq(av, bv)) {
+      out[f] = av;
+      continue;
+    }
+    const at = _fieldTs(a, f), bt = _fieldTs(b, f);
+    const win = bt > at ? b : at > bt ? a
+      : ((Number(b.updated) || 0) > (Number(a.updated) || 0) ? b : a);
+    if (f in win) out[f] = win[f];
+  }
+
+  /* _fieldTs об'єднуємо за максимумом — таймстемп кожного поля монотонний. */
+  const ft = {};
+  for (const f of new Set([...(Object.keys(a._fieldTs || {})), ...(Object.keys(b._fieldTs || {}))])) {
+    ft[f] = Math.max(Number(a._fieldTs && a._fieldTs[f]) || 0, Number(b._fieldTs && b._fieldTs[f]) || 0);
+  }
+
+  /* Супутні таймстемпи мають відповідати вибраному значенню поля. */
+  if ('status' in out && out.status) {
+    const src = _valEq(out.status, a.status) ? a : b;
+    out.statusDate = _fieldTs(src, 'status') || out.updated || Date.now();
+    ft.status = out.statusDate;
+  }
+  if ('ratings' in out && out.ratings && Object.values(out.ratings).some(v => v > 0)) {
+    const src = _valEq(out.ratings, a.ratings) ? a : b;
+    out.ratingUpdated = _fieldTs(src, 'ratings') || out.updated || Date.now();
+    ft.ratings = out.ratingUpdated;
+  }
+  if ('elo' in out && typeof out.elo === 'number') {
+    const src = _valEq(out.elo, a.elo) ? a : b;
+    out.eloUpdated = _fieldTs(src, 'elo') || ft.elo || 0;
+  }
+
+  /* Оцінки сезонів — окремо по кожному сезону. */
+  const sr = {}, srTs = {};
+  for (const s of new Set([...Object.keys(a.seasonRatings || {}), ...Object.keys(b.seasonRatings || {})])) {
+    const av = a.seasonRatings && a.seasonRatings[s], bv = b.seasonRatings && b.seasonRatings[s];
+    if (_valEq(av, bv)) {
+      if (av !== undefined) { sr[s] = av; srTs[s] = (a.seasonRatingTs && a.seasonRatingTs[s]) || (b.seasonRatingTs && b.seasonRatingTs[s]) || 0; }
+      continue;
+    }
+    const at = Number(a.seasonRatingTs && a.seasonRatingTs[s]) || 0;
+    const bt = Number(b.seasonRatingTs && b.seasonRatingTs[s]) || 0;
+    const win = bt > at ? b : at > bt ? a
+      : ((Number(b.updated) || 0) > (Number(a.updated) || 0) ? b : a);
+    const val = win.seasonRatings && win.seasonRatings[s];
+    if (val !== undefined) { sr[s] = val; srTs[s] = (win.seasonRatingTs && win.seasonRatingTs[s]) || Number(win.updated) || 0; }
+  }
+  if (Object.keys(sr).length) { out.seasonRatings = sr; out.seasonRatingTs = srTs; }
+  if (Object.keys(ft).length) out._fieldTs = ft;
+
+  out.updated = Math.max(Number(a.updated) || 0, Number(b.updated) || 0);
+  if (!out.key) out.key = a.key || b.key;
+  return out;
+}
+
 function mergeLibraries(localItems, localDel, cloudItems, cloudDel) {
   const now = Date.now();
   const del = { ...cloudDel };
@@ -743,9 +826,13 @@ function mergeLibraries(localItems, localDel, cloudItems, cloudDel) {
 
   const items = {};
   for (const k of new Set([...Object.keys(localItems), ...Object.keys(cloudItems)])) {
-    const a = localItems[k], b = cloudItems[k];
-    const win = !a ? b : !b ? a : ((b.updated || 0) > (a.updated || 0) ? b : a);
-    if (del[k] && del[k] >= (win.updated || 0)) continue; // видалено після останньої правки
+    const win = _mergeItem(localItems[k], cloudItems[k]);
+    if (!win) continue;
+    const wUpd = Number(win.updated) || 0;
+    if (del[k] && del[k] >= wUpd) continue; // видалено після останньої правки
+    /* [SYNC-RESURRECT] Якщо тайтл додали/змінили після видалення —
+       tombstone треба прибрати, інакше новий запис щоразу видаляється з хмари. */
+    if (del[k] && wUpd > del[k]) delete del[k];
     items[k] = win;
   }
   return { items, deleted: del };
@@ -795,7 +882,6 @@ function mergeCloudExtras(cloud) {
 
   if (cloud.appearance) applyCloudAppearance(cloud.appearance);
   if (cloud.online) { if (applyCloudOnline(cloud.online)) changed = true; }
-  if (cloud.gemini) { if (applyCloudGemini(cloud.gemini)) changed = true; }
 
   return changed;
 }
@@ -874,21 +960,6 @@ function applyCloudOnline(c) {
   return true;
 }
 
-// Ключ Gemini живе в профілі акаунта разом з іншими налаштуваннями онлайн.
-// Порівнюємо за ts: хто останній змінив ключ — той і перемагає.
-function getGeminiCloudPayload() {
-  if (window.mcChat && typeof window.mcChat.getCloudKey === 'function') {
-    return window.mcChat.getCloudKey();
-  }
-  return { key: '', ts: 0 };
-}
-
-function applyCloudGemini(g) {
-  if (!g || typeof g !== 'object') return false;
-  if (!window.mcChat || typeof window.mcChat.applyCloudKey !== 'function') return false;
-  return window.mcChat.applyCloudKey({ key: g.key || '', ts: g.ts || 0 });
-}
-
 function applyCloudAppearance(app) {
   if (!app || typeof app !== 'object') return false;
   const cTs = Number(app.ts) || 0;
@@ -946,33 +1017,43 @@ async function reconcileWithCloud() {
   
   const cloudExtras = profile?.settings || {};
 
-  // 3. Зливаємо
-  const merged = mergeLibraries(lib, libTombstones, cloudLib, cloudExtras.deleted || {});
-  const libChanged = JSON.stringify(merged.items) !== JSON.stringify(lib);
+  // 3. Зливаємо. Поки йшли запити, користувач міг змінити бібліотеку —
+  //    тому перед застосуванням результату зливаємо ще й з поточним lib.
+  const beforeLib = lib;
+  const beforeDel = libTombstones;
+  let merged = mergeLibraries(lib, beforeDel, cloudLib, cloudExtras.deleted || {});
+  /* Tombstones після воскрешення прибрати, а нові видалення, зроблені під
+     час запитів, зберегти. */
+  const finalDel = { ...merged.deleted };
+  for (const [k, t] of Object.entries(beforeDel)) {
+    if (!(k in finalDel) && !merged.items[k]) finalDel[k] = t;
+  }
+  merged = mergeLibraries(lib, finalDel, merged.items, finalDel);
+  const libChanged = JSON.stringify(merged.items) !== JSON.stringify(beforeLib);
   
   lib = merged.items;
   libTombstones = merged.deleted;
   saveLocalOnly();
 
-  /* FIX-SYNC-RESIDUAL */
+  /* FIX-SYNC-RESIDUAL: офлайн-правки переживають перезавантаження —
+     порівнюємо вміст із хмарою, а не тільки `updated`. */
   for (const k of Object.keys(merged.items)) {
-    const localUpd = merged.items[k].updated || 0;
-    const cloudUpd = cloudLib[k]?.updated || 0;
-    if (localUpd > cloudUpd) _dirtyItems.add(k);
+    const cloudRow = cloudLib[k];
+    if (!cloudRow || !_valEq(merged.items[k], cloudRow)) _dirtyItems.add(k);
   }
 
   const extrasChanged = mergeCloudExtras(cloudExtras);
 
   // 4. Пишемо назад ТІЛЬКИ ЗМІНЕНІ елементи (Upsert)
   const keysToUpsert = Array.from(_dirtyItems);
-  const upsertData = keysToUpsert.map(key => {
-    if (!lib[key]) return null; // Якщо видалено
-    return {
-      user_id: uid,
-      item_key: key,
-      user_data: lib[key]
-    };
-  }).filter(Boolean);
+  const upsertData = [];
+  const sentSnapshot = {};
+  keysToUpsert.forEach(key => {
+    if (!lib[key]) return; // видалено
+    const snapshot = JSON.parse(JSON.stringify(lib[key]));
+    sentSnapshot[key] = JSON.stringify(snapshot);
+    upsertData.push({ user_id: uid, item_key: key, user_data: snapshot });
+  });
 
   if (upsertData.length > 0) {
     const { error: errUp } = await window.supabase
@@ -980,10 +1061,15 @@ async function reconcileWithCloud() {
       .upsert(upsertData, { onConflict: 'user_id,item_key' });
     if (errUp) throw errUp;
   }
-  _dirtyItems.clear(); // Очищаємо після успішного запису
+  /* Знімаємо прапорець тільки з реально відправлених ключів. Якщо під час
+     запису той самий ключ змінили знову — лишаємо його в черзі. */
+  for (const k of Object.keys(sentSnapshot)) {
+    if (!lib[k] || JSON.stringify(lib[k]) === sentSnapshot[k]) _dirtyItems.delete(k);
+  }
 
-  // Видаляємо tombstones з бази
-  const deletedKeys = Object.keys(libTombstones);
+  // Видаляємо з бази тільки ті ключі, яких справді немає в злитті.
+  // Воскрешені тайтли (новіша правка після tombstone) лишаються в хмарі.
+  const deletedKeys = Object.keys(libTombstones).filter(k => !lib[k]);
   if (deletedKeys.length > 0) {
     await window.supabase.from('user_library').delete().eq('user_id', uid).in('item_key', deletedKeys);
   }
@@ -998,8 +1084,7 @@ async function reconcileWithCloud() {
       actorAdjustTs,
       appearance: getAppearancePayload(),
       deleted: libTombstones,
-      online: getOnlineConfig(),
-      gemini: getGeminiCloudPayload()
+      online: getOnlineConfig()
     },
     updated_at: new Date().toISOString()
   });
@@ -1014,39 +1099,31 @@ function saveNow() { saveLocalOnly(); clearTimeout(_saveTimer); return saveToClo
 
 let _syncing = Promise.resolve();
 function saveToCloud(isManual = false) {
-  if (!window.currentUser || !window.firebaseReady) return Promise.resolve();
+  if (!window.currentUser || !window.firebaseReady) return Promise.resolve(false);
   _syncing = _syncing.then(async () => {
     try {
       setSyncStatus('saving', isManual ? 'Синхронізую...' : 'Зберігаю...');
       const changed = await reconcileWithCloud();
       if (changed) refresh();
       setSyncStatus('saved', isManual ? '✓ Синхронізовано' : '✓');
+      return true;
     } catch (e) { 
       setSyncStatus('error', typeof navigator !== 'undefined' && navigator.onLine === false ? '📴 Офлайн' : '⚠ Помилка'); 
-      console.error(e); 
+      console.error(e);
+      return false;
     }
   });
   return _syncing;
 }
 
+/* Усі точки входу йдуть через єдиний ланцюг _syncing — інакше два
+   паралельні read-modify-write затирають одне одного. */
 async function pullFromCloud() {
   if (!window.currentUser || !window.firebaseReady) {
     showSyncToast('❌ Увійдіть в акаунт');
-    return;
+    return false;
   }
-  try {
-    setSyncStatus('saving', 'Оновлюю...');
-    const changed = await reconcileWithCloud();
-    /* NO-CLOUD-CENTER-TOAST */
-    if (changed) {
-      refresh();
-    }
-    setSyncStatus('saved', '✓');
-  } catch (e) {
-    setSyncStatus('error', typeof navigator !== 'undefined' && navigator.onLine === false ? '📴 Офлайн' : '⚠ Помилка');
-    console.error(e);
-    
-  }
+  return saveToCloud(true);
 }
 
 async function syncFromCloud() {
@@ -1317,12 +1394,14 @@ function recordEloMatch(winner, loser) {
   _dirtyItems.add(w.key);
   w.eloGames = (w.eloGames || 0) + 1;
   w.eloUpdated = eloNow;
+  w._fieldTs = { ...(w._fieldTs || {}), elo: eloNow };
   // w.updated НЕ чіпаємо, щоб не збивати дату перегляду і сортування бібліотеки
 
   l.elo = Math.round(lElo - delta);
   _dirtyItems.add(l.key);
   l.eloGames = (l.eloGames || 0) + 1;
   l.eloUpdated = eloNow;
+  l._fieldTs = { ...(l._fieldTs || {}), elo: eloNow };
   // l.updated НЕ чіпаємо
 
   // Перемоги Elo більше не засмічують загальний журнал дій

@@ -70,8 +70,6 @@ function toggleNavGroup(groupName, e) {
     if (typeof hideFilterDropdown === 'function') hideFilterDropdown();
     if (typeof hideAutocomplete === 'function') hideAutocomplete();
   }
-  /* [LAYOUT] Клік по кнопці «Топи» веде на сторінку топів; підпункти відкривають конкретний топ. */
-  if (groupName === 'tops' && isDesktop && typeof setTab === 'function') setTab('tops');
   /* [LAYOUT] На десктопі група вже відкривається по наведенню — клік не закриває її. */
   if (isDesktop) { group.classList.add('open'); return; }
   group.classList.toggle('open', !isOpen);

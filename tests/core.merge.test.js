@@ -67,3 +67,50 @@ describe('mergeLibraries', () => {
     expect(res.deleted['movie-1']).toBeUndefined();
   });
 });
+
+describe('SYNC-FIELD-MERGE — паралельні правки не затираються', () => {
+  it('зберігає оцінку з одного пристрою і статус з іншого', () => {
+    const now = Date.now();
+    const local = { 'movie-9': { key: 'movie-9', updated: now - 5000, ratings: { overall: 9 }, ratingUpdated: now - 1000 } };
+    const cloud = { 'movie-9': { key: 'movie-9', updated: now, status: 'watched', statusDate: now, ratings: null } };
+    const res = window.mergeLibraries(local, {}, cloud, {});
+    expect(res.items['movie-9'].ratings.overall).toBe(9);
+    expect(res.items['movie-9'].status).toBe('watched');
+    expect(res.items['movie-9'].updated).toBe(now);
+  });
+
+  it('зливає оцінки сезонів по ключах, а не цілим об\'єктом', () => {
+    const now = Date.now();
+    const local = { 'tv-9': { key: 'tv-9', updated: now - 1000, seasonRatings: { 1: { overall: 8 } }, seasonRatingTs: { 1: now - 1000 } } };
+    const cloud = { 'tv-9': { key: 'tv-9', updated: now, seasonRatings: { 2: { overall: 9 } }, seasonRatingTs: { 2: now } } };
+    const res = window.mergeLibraries(local, {}, cloud, {});
+    expect(res.items['tv-9'].seasonRatings[1].overall).toBe(8);
+    expect(res.items['tv-9'].seasonRatings[2].overall).toBe(9);
+  });
+
+  it('офлайн-правка зі старим updated, але свіжим _fieldTs перемагає', () => {
+    const now = Date.now();
+    const local = { 'movie-10': { key: 'movie-10', updated: now - 10000, notes: 'нова нотатка', _fieldTs: { notes: now } } };
+    const cloud = { 'movie-10': { key: 'movie-10', updated: now - 5000, notes: 'стара нотатка' } };
+    const res = window.mergeLibraries(local, {}, cloud, {});
+    expect(res.items['movie-10'].notes).toBe('нова нотатка');
+  });
+
+  it('поле, яке є тільки в хмарі, не губиться при злитті', () => {
+    const now = Date.now();
+    const local = { 'movie-12': { key: 'movie-12', updated: now, ratings: { overall: 8 } } };
+    const cloud = { 'movie-12': { key: 'movie-12', updated: now - 1000, notes: 'важлива нотатка' } };
+    const res = window.mergeLibraries(local, {}, cloud, {});
+    expect(res.items['movie-12'].notes).toBe('важлива нотатка');
+    expect(res.items['movie-12'].ratings.overall).toBe(8);
+  });
+
+  it('повторне додання знімає tombstone, щоб запис не видалявся з хмари', () => {
+    const now = Date.now();
+    const local = { 'movie-11': { key: 'movie-11', updated: now } };
+    const del = { 'movie-11': now - 1000 };
+    const res = window.mergeLibraries(local, del, {}, {});
+    expect(res.items['movie-11']).toBeDefined();
+    expect(res.deleted['movie-11']).toBeUndefined();
+  });
+});

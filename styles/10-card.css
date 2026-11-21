@@ -324,10 +324,6 @@ body.mc-fs {
 @media (max-width: 899px), (max-height: 599px) {
   #sidebar .nav-group-btn { display: none; }
   #sidebar .nav-dropdown { display: flex; flex-direction: column; padding-left: 0; gap: 3px; }
-  /* [LAYOUT] «Топи» — один пункт із розкривним списком, а не россып підпунктів. */
-  #sidebar .nav-group[data-group="tops"] .nav-group-btn { display: flex; }
-  #sidebar .nav-group[data-group="tops"] .nav-dropdown { display: none; }
-  #sidebar .nav-group[data-group="tops"].open .nav-dropdown { display: flex; }
   #sidebar .sidebar-nav { padding: 12px 10px; gap: 3px; }
   #sidebar .nav-group { gap: 3px; }
   #sidebar .nav-item {

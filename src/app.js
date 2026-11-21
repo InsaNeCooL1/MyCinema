@@ -101,9 +101,6 @@ function refresh() {
   else if (state.tab === "filter") renderFilter();
   else if (state.tab === "game") renderGame();
   else if (state.tab === "statistics") renderStatistics();
-  else if (state.tab === "collections") renderCollections();
-  else if (state.tab === "tops") renderTops();
-  else if (state.tab === "streamings") renderStreamings();
   else if (state.tab === "notes") renderNotesList();
   else if (state.tab === "calendar") renderCalendar();
   else if (state.tab === "top") renderMyTop();
@@ -300,9 +297,6 @@ if (!window.currentUser && Object.keys(lib).length === 0 && !localStorage.getIte
     const exitDlg = document.getElementById('exit-confirm-modal');
     if (exitDlg) { exitDlg.remove(); return; }
 
-    // 0.1. AI-помічник
-    if (window.mcChat && window.mcChat.handleBack()) return;
-
     // 0.2. Плеєр / балансери (відео -> кроки назад -> закриття)
     if (window.mcRoom && window.mcRoom.handleBack()) return;
     if (typeof window.handleStreamsBack === 'function' && window.handleStreamsBack()) return;
@@ -366,9 +360,18 @@ document.addEventListener('keydown', (e) => {
   if (overlay.classList.contains('open') && cardStack.length) { history.back(); return; }
 });
 
+/* [SYNC-FLUSH] Не чекаємо 800мс debounce, якщо користувач згортає додаток
+   одразу після зміни — інакше правка не встигає потрапити у хмару. */
+function _flushSyncBeforeHide() {
+  if (!window.currentUser) return;
+  try { saveNow().catch(() => {}); } catch (e) {}
+}
+window.addEventListener('pagehide', _flushSyncBeforeHide);
+
 // Auto-sync when app comes to foreground
 let _lastAutoSync = 0;
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { _flushSyncBeforeHide(); return; }
   if (document.visibilityState === 'visible' && window.currentUser && window.firebaseReady) {
     const now = Date.now();
     if (now - _lastAutoSync > 30000) { // не частіше ніж раз на 30 секунд
@@ -377,6 +380,19 @@ document.addEventListener('visibilitychange', () => {
     }
   }
 });
+
+/* Після повернення мережі вивантажуємо накопичені офлайн-правки. */
+window.addEventListener('online', () => {
+  if (!window.currentUser) return;
+  window.firebaseReady = true;
+  syncFromCloud();
+});
+
+/* Realtime-підписки немає — тому раз на хвилину підтягуємо changes з хмари,
+   щоб друга відкрита вкладка/пристрій бачив нові правки без ручного оновлення. */
+setInterval(() => {
+  if (document.visibilityState === 'visible' && window.currentUser && window.firebaseReady) syncFromCloud();
+}, 60000);
 
 // Закриття модалок по кліку на темний фон
 document.querySelectorAll('.settings-modal').forEach((m) => {
@@ -545,6 +561,11 @@ async function deleteAccount() {
     if (typeof evictHeavyCaches === 'function') evictHeavyCaches();
   } catch (e) {}
 
+  /* Інакше onAuthStateChange відновить currentUser із кешу після перезавантаження. */
+  window._isExplicitLogout = true;
+  window.currentUser = null;
+  window.firebaseReady = false;
+  try { localStorage.removeItem('mycinema.auth.user'); } catch (e) {}
   try { if (window.supabase) await window.supabase.auth.signOut(); } catch (e) {}
   location.reload();
 }

@@ -23,14 +23,13 @@ function makeMediaCtx(item) {
   return { type: 'media', item, activeTab: item.type === 'tv' ? 'seasons' : 'cast', seasonState: {}, playingTrailer: false, overviewExpanded: false, overviewSource: 'tmdb' };
 }
 
-function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : (ctx.type === 'company' ? `#/company/${ctx.id}` : (ctx.type === 'streaming' ? `#/streaming/${ctx.key}` : `#/${ctx.item.type}/${ctx.item.id}`)); }
+function hashFor(ctx) { return ctx.type === 'person' ? `#/person/${ctx.id}` : (ctx.type === 'company' ? `#/company/${ctx.id}` : `#/${ctx.item.type}/${ctx.item.id}`); }
 function pushCardState() {
   const ctx = cardStack[cardStack.length - 1];
   if (!ctx) return;
   const st = { mc: cardStack.length };
   if (ctx.type === 'person') st.ctx = { type: 'person', id: ctx.id };
   else if (ctx.type === 'company') st.ctx = { type: 'company', id: ctx.id };
-  else if (ctx.type === 'streaming') st.ctx = { type: 'streaming', key: ctx.key, region: ctx.streamingRegion };
   else st.ctx = { type: 'media', id: ctx.item.id, media_type: ctx.item.type, key: ctx.item.key };
   history.pushState(st, '', hashFor(ctx));
 }
@@ -160,7 +159,7 @@ function cardBar() {
 
 function renderLoading() {
   const top = cardStack[cardStack.length - 1];
-  card.classList.toggle('is-person', top?.type === 'person' || top?.type === 'company' || top?.type === 'streaming');
+  card.classList.toggle('is-person', top?.type === 'person' || top?.type === 'company');
   card.innerHTML = '';
   card.append(cardBar());
   const scroll = el('div', 'card-scroll');
@@ -355,14 +354,13 @@ window.addEventListener('popstate', async (e) => {
   if (depth > cardStack.length) {
     const s = e.state;
     if (!s || !s.ctx || depth - cardStack.length > 1) {
-      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id : (s.ctx.type === 'company' ? '#/company/' + s.ctx.id : (s.ctx.type === 'streaming' ? '#/streaming/' + s.ctx.key : '#/' + s.ctx.media_type + '/' + s.ctx.id))) : '';
+      const h = s?.ctx ? (s.ctx.type === 'person' ? '#/person/' + s.ctx.id : (s.ctx.type === 'company' ? '#/company/' + s.ctx.id : '#/' + s.ctx.media_type + '/' + s.ctx.id)) : '';
       location.hash = h;
       location.reload();
       return;
     }
     if (s.ctx.type === 'person') await loadPersonForForward(s.ctx.id);
     else if (s.ctx.type === 'company') await loadCompanyForForward(s.ctx.id);
-    else if (s.ctx.type === 'streaming') await loadStreamingForForward(s.ctx.key, s.ctx.region);
     else if (s.ctx.type === 'media') await loadMediaForForward(s.ctx);
     return;
   }
@@ -378,10 +376,8 @@ window.addEventListener('popstate', async (e) => {
 
 function routeFromHash() {
   const m = location.hash.match(/^#\/(movie|tv|person|company)\/(\d+)$/);
-  const s = location.hash.match(/^#\/streaming\/([a-z0-9_-]+)$/);
-  if (!m && !s) return;
+  if (!m) return;
   history.replaceState({ mc: 0 }, '', location.pathname + location.search);
-  if (s) { openStreaming(s[1]); return; }
   const id = parseInt(m[2]);
   if (m[1] === 'person') openPerson(id);
   else if (m[1] === 'company') openCompany(id);
@@ -397,7 +393,7 @@ function renderCard(restore) {
 
   const prevScroll = card.querySelector('.card-scroll');
   const savedScroll = restore ? (ctx.scroll || 0) : (prevScroll ? prevScroll.scrollTop : 0);
-  card.classList.toggle('is-person', ctx.type === 'person' || ctx.type === 'company' || ctx.type === 'streaming');
+  card.classList.toggle('is-person', ctx.type === 'person' || ctx.type === 'company');
   card.innerHTML = '';
   if (settings.posterBg && ctx.type === 'media') {
     const bgPath = ctx.item?.poster || ctx.details?.poster_path;
@@ -414,7 +410,6 @@ function renderCard(restore) {
   else if (ctx.error) scroll.innerHTML = `<div style="text-align:center; padding:40px; color:var(--danger);">Помилка: ${escapeHtml(ctx.error)}</div>`; /* FIX-CARD-ERR-ESC */
   else if (ctx.type === 'person') renderPersonCard(ctx, scroll);
   else if (ctx.type === 'company') renderCompanyCard(ctx, scroll);
-  else if (ctx.type === 'streaming') renderStreamingCard(ctx, scroll);
   else {
     const _isDesktop = isDesktopLayout();
     if (_isDesktop && typeof renderDesktopCard === 'function') {
@@ -466,8 +461,35 @@ function attachCtxMeta(entry, ctx) {
 function updateCore(r, patch) {
   const cur = lib[r.key] || { ...r, status: null, ratings: null, watchedEpisodes: [] };
   if (!cur.createdAt) cur.createdAt = Date.now();
-  const merged = { ...cur, ...patch, updated: Date.now() };
-  if (patch.status !== undefined && patch.status !== cur.status) merged.statusDate = Date.now();
+  const nowTs = Date.now();
+  const merged = { ...cur, ...patch, updated: nowTs };
+  if (patch.status !== undefined && patch.status !== cur.status) merged.statusDate = nowTs;
+
+  /* [SYNC-FIELD-MERGE] Помічаємо час кожної зміненої кнопкою/корточкою поля.
+     Це дає змогу зливати паралельні правки різних полів без втрат. */
+  const fts = { ...(cur._fieldTs || {}) };
+  for (const f of Object.keys(patch)) {
+    if (f === 'updated' || f === 'statusDate' || f === 'ratingUpdated' || f === 'seasonRatingTs' || f === '_fieldTs') continue;
+    if (JSON.stringify(patch[f]) !== JSON.stringify(cur[f])) fts[f] = nowTs;
+  }
+  if (patch.ratings !== undefined && JSON.stringify(patch.ratings || {}) !== JSON.stringify(cur.ratings || {})) {
+    merged.ratingUpdated = patch.ratingUpdated !== undefined ? patch.ratingUpdated : nowTs;
+    fts.ratings = merged.ratingUpdated;
+  }
+  if (patch.seasonRatings !== undefined && JSON.stringify(patch.seasonRatings || {}) !== JSON.stringify(cur.seasonRatings || {})) {
+    const oldSR = cur.seasonRatings || {}, newSR = merged.seasonRatings || {};
+    const srTs = { ...(cur.seasonRatingTs || {}), ...(patch.seasonRatingTs || {}) };
+    let srDirty = false;
+    for (const s of new Set([...Object.keys(oldSR), ...Object.keys(newSR)])) {
+      if (JSON.stringify(oldSR[s] || {}) !== JSON.stringify(newSR[s] || {})) {
+        srTs[s] = (patch.seasonRatingTs && patch.seasonRatingTs[s]) || nowTs;
+        srDirty = true;
+      }
+    }
+    if (srDirty) { merged.seasonRatingTs = srTs; fts.seasonRatings = nowTs; }
+  }
+  merged._fieldTs = fts;
+
   const ctx = cardStack[cardStack.length - 1];
   attachCtxMeta(merged, ctx);
   lib[r.key] = merged;

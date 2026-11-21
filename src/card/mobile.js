@@ -142,17 +142,16 @@
         _tvBadge = el('div', 'tv-icon-badge', 'TV');
       }
       if (ctx.providerPick) {
-        /* [LAYOUT] Лейба стрімінгу/мережі відкриває картку компанії. */
-        _tvBadge.classList.add('tv-icon-badge-clickable');
-        _tvBadge.title = `${ctx.providerPick.name || 'Стрімінг'} → ${typeof findStreamingServiceByName === 'function' && findStreamingServiceByName(ctx.providerPick.name) ? 'профіль стрімінгу' : 'картка компанії'}`;
-        _tvBadge.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const pick = ctx.providerPick;
-          const svc = typeof findStreamingServiceByName === 'function' ? findStreamingServiceByName(pick.name) : null;
-          if (svc && typeof openStreaming === 'function') { openStreaming(svc.key); return; }
-          const companyId = pick.source === 'studio' ? pick.id : null;
-          if (companyId && typeof openCompany === 'function') openCompany(companyId);
-        });
+        /* Лейба студії відкриває картку компанії. */
+        const companyId = ctx.providerPick.source === 'studio' ? ctx.providerPick.id : null;
+        if (companyId) {
+          _tvBadge.classList.add('tv-icon-badge-clickable');
+          _tvBadge.title = `${ctx.providerPick.name || 'Стрімінг'} → картка компанії`;
+          _tvBadge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof openCompany === 'function') openCompany(companyId);
+          });
+        }
       }
       titleRow.append(_tvBadge);
     }

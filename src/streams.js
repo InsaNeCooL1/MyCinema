@@ -202,6 +202,31 @@
     });
   }
 
+  /* Універсальний контракт для плеєра: будь-який джерело (Енеїда, UASerials,
+     нове — потім) просто віддає flat-список, а оверлей сам будує селектори. */
+  function buildVariants(rawItems) {
+    return Promise.all((rawItems || []).map(function (x) {
+      return fetchQualities(x.url).catch(function () { return []; });
+    })).then(function (allQ) {
+      var out = [];
+      (rawItems || []).forEach(function (x, i) {
+        var qs = allQ[i] && allQ[i].length ? allQ[i] : [{ label: '', url: x.url }];
+        qs.forEach(function (q) {
+          out.push({
+            season: x.season || '',
+            episode: x.episode || '',
+            translation: x.translation || 'За замовчуванням',
+            quality: q.label || 'Найкраща',
+            url: q.url || x.url,
+            subtitle: x.subtitle || '',
+            audioLang: x.audioLang || ''
+          });
+        });
+      });
+      return out;
+    });
+  }
+
   // ─── Search providers ───
   function searchEneyida(query) {
     return px('https://eneyida.tv/', {
@@ -537,6 +562,8 @@
         vid.pause();
       }
       if (v._hls) { try { v._hls.destroy(); } catch (e) {} }
+      if (v._overlay) { try { v._overlay.destroy(); } catch (e) {} }
+      if (v._controls) { try { v._controls.destroy(); } catch (e) {} }
       var onClosed = v._onClosed;
       v.remove();
       if (typeof onClosed === 'function') onClosed(watchedTime);
@@ -629,56 +656,20 @@
     ov._onClosed = meta.onClosed || null;
     ov.style.cssText = 'position:fixed;inset:0;height:100dvh;width:100vw;background:#000;z-index:10000;display:flex;flex-direction:column;overflow:hidden;';
 
-    var bar = document.createElement('div');
-    bar.setAttribute('data-role', 'video-bar');
-    bar.style.cssText = 'padding:calc(8px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 8px calc(14px + env(safe-area-inset-left));background:var(--bg-1);display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;';
-
-    var backBtn = document.createElement('button');
-    backBtn.type = 'button';
-    backBtn.title = 'До списку';
-    backBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
-    backBtn.style.cssText = 'background:var(--bg-2);border:1px solid rgba(255,255,255,0.08);color:var(--text);width:36px;height:36px;border-radius:8px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;';
-    backBtn.addEventListener('click', closeVideoOverlay);
-    bar.appendChild(backBtn);
-
-    var rightBtns = document.createElement('div');
-    rightBtns.style.cssText = 'display:flex;gap:8px;align-items:center;margin-left:auto;';
-
     var epPlugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExternalPlayer;
-    if (epPlugin && typeof epPlugin.open === 'function') {
-      var vlcBtn = document.createElement('button');
-      vlcBtn.type = 'button';
-      vlcBtn.textContent = 'VLC';
-      vlcBtn.title = 'Відкрити у зовнішньому плеєрі (VLC / MX)';
-      vlcBtn.style.cssText = 'background:rgba(var(--accent-rgb),0.15);border:1px solid rgba(var(--accent-rgb),0.4);color:var(--accent);height:36px;padding:0 10px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;';
-      vlcBtn.addEventListener('click', function () {
-        video.pause();
-        epPlugin.open({ url: url, title: meta.title || 'MyCinema' }).catch(function () {
-          if (typeof showSyncToast === 'function') showSyncToast('⚠ Зовнішній плеєр не знайдено');
-        });
+    function openExternal() {
+      if (!epPlugin || typeof epPlugin.open !== 'function') return;
+      video.pause();
+      epPlugin.open({ url: url, title: meta.title || 'MyCinema' }).catch(function () {
+        if (typeof showSyncToast === 'function') showSyncToast('⚠ Зовнішній плеєр не знайдено');
       });
-      rightBtns.appendChild(vlcBtn);
     }
-
-    var fsBtn = document.createElement('button');
-    fsBtn.type = 'button'; fsBtn.title = 'На весь екран';
-    fsBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
-    fsBtn.style.cssText = 'background:var(--bg-2);border:1px solid rgba(255,255,255,0.08);color:var(--text);width:36px;height:36px;border-radius:8px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;';
-    fsBtn.addEventListener('click', function () { toggleElementFullscreen(ov); });
-    rightBtns.appendChild(fsBtn);
-
-    var cb = document.createElement('button');
-    cb.type = 'button'; cb.textContent = '✕';
-    cb.style.cssText = 'background:var(--bg-2);border:1px solid rgba(255,255,255,0.08);color:var(--text);width:36px;height:36px;border-radius:8px;font-size:16px;cursor:pointer;flex-shrink:0;';
-    cb.addEventListener('click', function () { closeModal(false); });
-    rightBtns.appendChild(cb);
-    bar.appendChild(rightBtns);
 
     var videoWrap = document.createElement('div');
     videoWrap.style.cssText = 'flex:1;position:relative;min-height:0;min-width:0;background:#000;overflow:hidden;';
 
     var video = document.createElement('video');
-    video.controls = true; video.autoplay = true; video.playsInline = true;
+    video.controls = false; video.autoplay = true; video.playsInline = true;
     video.setAttribute('playsinline', ''); video.setAttribute('crossorigin', 'anonymous');
     video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain;';
 
@@ -692,13 +683,16 @@
     }
 
     videoWrap.appendChild(video);
-    ov.appendChild(bar); ov.appendChild(videoWrap);
+    ov.appendChild(videoWrap);
     document.body.appendChild(ov);
 
     var resumeAt = getResumePos(meta.resumeKey);
     var resumed = false;
     var lastSaveT = 0;
+    var activeResumeKey = meta.resumeKey || '';
+    var switchingSource = false;
     video.addEventListener('loadedmetadata', function () {
+      switchingSource = false;
       if (!resumed && resumeAt > 15 && (!video.duration || (video.duration - resumeAt) > 20)) {
         resumed = true;
         try { video.currentTime = resumeAt; } catch (e) {}
@@ -706,58 +700,151 @@
       }
     });
     video.addEventListener('timeupdate', function () {
+      if (switchingSource) return;
       var now = Date.now();
-      if (now - lastSaveT > 5000 && meta.resumeKey) {
+      if (now - lastSaveT > 5000 && activeResumeKey) {
         lastSaveT = now;
-        saveResumePos(meta.resumeKey, video.currentTime || 0, video.duration || 0);
+        saveResumePos(activeResumeKey, video.currentTime || 0, video.duration || 0);
       }
     });
     video.addEventListener('pause', function () {
-      if (meta.resumeKey) saveResumePos(meta.resumeKey, video.currentTime || 0, video.duration || 0);
+      if (switchingSource) return;
+      if (activeResumeKey) saveResumePos(activeResumeKey, video.currentTime || 0, video.duration || 0);
     });
     video.addEventListener('webkitbeginfullscreen', function () { setNativeFullscreen(true); });
     video.addEventListener('webkitendfullscreen', function () { setNativeFullscreen(false); });
 
-    var isHls = /\.m3u8(\?|$)/i.test(url);
-    if (isHls) {
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = url;
-        if (meta.audioLang) {
-          video.addEventListener('loadedmetadata', function () {
-            var tracks = video.audioTracks;
-            if (!tracks) return;
-            for (var i = 0; i < tracks.length; i++) {
-              if ((tracks[i].language || '').toLowerCase().indexOf(meta.audioLang) === 0 ||
-                  /укр|ukr/i.test(tracks[i].label || '')) { tracks[i].enabled = true; break; }
-            }
-          });
+    var desiredAudioLang = meta.audioLang || '';
+    var overlay = null;
+    var currentVariant = meta.initial || (meta.variants && meta.variants[0]) || null;
+    var baseTitle = String(meta.title || 'MyCinema').replace(/ · S\d+E\d+$/, '');
+
+    function variantCode(v) {
+      var s = extractNum(v && v.season, 0), e = extractNum(v && v.episode, 0);
+      return (s || e) ? 'S' + (s || 1) + 'E' + String(e || 1).padStart(2, '0') : '';
+    }
+    function variantResumeKey(v) {
+      var base = String(meta.resumeKey || (baseTitle + '|s0|e0')).replace(/\|s\d+\|e\d+$/, '');
+      return base + '|s' + extractNum(v && v.season, 0) + '|e' + extractNum(v && v.episode, 0);
+    }
+    function updateTitle(v) {
+      var code = variantCode(v);
+      var text = baseTitle + (code ? ' · ' + code : '');
+      if (ov._controls) ov._controls.setTitle(text);
+      else ov.querySelector('[data-role="video-title"]')?.setAttribute('data-title', text);
+    }
+
+    function applyNativeAudio() {
+      var tracks = video.audioTracks;
+      if (!tracks || !desiredAudioLang) return;
+      for (var i = 0; i < tracks.length; i++) {
+        var lang = String(tracks[i].language || '').toLowerCase();
+        if (lang.indexOf(desiredAudioLang.toLowerCase()) === 0 || /укр|ukr/i.test(tracks[i].label || '')) {
+          tracks[i].enabled = true; break;
         }
-      } else {
+      }
+    }
+    function bindHlsAudio(Hls, hls) {
+      if (!Hls || !hls || hls._mcAudioBound) return;
+      hls._mcAudioBound = true;
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function (_e, data) {
+        if (!desiredAudioLang) return;
+        var list = (data && data.audioTracks) || [];
+        for (var i = 0; i < list.length; i++) {
+          var t = list[i] || {};
+          var lang = String(t.lang || '').toLowerCase();
+          if (lang.indexOf(desiredAudioLang.toLowerCase()) === 0 || /укр|ukr/i.test(t.name || '')) {
+            try { hls.audioTrack = i; } catch (e) {}
+            break;
+          }
+        }
+      });
+    }
+
+    /* Вибір джерела — для старту й для оверлею один і той самий шлях. */
+    function loadSource(nextUrl, audioLang, keepTime, resumeAt) {
+      desiredAudioLang = audioLang || '';
+      var pos = 0;
+      /* Нова серія починається з її власної позиції (або з 0), а не з поточного часу. */
+      if (resumeAt && resumeAt > 0) pos = resumeAt;
+      else if (keepTime) { try { pos = video.currentTime || 0; } catch (e) {} }
+      var isHls = /\.m3u8(\?|$)/i.test(nextUrl);
+      function afterSeek() {
+        var seek = function () {
+          try { video.currentTime = pos; } catch (e) {}
+          video.removeEventListener('loadedmetadata', seek);
+        };
+        if (pos > 0) video.addEventListener('loadedmetadata', seek);
+        video.play().catch(function () {});
+      }
+      if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = nextUrl;
+        video.addEventListener('loadedmetadata', applyNativeAudio);
+        afterSeek();
+      } else if (isHls) {
         ensureHls().then(function (Hls) {
           if (Hls && Hls.isSupported()) {
-            var hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+            var hls = ov._hls || new Hls({ enableWorker: true, lowLatencyMode: false });
             ov._hls = hls;
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            if (meta.audioLang) {
-              hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function (_e, data) {
-                var list = (data && data.audioTracks) || [];
-                var idx = -1;
-                for (var i = 0; i < list.length; i++) {
-                  var t = list[i] || {};
-                  if ((t.lang && t.lang.toLowerCase().indexOf(meta.audioLang) === 0) ||
-                      /укр|ukr/i.test(t.name || '')) { idx = i; break; }
-                }
-                if (idx >= 0) { try { hls.audioTrack = idx; } catch (e) {} }
-              });
-            }
+            hls.loadSource(nextUrl);
+            if (!hls.media) hls.attachMedia(video);
+            bindHlsAudio(Hls, hls);
           } else {
-            video.src = url;
+            video.src = nextUrl;
           }
-        }).catch(function () { video.src = url; });
+          afterSeek();
+        }).catch(function () { video.src = nextUrl; afterSeek(); });
+      } else {
+        if (ov._hls) { try { ov._hls.destroy(); } catch (e) {} ov._hls = null; }
+        video.src = nextUrl;
+        video.addEventListener('loadedmetadata', applyNativeAudio);
+        afterSeek();
       }
-    } else {
-      video.src = url;
+    }
+
+    loadSource(url, meta.audioLang, false);
+
+    if (window.MCPlayerOverlay && meta.variants && meta.variants.length) {
+      overlay = window.MCPlayerOverlay.mount({
+        host: videoWrap,
+        variants: meta.variants,
+        initial: currentVariant || meta.variants[0],
+        onSwitch: function (v) {
+          var sameEpisode = currentVariant &&
+            String(currentVariant.season || '') === String(v.season || '') &&
+            String(currentVariant.episode || '') === String(v.episode || '');
+          /* Зберігаємо позицію поточної серії, перш ніж перемкнутись. */
+          switchingSource = true;
+          if (activeResumeKey) saveResumePos(activeResumeKey, video.currentTime || 0, video.duration || 0);
+          currentVariant = v;
+          var newKey = variantResumeKey(v);
+          activeResumeKey = newKey;
+          meta.resumeKey = newKey;
+          ov._resumeKey = newKey;
+          updateTitle(v);
+          if (sameEpisode) {
+            loadSource(v.url, v.audioLang, true);
+          } else {
+            var at = getResumePos(newKey);
+            loadSource(v.url, v.audioLang, false, at > 15 ? at : 0);
+          }
+          setTimeout(function () { switchingSource = false; }, 1500);
+        }
+      });
+      ov._overlay = overlay;
+    }
+
+    if (window.MCPlayerControls) {
+      ov._controls = window.MCPlayerControls.mount({
+        host: videoWrap,
+        video: video,
+        title: meta.title || 'MyCinema',
+        onBack: closeVideoOverlay,
+        onMenu: overlay && overlay.hasOptions() ? function () { overlay.toggle(); } : null,
+        onFullscreen: function () { toggleElementFullscreen(ov); },
+        onExternal: epPlugin && typeof epPlugin.open === 'function' ? openExternal : null
+      });
+      updateTitle(currentVariant);
     }
   }
 
@@ -875,7 +962,6 @@
           if (ui.provIdx === i) return;
           ui.provIdx = i;
           ui.matchesOpen = false;
-          ui.season = '';
           saveStreamPref(mediaKey, { provId: p.id });
           renderProvidersBar();
           loadCurrentProvider();
@@ -884,25 +970,22 @@
       });
     }
 
-    function playWithQuality(url, subtitle, epMeta) {
-      var prov = providers[ui.provIdx];
-      saveStreamPref(mediaKey, { provId: prov ? prov.id : '', translation: ui.translation });
-      fetchQualities(url).then(function (vars) {
-        var chosen = null;
-        if (ui.quality && vars.length > 0) {
-          for (var i = 0; i < vars.length; i++) {
-            if (vars[i].label === ui.quality) { chosen = vars[i]; break; }
-          }
-        }
-        if (!chosen && vars.length > 0) chosen = vars[0];
+    /* Усі перемикання (сезон/серія/якість/озвучка) тепер у плеєрі. */
+    function playVariants(rawItems, epMeta) {
+      buildVariants(rawItems).then(function (variants) {
+        if (!variants.length) return;
+        var prov = providers[ui.provIdx];
+        saveStreamPref(mediaKey, { provId: prov ? prov.id : '', translation: ui.translation });
         var sNum = epMeta ? epMeta.sNum : 0;
         var epNum = epMeta ? epMeta.epNum : 0;
         var rKey = (mediaKey || mediaTitle) + '|s' + sNum + '|e' + epNum;
         var labelTitle = mediaTitle + (epMeta && epMeta.code ? ' · ' + epMeta.code : '');
-        openVideo(chosen ? chosen.url : url, subtitle, {
+        openVideo(variants[0].url, variants[0].subtitle, {
           resumeKey: rKey,
           title: labelTitle,
-          audioLang: epMeta && epMeta.audioLang,
+          variants: variants,
+          initial: variants[0],
+          audioLang: variants[0].audioLang,
           onClosed: function (watchedSec) {
             if (epMeta && mediaKey && watchedSec >= 25 && !isEpWatchedInLib(mediaKey, sNum, epNum)) {
               ui.pendingMark = epMeta;
@@ -951,8 +1034,7 @@
           itemBtn.addEventListener('click', function () {
             ui.matchIdxByProv[prov.id] = idx;
             ui.matchesOpen = false;
-            ui.season = '';
-            loadCurrentProvider();
+              loadCurrentProvider();
           });
           listEl.appendChild(itemBtn);
         });
@@ -962,23 +1044,6 @@
     }
 
     function renderPlayerControls(rawItems, prov, activeIdx) {
-      var hasSeasons = rawItems.some(function (x) { return x.season; });
-      var translations = [], seenT = {};
-      rawItems.forEach(function (x) {
-        var t = x.translation || 'За замовчуванням';
-        if (!seenT[t]) { seenT[t] = 1; translations.push(t); }
-      });
-      if (!ui.translation || translations.indexOf(ui.translation) < 0) ui.translation = translations[0] || '';
-
-      var filtered = rawItems.filter(function (x) {
-        return (x.translation || 'За замовчуванням') === ui.translation;
-      });
-      var seasons = [], seenS = {};
-      filtered.forEach(function (x) {
-        if (x.season && !seenS[x.season]) { seenS[x.season] = 1; seasons.push(x.season); }
-      });
-      if (seasons.length && (!ui.season || seasons.indexOf(ui.season) < 0)) ui.season = seasons[0];
-
       body.innerHTML = '';
 
       if (ui.pendingMark && mediaKey) {
@@ -1011,160 +1076,35 @@
 
       body.appendChild(renderMatchSelector(prov, activeIdx));
 
-      // Озвучка
-      if (translations.length > 1) {
-        var tGrp = document.createElement('div');
-        tGrp.className = 'streams-ctrl-group';
-        tGrp.innerHTML = '<div class="streams-ctrl-label">Озвучка</div>';
-        if (translations.length <= 4) {
-          var tRow = document.createElement('div');
-          tRow.className = 'streams-chips-row';
-          translations.forEach(function (t) {
-            var ch = document.createElement('button');
-            ch.type = 'button';
-            ch.className = 'streams-chip' + (t === ui.translation ? ' active' : '');
-            ch.textContent = t;
-            ch.addEventListener('click', function () {
-              ui.translation = t;
-              ui.season = '';
-              saveStreamPref(mediaKey, { provId: prov.id, translation: t });
-              renderPlayerControls(rawItems, prov, activeIdx);
-            });
-            tRow.appendChild(ch);
-          });
-          tGrp.appendChild(tRow);
-        } else {
-          var tSel = document.createElement('select');
-          tSel.className = 'streams-select';
-          translations.forEach(function (t) {
-            var opt = document.createElement('option');
-            opt.value = t; opt.textContent = t;
-            if (t === ui.translation) opt.selected = true;
-            tSel.appendChild(opt);
-          });
-          tSel.addEventListener('change', function () {
-            ui.translation = this.value;
-            ui.season = '';
-            saveStreamPref(mediaKey, { provId: prov.id, translation: this.value });
-            renderPlayerControls(rawItems, prov, activeIdx);
-          });
-          tGrp.appendChild(tSel);
-        }
-        body.appendChild(tGrp);
-      }
+      var iframeItem = rawItems.find(function (x) { return x.iframeUrl; });
+      var playable = rawItems.filter(function (x) { return x.url && !x.iframeUrl; });
 
-      // Сезони
-      if (hasSeasons && seasons.length > 1) {
-        var sGrp = document.createElement('div');
-        sGrp.className = 'streams-ctrl-group';
-        sGrp.innerHTML = '<div class="streams-ctrl-label">Сезон</div>';
-        var sRow = document.createElement('div');
-        sRow.className = 'streams-chips-row';
-        seasons.forEach(function (s) {
-          var ch = document.createElement('button');
-          ch.type = 'button';
-          ch.className = 'streams-chip' + (s === ui.season ? ' active' : '');
-          ch.textContent = s;
-          ch.addEventListener('click', function () {
-            ui.season = s;
-            renderPlayerControls(rawItems, prov, activeIdx);
-          });
-          sRow.appendChild(ch);
-        });
-        sGrp.appendChild(sRow);
-        body.appendChild(sGrp);
-      }
-
-      // Якість (чіпи)
-      var qGrp = document.createElement('div');
-      qGrp.className = 'streams-ctrl-group';
-      qGrp.innerHTML = '<div class="streams-ctrl-label">Якість</div>';
-      var qRow = document.createElement('div');
-      qRow.className = 'streams-chips-row';
-      qRow.innerHTML = '<button type="button" class="streams-chip active">Найкраща</button>';
-      qGrp.appendChild(qRow);
-      body.appendChild(qGrp);
-
-      var viewItems = hasSeasons
-        ? filtered.filter(function (x) { return (x.season || '') === ui.season; })
-        : filtered;
-
-      var sNum = extractNum(ui.season, 1);
-
-      if (viewItems[0] && viewItems[0].iframeUrl) {
-        qGrp.style.display = 'none';
+      if (iframeItem && !playable.length) {
         var ifBtn = document.createElement('button');
         ifBtn.type = 'button';
         ifBtn.className = 'streams-play-btn';
         ifBtn.textContent = '▶ Відкрити плеєр балансера';
-        ifBtn.addEventListener('click', function () { openIframeOverlay(viewItems[0].iframeUrl, mediaTitle); });
+        ifBtn.addEventListener('click', function () { openIframeOverlay(iframeItem.iframeUrl, mediaTitle); });
         body.appendChild(ifBtn);
-      } else if (!viewItems.length) {
+      } else if (!playable.length) {
         var errEl = document.createElement('div');
         errEl.className = 'streams-error';
-        errEl.textContent = 'Немає джерел для обраних параметрів';
+        errEl.textContent = 'Немає прямих джерел для відтворення';
         body.appendChild(errEl);
-      } else if (!hasSeasons || viewItems.length === 1) {
-        var target = viewItems[0];
-        var epMetaSingle = hasSeasons ? { sNum: sNum, epNum: extractNum(target.episode, 1), code: 'S' + sNum + 'E' + String(extractNum(target.episode, 1)).padStart(2, '0'), audioLang: target.audioLang } : { audioLang: target.audioLang };
+      } else {
+        var first = playable[0];
+        var sNum = extractNum(first.season, 1);
+        var epNum = extractNum(first.episode, 1);
+        var epMeta = first.season
+          ? { sNum: sNum, epNum: epNum, code: 'S' + sNum + 'E' + String(epNum).padStart(2, '0'), audioLang: first.audioLang }
+          : { audioLang: first.audioLang };
         var playBtn = document.createElement('button');
         playBtn.type = 'button';
         playBtn.className = 'streams-play-btn';
-        playBtn.textContent = '▶ ' + (hasSeasons && target.episode ? target.episode : 'Дивитись');
-        playBtn.addEventListener('click', function () { playWithQuality(target.url, target.subtitle, epMetaSingle); });
+        playBtn.textContent = '▶ Дивитись' + (playable.length > 1 ? ' (' + playable.length + ')' : '');
+        playBtn.addEventListener('click', function () { playVariants(playable, epMeta); });
         body.appendChild(playBtn);
-      } else {
-        var epList = document.createElement('div');
-        epList.className = 'streams-ep-list';
-        viewItems.forEach(function (ep, idx) {
-          var epNum = extractNum(ep.episode, idx + 1);
-          var watchedMark = isEpWatchedInLib(mediaKey, sNum, epNum);
-          var epMeta = { sNum: sNum, epNum: epNum, code: 'S' + sNum + 'E' + String(epNum).padStart(2, '0'), audioLang: ep.audioLang };
-          var eb = document.createElement('button');
-          eb.type = 'button';
-          eb.className = 'streams-ep-btn';
-          eb.innerHTML = '<span class="streams-ep-title">' +
-            (watchedMark ? '<span class="streams-ep-watched">✓</span>' : '') +
-            esc(ep.episode || ('Серія ' + (idx + 1))) + '</span>' +
-            '<span class="streams-ep-qual" data-qual="' + idx + '"></span>';
-          eb.addEventListener('click', function () { playWithQuality(ep.url, ep.subtitle, epMeta); });
-          epList.appendChild(eb);
-        });
-        body.appendChild(epList);
       }
-
-      var localSeq = reqSeq;
-      Promise.all(viewItems.map(function (ep) {
-        return fetchQualities(ep.url).catch(function () { return []; });
-      })).then(function (allQ) {
-        if (localSeq !== reqSeq || !body.isConnected) return;
-        var qMap = {};
-        allQ.forEach(function (vars, idx) {
-          if (vars.length && hasSeasons && viewItems.length > 1) {
-            var badge = body.querySelector('[data-qual="' + idx + '"]');
-            if (badge) badge.textContent = vars[0].label;
-          }
-          vars.forEach(function (v) {
-            if (v.label && v.label !== 'DIRECT') qMap[v.label] = v.width;
-          });
-        });
-        var labels = Object.keys(qMap).sort(function (a, b) { return qMap[b] - qMap[a]; });
-        if (ui.quality && labels.indexOf(ui.quality) < 0) ui.quality = '';
-        qRow.innerHTML = '';
-        var opts = [''].concat(labels);
-        opts.forEach(function (q) {
-          var ch = document.createElement('button');
-          ch.type = 'button';
-          ch.className = 'streams-chip' + (ui.quality === q ? ' active' : '');
-          ch.textContent = q || 'Найкраща';
-          ch.addEventListener('click', function () {
-            ui.quality = q;
-            qRow.querySelectorAll('.streams-chip').forEach(function (b) { b.classList.remove('active'); });
-            ch.classList.add('active');
-          });
-          qRow.appendChild(ch);
-        });
-      });
     }
 
     function loadCurrentProvider() {

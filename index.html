@@ -35,26 +35,7 @@
 
     <div class="nav-item nav-top-item" data-tab="notes" onclick="setTab('notes')"><span class="nav-icon">📝</span> <span>Нотатки</span></div>
 
-    <div class="nav-item nav-top-item" data-tab="collections" onclick="setTab('collections')"><span class="nav-icon">🎞️</span> <span>Підбірки</span></div>
-
-    <div class="nav-item nav-top-item" data-tab="streamings" onclick="setTab('streamings')"><span class="nav-icon">📺</span> <span>Стріммінги</span></div>
-
-    <div class="nav-group nav-top-item" data-group="tops">
-      <button type="button" class="nav-group-btn" onclick="toggleNavGroup('tops', event)">
-        <span class="nav-icon">🏆</span> <span>Топи</span> <span class="nav-caret">▾</span>
-      </button>
-      <div class="nav-dropdown" id="tops-dropdown"></div>
-    </div>
-
-    <div class="nav-group nav-top-item" data-group="overview">
-      <button type="button" class="nav-group-btn" onclick="toggleNavGroup('overview', event)">
-        <span class="nav-icon">📊</span> <span>Огляд</span> <span class="nav-caret">▾</span>
-      </button>
-      <div class="nav-dropdown">
-        <div class="nav-item" data-tab="top" onclick="setTab('top')"><span class="nav-icon">🏆</span> <span>Мій топ</span></div>
-        <div class="nav-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> <span>Календар</span></div>
-      </div>
-    </div>
+    <div class="nav-item nav-top-item" data-tab="calendar" onclick="setTab('calendar')"><span class="nav-icon">📅</span> <span>Календар</span></div>
 
     <div class="nav-item nav-top-item nav-item-accent" data-tab="statistics" onclick="setTab('statistics')"><span class="nav-icon">📊</span> <span>Обсерваторія</span></div>
 
@@ -254,7 +235,7 @@
       <h2>Додаткові функції</h2>
       <button class="settings-close" onclick="closeSettings()" aria-label="Закрити">✕</button>
     </div>
-    <!-- AI-помічник, проксі та керування клавіатурою додаються скриптами -->
+    <!-- Проксі та керування клавіатурою додаються скриптами -->
   </div>
 </div>
 
@@ -343,6 +324,9 @@ try {
     if (_ob) _ob.style.display = 'block';
     const _ab = document.getElementById('auth-banner');
     if (_ab) _ab.classList.remove('visible');
+    /* Повідомляємо застосунок, що користувач відновлений із кешу —
+       інакше початкової синхронізації не відбувається. */
+    window.dispatchEvent(new CustomEvent('firebase-ready'));
   }
 } catch (e) {}
 window.supabase = supabase;
@@ -479,12 +463,14 @@ window.resetPassword = async () => {
 window.logoutUser = async () => {
   /* FIX-LOGOUT-CLEAR */
   if (!confirm('Вийти з акаунту?\n\nЛокальні дані буде очищено. Усе, що встигло зберегтися в акаунті, відновиться при наступному вході.')) return;
+  /* Спочатку перевіряємо реальний результат запису — saveToCloud сам
+     ловить помилки, тому раніше вихід міг знищити несинхронізовані правки. */
+  let synced = true;
+  try { if (typeof saveToCloud === 'function') synced = await saveToCloud(); } catch (e) { synced = false; }
+  if (!synced && !confirm('Не вдалося синхронізувати дані. Вийти все одно? Несинхронізовані правки буде втрачено.')) return;
   /* LOGOUT_EXPLICIT */
   window._isExplicitLogout = true;
   try { localStorage.removeItem('mycinema.auth.user'); } catch (e) {}
-  window._isExplicitLogout = true;
-  try { localStorage.removeItem('mycinema.auth.user'); } catch (e) {}
-  try { if (typeof saveToCloud === 'function') await saveToCloud(); } catch (e) {}
   try {
     var _keys = (window.MC_LOCAL_KEYS || ['mycinema.library','mycinema.deleted','onboardingDone']);
     _keys.forEach(function(k) { try { localStorage.removeItem(k); } catch (e) {} });

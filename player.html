@@ -19,42 +19,33 @@
   html, body { margin:0; height:100%; background:var(--bg-0); color:var(--text); font-family:var(--sans); }
   button { font-family:inherit; cursor:pointer; }
 
-  #bar {
-    display:flex; align-items:center; gap:12px; padding:10px 14px;
-    background:var(--bg-1); border-bottom:1px solid rgba(255,255,255,.07);
+  #audio-wrap {
+    position:absolute; z-index:26; top:58px; right:14px;
+    display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);
+    background:rgba(8,7,10,.6); padding:5px 8px; border-radius:var(--r-sm);
   }
-  #bar strong {
-    flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    font-family:var(--serif); font-style:italic; font-size:18px; color:var(--accent);
-  }
-  .btn {
-    background:var(--bg-2); color:var(--text); border:1px solid rgba(255,255,255,.12);
-    border-radius:var(--r-sm); padding:8px 12px; font-size:13px;
-  }
-  .btn:hover { border-color:var(--accent); color:var(--accent); }
-  #audio-wrap { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); }
   #audio-wrap[hidden] { display:none; }
   #audio-sel {
     background:var(--bg-2); color:var(--text); border:1px solid rgba(255,255,255,.14);
-    border-radius:var(--r-sm); padding:7px 9px; font:12px var(--sans); max-width:190px;
+    border-radius:var(--r-sm); padding:6px 8px; font:12px var(--sans); max-width:190px;
   }
   #audio-sel:hover { border-color:var(--accent); }
 
-  #hud { display:flex; gap:6px; flex-wrap:wrap; font:11px/1 var(--mono); color:var(--accent); }
+  #hud { position:absolute; z-index:26; left:14px; bottom:78px; display:flex; gap:6px; flex-wrap:wrap; max-width:70%; font:11px/1 var(--mono); color:var(--accent); }
   #hud[hidden] { display:none; }
   #hud span {
-    background:var(--bg-2); border:1px solid rgba(var(--accent-rgb),.22);
+    background:rgba(8,7,10,.75); border:1px solid rgba(var(--accent-rgb),.22);
     padding:5px 7px; border-radius:var(--r-sm); white-space:nowrap;
   }
-  #preload { height:2px; background:var(--bg-2); }
+  #preload { position:absolute; z-index:27; top:0; left:0; right:0; height:2px; background:transparent; }
   #preload i { display:block; height:100%; width:0; background:var(--accent); transition:width .5s; }
 
-  #stage { position:absolute; top:60px; left:0; right:0; bottom:0; background:#000; }
+  #stage { position:absolute; inset:0; background:#000; overflow:hidden; }
   video { width:100%; height:100%; object-fit:contain; background:#000; }
 
   /* Preloader у стилі MyCinema */
   #loader {
-    position:absolute; inset:60px 0 0; z-index:5;
+    position:absolute; inset:0; z-index:5;
     display:flex; align-items:center; justify-content:center;
     background:radial-gradient(circle at 50% 35%, rgba(var(--accent-rgb),.10), transparent 55%), var(--bg-0);
     transition:opacity .45s ease;
@@ -87,19 +78,14 @@
 </style>
 </head>
 <body>
-<div id="bar">
-  <strong id="title">MyCinema</strong>
+<div id="stage">
+  <div id="preload"><i></i></div>
+  <video id="video" autoplay playsinline crossorigin="anonymous"></video>
   <div id="audio-wrap" hidden>
     <span>Озвучка:</span>
     <select id="audio-sel" aria-label="Вибір озвучки"></select>
   </div>
   <div id="hud" hidden></div>
-  <button id="fs" class="btn" type="button">⛶ На весь екран</button>
-  <button id="close" class="btn" type="button">✕</button>
-</div>
-<div id="preload"><i></i></div>
-<div id="stage">
-  <video id="video" controls autoplay playsinline crossorigin="anonymous"></video>
   <div id="loader">
     <div class="loader-card">
       <div class="loader-logo">MyCinema <small>· плеєр</small></div>
@@ -109,14 +95,30 @@
     </div>
   </div>
 </div>
+<script src="src/player-overlay.js"></script>
+<script src="src/player-controls.js"></script>
 <script>
 (function () {
   'use strict';
   var params = new URLSearchParams(location.search);
   var src = params.get('src') || '';
   var title = params.get('title') || 'MyCinema';
-  document.getElementById('title').textContent = title;
+  var variants = [];
+  try { variants = JSON.parse(params.get('playlist') || '[]') || []; } catch (e) {}
+  if (!variants.length && src) {
+    variants = [{ url: src, season: '', episode: '', translation: '', quality: '' }];
+  }
+  if (!src && variants[0]) src = variants[0].url;
+  var desiredAudioLang = '';
+  var controls = null;
+  var stage = document.getElementById('stage');
   var video = document.getElementById('video');
+  function setTitle(v) {
+    var suffix = [v && v.season, v && v.episode].filter(Boolean).join(' · ');
+    var text = title + (suffix ? ' · ' + suffix : '');
+    if (controls) controls.setTitle(text);
+    else document.title = text;
+  }
   var hud = document.getElementById('hud');
   var preloadBar = document.querySelector('#preload i');
   var loader = document.getElementById('loader');
@@ -127,11 +129,10 @@
   var loaderHidden = false;
   var hlsInstance = null, statsStarted = false, pendingSeek = 0;
 
-  document.getElementById('close').onclick = function () { window.close(); };
-  document.getElementById('fs').onclick = function () {
+  function toggleFullscreen() {
     if (document.fullscreenElement) document.exitFullscreen();
-    else if (document.getElementById('stage').requestFullscreen) document.getElementById('stage').requestFullscreen();
-  };
+    else if (stage.requestFullscreen) stage.requestFullscreen();
+  }
 
   function hideLoader() {
     if (loaderHidden) return;
@@ -216,15 +217,68 @@
     if (!info) return;
     var next = new URL(info.u.href);
     next.searchParams.set('audio', String(idx));
-    pendingSeek = video.currentTime || 0;
-    src = next.href;
-    if (hlsInstance) {
-      hlsInstance.loadSource(src);
-    } else {
-      video.src = src;
-      video.load();
-    }
+    loadUrl(next.href, true);
+  }
+
+  /* Єдина точка зміни джерела: і для оверлею, і для вибору аудіодоріжки. */
+  function loadUrl(url, keepTime) {
+    try { pendingSeek = keepTime ? (video.currentTime || 0) : 0; } catch (e) { pendingSeek = 0; }
+    src = url;
+    if (hlsInstance) hlsInstance.loadSource(src);
+    else { video.src = src; video.load(); }
     video.play().catch(function () {});
+  }
+
+  function loadVariant(v, keepTime) {
+    if (!v || !v.url) return;
+    desiredAudioLang = v.audioLang || '';
+    setTitle(v);
+    loadUrl(v.url, keepTime);
+  }
+
+  function applyHlsAudio() {
+    if (!hlsInstance || !desiredAudioLang) return;
+    var list = hlsInstance.audioTracks || [];
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i] || {};
+      var lang = String(t.lang || '').toLowerCase();
+      if (lang.indexOf(desiredAudioLang.toLowerCase()) === 0 || /укр|ukr/i.test(t.name || '')) {
+        try { hlsInstance.audioTrack = i; } catch (e) {}
+        return;
+      }
+    }
+  }
+
+  var overlay = null;
+  var currentVariant = variants[0] || null;
+  function mountUI() {
+    if (controls) return;
+    if (window.MCPlayerOverlay && variants.length) {
+      overlay = window.MCPlayerOverlay.mount({
+        host: stage,
+        variants: variants,
+        initial: currentVariant,
+        onSwitch: function (v) {
+          var sameEpisode = currentVariant &&
+            String(currentVariant.season || '') === String(v.season || '') &&
+            String(currentVariant.episode || '') === String(v.episode || '');
+          currentVariant = v;
+          /* Нова серія — з початку; якість/озвучка тієї самої серії — без перемотки. */
+          loadVariant(v, sameEpisode);
+        }
+      });
+    }
+    if (window.MCPlayerControls) {
+      controls = window.MCPlayerControls.mount({
+        host: stage,
+        video: video,
+        title: title,
+        onMenu: overlay && overlay.hasOptions() ? function () { overlay.toggle(); } : null,
+        onFullscreen: toggleFullscreen,
+        onBack: function () { window.close(); }
+      });
+    }
+    setTitle(variants[0]);
   }
 
   function initStats() {
@@ -284,16 +338,22 @@
       hls.attachMedia(video);
       hlsInstance = hls;
       initAudioTracks();
+      if (variants[0]) { desiredAudioLang = variants[0].audioLang || ''; setTitle(variants[0]); }
+      mountUI();
       hls.on(Hls.Events.ERROR, function (_e, data) {
         if (data && data.fatal) showLoaderError('Помилка потоку: '+(data.details||'unknown'));
       });
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, applyHlsAudio);
       hls.on(Hls.Events.MANIFEST_PARSED, function () {
         if (pendingSeek > 0) { try { video.currentTime = pendingSeek; } catch (e) {} pendingSeek = 0; }
+        applyHlsAudio();
         video.play().catch(function () {});
         initStats();
       });
     } else {
       video.src = src;
+      if (variants[0]) { desiredAudioLang = variants[0].audioLang || ''; setTitle(variants[0]); }
+      mountUI();
       video.addEventListener('loadedmetadata', function () {
         if (pendingSeek > 0) { try { video.currentTime = pendingSeek; } catch (e) {} pendingSeek = 0; }
         video.play().catch(function(){}); initAudioTracks(); initStats();

@@ -200,15 +200,15 @@ function importLibrary() {
       if (skippedN > 0 && !confirm('У файлі ' + skippedN + ' невалідних записів буде пропущено. Продовжити?')) return;
       data = cleanData;
       const count = Object.keys(data).length;
-      if (!confirm('Імпортувати ' + count + ' тайтлів? Поточні буде замінено.')) return;
+      if (!confirm('Імпортувати ' + count + ' тайтлів? Дані з файлу буде об\'єднано з поточними (нічого не видаляємо).')) return;
       const nowTs = Date.now();
-      for (const k of Object.keys(lib)) if (!(k in data)) libTombstones[k] = nowTs;
-      for (const k of Object.keys(data)) {
-        delete libTombstones[k];
-        if (data[k] && typeof data[k] === 'object' && !data[k].updated) data[k].updated = nowTs; /* FIX-IMPORT-UPDATED */
-      }
-      lib = data;
-      for (const k of Object.keys(data)) _dirtyItems.add(k); /* SYNC-FIX-IMPORT */
+      for (const k of Object.keys(data)) if (!data[k].updated) data[k].updated = nowTs; /* FIX-IMPORT-UPDATED */
+      /* [SYNC-IMPORT-MERGE] Раніше імпорт tombstone'ив усе, чого немає у файлі —
+         це видаляло з хмари правки з інших пристроїв. Тепер тільки об'єднуємо. */
+      const mergedImport = mergeLibraries(lib, {}, data, {});
+      lib = mergedImport.items;
+      libTombstones = mergedImport.deleted;
+      for (const k of Object.keys(lib)) _dirtyItems.add(k); /* SYNC-FIX-IMPORT */
       if (typeof logActivity === 'function') logActivity({ cat: 'import', sub: 'import', icon: '📥', text: `Імпортовано тайтлів: ${count}`, title: 'Бібліотека' });
       await saveNow();
       refresh();
@@ -303,7 +303,9 @@ async function submitOnboarding() {
       ...(isTv
         ? { seasonRatings: prev.seasonRatings || { 1: { overall: 8 } }, totalSeasons: prev.totalSeasons || 1 }
         : { ratings: prev.ratings || { overall: 8 } }),
-      updated: Date.now(),
+      /* Не піднімаємо `updated` для вже наявних тайтлів — інакше онбординг
+         перезаписує оцінки/нотатки, зроблені на іншому пристрої. */
+      updated: prev.updated || Date.now(),
       createdAt: prev.createdAt || Date.now()
     };
     _dirtyItems.add(it.key); /* SYNC-FIX-ONB */
