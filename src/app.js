@@ -29,6 +29,23 @@ function _flushPendingSetTab() {
   return true;
 }
 
+/* [FIX-TOPMENU-CLOSE-CARD] Будь-яка кнопка верхнього меню закриває відкриту картку. */
+function closeCardForTopMenu() {
+  if (!cardStack.length) return;
+  /* setTab уже ініціював закриття через history.go — не подвоюємо його. */
+  if (_pendingSetTab || _cardClosingForNav) return;
+  _cardClosingForNav = true; /* скинеться в _flushPendingSetTab() на popstate */
+  closeCard();
+}
+
+/* capture + мікрозадача: кнопки груп і пошуку викликають stopPropagation(),
+   а inline-обробники setTab мають виконатись першими. */
+document.addEventListener('click', (e) => {
+  const target = e.target instanceof Element ? e.target : null;
+  if (!target || !target.closest('#sidebar button, #sidebar .sidebar-logo, #sidebar .nav-item, header button')) return;
+  queueMicrotask(closeCardForTopMenu);
+}, true);
+
 function setTab(t, opts) {
   if (cardStack.length) {
     _pendingSetTab = { t, opts };

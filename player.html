@@ -32,6 +32,13 @@
     border-radius:var(--r-sm); padding:8px 12px; font-size:13px;
   }
   .btn:hover { border-color:var(--accent); color:var(--accent); }
+  #audio-wrap { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); }
+  #audio-wrap[hidden] { display:none; }
+  #audio-sel {
+    background:var(--bg-2); color:var(--text); border:1px solid rgba(255,255,255,.14);
+    border-radius:var(--r-sm); padding:7px 9px; font:12px var(--sans); max-width:190px;
+  }
+  #audio-sel:hover { border-color:var(--accent); }
 
   #hud { display:flex; gap:6px; flex-wrap:wrap; font:11px/1 var(--mono); color:var(--accent); }
   #hud[hidden] { display:none; }
@@ -82,6 +89,10 @@
 <body>
 <div id="bar">
   <strong id="title">MyCinema</strong>
+  <div id="audio-wrap" hidden>
+    <span>Озвучка:</span>
+    <select id="audio-sel" aria-label="Вибір озвучки"></select>
+  </div>
   <div id="hud" hidden></div>
   <button id="fs" class="btn" type="button">⛶ На весь екран</button>
   <button id="close" class="btn" type="button">✕</button>
@@ -114,6 +125,7 @@
   var loaderBar = document.getElementById('loader-bar');
   var hideTimer = null;
   var loaderHidden = false;
+  var hlsInstance = null, statsStarted = false, pendingSeek = 0;
 
   document.getElementById('close').onclick = function () { window.close(); };
   document.getElementById('fs').onclick = function () {
@@ -155,7 +167,69 @@
   }
   function badge(text) { var s=document.createElement('span'); s.textContent=text; return s; }
 
+  /* Вибір озвучки: TorrServer віддає список доріжок через /gst/<hash>/probe */
+  function sourceInfo() {
+    try {
+      var u = new URL(src, location.href);
+      var m = u.pathname.match(/\/gst\/([^/]+)\//);
+      return { u: u, hash: m ? m[1] : (u.searchParams.get('link') || ''),
+        index: u.searchParams.get('index') || '1' };
+    } catch (e) { return null; }
+  }
+
+  function initAudioTracks() {
+    var info = sourceInfo();
+    if (!info || !info.hash) return;
+    var endpoint = info.u.origin + '/gst/' + encodeURIComponent(info.hash) +
+      '/probe?index=' + encodeURIComponent(info.index);
+    fetch(endpoint, { cache:'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !Array.isArray(d.Tracks)) return;
+        var wrap = document.getElementById('audio-wrap');
+        var sel = document.getElementById('audio-sel');
+        var found = false, ukIdx = -1;
+        sel.replaceChildren();
+        d.Tracks.forEach(function (t, i) {
+          var isAudio = t.Type === 'audio' || /^audio\//.test(t.CapsName || '');
+          if (!isAudio) return;
+          var label = t.Title || t.Language || ('Доріжка ' + i);
+          var opt = document.createElement('option');
+          opt.value = String(i);
+          opt.textContent = label;
+          sel.append(opt);
+          found = true;
+          if (/^(uk|ua)/i.test(t.Language || '') || /укр|ukr/i.test(label)) {
+            if (ukIdx < 0) ukIdx = i;
+          }
+        });
+        if (!found) return;
+        sel.value = String(ukIdx >= 0 ? ukIdx : Number(info.u.searchParams.get('audio') || 0));
+        wrap.hidden = false;
+        sel.onchange = function () { switchAudio(Number(sel.value)); };
+      })
+      .catch(function () {});
+  }
+
+  function switchAudio(idx) {
+    var info = sourceInfo();
+    if (!info) return;
+    var next = new URL(info.u.href);
+    next.searchParams.set('audio', String(idx));
+    pendingSeek = video.currentTime || 0;
+    src = next.href;
+    if (hlsInstance) {
+      hlsInstance.loadSource(src);
+    } else {
+      video.src = src;
+      video.load();
+    }
+    video.play().catch(function () {});
+  }
+
   function initStats() {
+    if (statsStarted) return;
+    statsStarted = true;
     var u;
     try { u = new URL(src, location.href); } catch(e) { return; }
     var m = u.pathname.match(/\/gst\/([^/]+)\//);
@@ -208,16 +282,22 @@
       var hls = new Hls({ enableWorker:true });
       hls.loadSource(src);
       hls.attachMedia(video);
+      hlsInstance = hls;
+      initAudioTracks();
       hls.on(Hls.Events.ERROR, function (_e, data) {
         if (data && data.fatal) showLoaderError('Помилка потоку: '+(data.details||'unknown'));
       });
       hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        if (pendingSeek > 0) { try { video.currentTime = pendingSeek; } catch (e) {} pendingSeek = 0; }
         video.play().catch(function () {});
         initStats();
       });
     } else {
       video.src = src;
-      video.addEventListener('loadedmetadata', function () { video.play().catch(function(){}); initStats(); });
+      video.addEventListener('loadedmetadata', function () {
+        if (pendingSeek > 0) { try { video.currentTime = pendingSeek; } catch (e) {} pendingSeek = 0; }
+        video.play().catch(function(){}); initAudioTracks(); initStats();
+      });
     }
   }
 
